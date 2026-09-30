@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.env.local
+.env
+.env.*
+!.env.example
+coverage/
+*.tsbuildinfo
+dark-theme-preview.jpg
+service-form-updated.jpg
