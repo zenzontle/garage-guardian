@@ -1,6 +1,6 @@
 'use client';
 
-import { del, get, set } from 'idb-keyval';
+import { del, get, set, update } from 'idb-keyval';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { EMPTY_SNAPSHOT, type Car, type Photo, type ScheduleItem, type Snapshot, type Visit } from './model';
 
@@ -20,14 +20,12 @@ export type Repository = {
 const SNAPSHOT_KEY = 'garage-guardian:local:v1';
 const clone = <T>(value: T): T => structuredClone(value);
 
-class LocalRepository implements Repository {
+export class LocalRepository implements Repository {
   async load(): Promise<Snapshot> {
     return clone((await get<Snapshot>(SNAPSHOT_KEY)) ?? EMPTY_SNAPSHOT);
   }
   private async write(update: (snapshot: Snapshot) => void) {
-    const snapshot = await this.load();
-    update(snapshot);
-    await set(SNAPSHOT_KEY, snapshot);
+    await mutateLocalSnapshot(update);
   }
   saveCar(car: Car) {
     return this.write((snapshot) => {
@@ -77,13 +75,54 @@ class LocalRepository implements Repository {
     return { id, path, name: file.name, contentType: file.type };
   }
   async photoUrl(photo: Photo): Promise<string> {
-    const file = await get<Blob>(`photo:${photo.path}`);
-    if (!file) throw new Error('Photo is no longer available.');
+    const file = await this.readPhoto(photo);
     return URL.createObjectURL(file);
+  }
+  async readPhoto(photo: Photo): Promise<Blob> {
+    const file = await get<Blob>(`photo:${photo.path}`);
+    if (!file) throw new Error(`Photo ${photo.name} is no longer available. Your local records have been kept.`);
+    return file;
+  }
+  async clearTransferred(transferred: Snapshot) {
+    // Preserve anything edited in another tab or after signing out during a transfer.
+    await this.write((current) => {
+      const changed = <T extends { id: string }>(item: T, originals: T[]) => !originals.some((original) => original.id === item.id && sameRecord(item, original));
+      current.visits = current.visits.filter((item) => changed(item, transferred.visits));
+      const neededSchedules = new Set(current.visits.flatMap((visit) => visit.items.map((item) => item.scheduleItemId)));
+      current.schedules = current.schedules.filter((item) => changed(item, transferred.schedules) || neededSchedules.has(item.id));
+      const neededCars = new Set([...current.schedules, ...current.visits].map((item) => item.carId));
+      current.cars = current.cars.filter((item) => changed(item, transferred.cars) || neededCars.has(item.id));
+    });
+    const current = await this.load();
+    const retainedPaths = new Set(current.visits.flatMap((visit) => visit.photos.map((photo) => photo.path)));
+    for (const visit of transferred.visits) {
+      for (const photo of visit.photos) if (!retainedPaths.has(photo.path)) await this.removePhoto(photo);
+    }
   }
   async removePhoto(photo: Photo) {
     await del(`photo:${photo.path}`);
   }
+}
+
+async function mutateLocalSnapshot(mutate: (snapshot: Snapshot) => void) {
+  await update<Snapshot>(SNAPSHOT_KEY, (saved) => {
+    const snapshot = clone(saved ?? EMPTY_SNAPSHOT);
+    mutate(snapshot);
+    return snapshot;
+  });
+}
+
+export function sameRecord(left: unknown, right: unknown): boolean {
+  const canonical = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(canonical);
+    if (value && typeof value === 'object') return Object.fromEntries(
+      Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => [
+        key, key === 'createdAt' && typeof entry === 'string' ? new Date(entry).toISOString() : canonical(entry),
+      ]),
+    );
+    return value;
+  };
+  return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
 }
 
 function upsert<T extends { id: string }>(items: T[], item: T): T[] {
@@ -130,7 +169,7 @@ const visitToRow = (visit: Visit, userId: string) => ({
   created_at: visit.createdAt,
 });
 
-class SupabaseRepository implements Repository {
+export class SupabaseRepository implements Repository {
   constructor(
     private client: SupabaseClient,
     private userId: string,
@@ -138,9 +177,9 @@ class SupabaseRepository implements Repository {
 
   async load(): Promise<Snapshot> {
     const [cars, schedules, visits] = await Promise.all([
-      this.client.from('cars').select('*').order('created_at'),
-      this.client.from('schedule_items').select('*').order('created_at'),
-      this.client.from('visits').select('*').order('service_date', { ascending: false }),
+      this.client.from('cars').select('*').eq('user_id', this.userId).order('created_at'),
+      this.client.from('schedule_items').select('*').eq('user_id', this.userId).order('created_at'),
+      this.client.from('visits').select('*').eq('user_id', this.userId).order('service_date', { ascending: false }),
     ]);
     for (const result of [cars, schedules, visits]) if (result.error) throw result.error;
     return {
@@ -188,9 +227,9 @@ class SupabaseRepository implements Repository {
     if (error) throw error;
   }
   async deleteCar(id: string) {
-    const { data: visits, error: lookupError } = await this.client.from('visits').select('photos').eq('car_id', id);
+    const { data: visits, error: lookupError } = await this.client.from('visits').select('photos').eq('user_id', this.userId).eq('car_id', id);
     if (lookupError) throw lookupError;
-    const { error } = await this.client.from('cars').delete().eq('id', id);
+    const { error } = await this.client.from('cars').delete().eq('user_id', this.userId).eq('id', id);
     if (error) throw error;
     const paths = (visits ?? []).flatMap((visit) => (visit.photos as Photo[]).map((photo) => photo.path));
     if (paths.length) await this.client.storage.from('visit-photos').remove(paths);
@@ -200,13 +239,14 @@ class SupabaseRepository implements Repository {
     if (error) throw error;
   }
   async deleteSchedule(id: string) {
-    const { error } = await this.client.from('schedule_items').delete().eq('id', id);
+    const { error } = await this.client.from('schedule_items').delete().eq('user_id', this.userId).eq('id', id);
     if (error) throw error;
   }
   async saveVisit(visit: Visit) {
     const { data: previous, error: lookupError } = await this.client
       .from('visits')
       .select('photos')
+      .eq('user_id', this.userId)
       .eq('id', visit.id)
       .maybeSingle();
     if (lookupError) throw lookupError;
@@ -217,7 +257,7 @@ class SupabaseRepository implements Repository {
     }
   }
   async deleteVisit(visit: Visit) {
-    const { error } = await this.client.from('visits').delete().eq('id', visit.id);
+    const { error } = await this.client.from('visits').delete().eq('user_id', this.userId).eq('id', visit.id);
     if (error) throw error;
     if (visit.photos.length)
       await this.client.storage.from('visit-photos').remove(visit.photos.map((photo) => photo.path));
@@ -250,8 +290,7 @@ export const supabase = isCloudConfigured
   : null;
 
 export function createRepository(userId?: string): Repository {
-  if (supabase) {
-    if (!userId) throw new Error('Sign in to access your records.');
+  if (supabase && userId) {
     return new SupabaseRepository(supabase, userId);
   }
   return new LocalRepository();

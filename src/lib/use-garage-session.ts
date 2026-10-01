@@ -1,0 +1,169 @@
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
+import { EMPTY_SNAPSHOT, type Snapshot } from './model';
+import { createRepository, supabase, type Repository } from './repository';
+import { pendingTransfer, registerSignup, transferSignupData } from './signup-transfer';
+
+export function errorMessage(cause: unknown): string {
+  if (cause && typeof cause === 'object' && 'message' in cause && typeof cause.message === 'string') return cause.message;
+  return 'Something went wrong. Please try again.';
+}
+
+export function useGarageSession() {
+  const [repository, setRepository] = useState<Repository | null>(null);
+  const [snapshot, setSnapshot] = useState<Snapshot>(EMPTY_SNAPSHOT);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [transferring, setTransferring] = useState(false);
+  const [error, setError] = useState('');
+  const generation = useRef(0);
+  const operations = useRef(new Set<Promise<unknown>>());
+  const signupWork = useRef<Promise<unknown> | null>(null);
+  const transition = useRef<(user: User | null, force?: boolean) => void>(() => {});
+  const currentUser = useRef<User | null>(null);
+  const retry = useRef<() => void>(() => {});
+  const mutationBusy = useRef(false);
+  const project = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+
+  useEffect(() => {
+    let active = true;
+    let identity: string | null | undefined;
+    const receive = (nextUser: User | null, force = false) => {
+      const nextIdentity = nextUser?.id ?? null;
+      if (!active || (!force && identity === nextIdentity)) return;
+      identity = nextIdentity;
+      currentUser.current = nextUser;
+      const version = ++generation.current;
+      const assertActive = () => {
+        if (!active || generation.current !== version) throw new Error('Your session changed. Please try again.');
+      };
+      setUser(nextUser);
+      setRepository(null);
+      setSnapshot(EMPTY_SNAPSHOT);
+      setError('');
+      setLoading(true);
+      setTransferring(false);
+
+      // The auth callback only schedules work; Supabase calls happen after it returns.
+      setTimeout(() => {
+        void (async () => {
+          try {
+            await signupWork.current;
+            await Promise.allSettled([...operations.current]);
+            assertActive();
+            if (supabase && nextUser) {
+              const pending = await pendingTransfer(project);
+              assertActive();
+              setTransferring(pending?.userId === nextUser.id);
+              await transferSignupData(supabase, project, nextUser.id, assertActive);
+            }
+            assertActive();
+            const backend = createRepository(nextUser?.id);
+            const data = await backend.load();
+            assertActive();
+            const guarded = new Proxy(backend, {
+              get(target, property: keyof Repository) {
+                return (...args: unknown[]) => {
+                  const work = (async () => {
+                    assertActive();
+                    const method = target[property] as (...args: unknown[]) => Promise<unknown>;
+                    const result = await method.apply(target, args);
+                    assertActive();
+                    return result;
+                  })();
+                  operations.current.add(work);
+                  void work.finally(() => operations.current.delete(work)).catch(() => {});
+                  return work;
+                };
+              },
+            });
+            setSnapshot(data);
+            setRepository(guarded);
+            setTransferring(false);
+          } catch (cause) {
+            if (active && generation.current === version) setError(errorMessage(cause));
+          } finally {
+            if (active && generation.current === version) setLoading(false);
+          }
+        })();
+      }, 0);
+    };
+    transition.current = receive;
+    retry.current = () => receive(currentUser.current, true);
+    if (!supabase) receive(null);
+    else {
+      const client = supabase;
+      const { data: listener } = client.auth.onAuthStateChange((_event, session) => receive(session?.user ?? null));
+      const initialize = async () => {
+        try {
+          const { data, error } = await client.auth.getSession();
+          if (!active || identity !== undefined) return;
+          if (error) throw error;
+          receive(data.session?.user ?? null);
+        } catch (cause) {
+          if (active && identity === undefined) { setError(errorMessage(cause)); setLoading(false); }
+        }
+      };
+      retry.current = () => { if (identity === undefined) void initialize(); else receive(currentUser.current, true); };
+      void initialize();
+      return () => { active = false; ++generation.current; listener.subscription.unsubscribe(); };
+    }
+    return () => { active = false; ++generation.current; };
+  }, [project]);
+
+  const run = useCallback(async (action: () => Promise<void>) => {
+    if (!repository || mutationBusy.current) throw new Error('Please wait for the current operation to finish.');
+    mutationBusy.current = true;
+    const version = generation.current;
+    setError('');
+    const work = (async () => {
+      try {
+        await action();
+        const data = await repository.load();
+        if (generation.current === version) setSnapshot(data);
+      } catch (cause) {
+        if (generation.current === version) setError(errorMessage(cause));
+        throw cause;
+      } finally { mutationBusy.current = false; }
+    })();
+    operations.current.add(work);
+    try { await work; }
+    finally { operations.current.delete(work); }
+  }, [repository]);
+
+  async function signUp(email: string, password: string): Promise<boolean> {
+    if (!supabase) throw new Error('Cloud accounts are not configured.');
+    if (signupWork.current) throw new Error('Account creation is already in progress.');
+    const client = supabase;
+    const work = (async () => {
+      const pending = await pendingTransfer(project);
+      if (pending) throw new Error('Sign in to finish the previous account transfer before creating another account.');
+      const { data, error } = await client.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+      if (error) throw error;
+      if (data.user) await registerSignup(project, data.user, Boolean(data.session));
+      if (data.session) transition.current(data.session.user, true);
+      return !data.session;
+    })();
+    signupWork.current = work;
+    try { return await work; }
+    finally { signupWork.current = null; }
+  }
+
+  async function signIn(email: string, password: string) {
+    if (!supabase) throw new Error('Cloud accounts are not configured.');
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    transition.current(data.user);
+  }
+
+  async function signOut() {
+    if (!supabase) return;
+    const { error } = await supabase.auth.signOut();
+    if (error) setError(errorMessage(error));
+    else transition.current(null);
+  }
+
+  return { repository, snapshot, user, loading, transferring, error, setError, run, signUp, signIn, signOut, retry: () => retry.current() };
+}

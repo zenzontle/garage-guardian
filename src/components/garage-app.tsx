@@ -1,14 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   ArrowDownToLine, ArrowRight, CalendarDays, CarFront, Check, ChevronDown, CircleAlert,
   ClipboardList, DollarSign, Gauge, LayoutDashboard, LogOut, Menu, Plus, Search,
   Settings2, Trash2, Wrench, X,
 } from "lucide-react";
 import { getAllDue, dueDescription, latestOdometer, type DueItem } from "@/lib/due";
-import { createRepository, isCloudConfigured, supabase, type Repository } from "@/lib/repository";
-import { displayDate, formatMiles, makeStarterSchedules, money, newId, type Car, type ScheduleItem, type Snapshot, type Visit, type VisitItem, type Photo } from "@/lib/model";
+import { isCloudConfigured, type Repository } from "@/lib/repository";
+import { useGarageSession, errorMessage } from "@/lib/use-garage-session";
+import { displayDate, formatMiles, makeStarterSchedules, money, newId, type Car, type ScheduleItem, type Visit, type VisitItem, type Photo } from "@/lib/model";
 import { reportTotals, visitsToCsv } from "@/lib/reports";
 import { MoneyInput } from "./money-input";
 import { GarageLogo } from "./garage-logo";
@@ -28,63 +29,41 @@ const todayISO = () => {
 };
 
 export function GarageApp() {
-  const [repository, setRepository] = useState<Repository | null>(null);
-  const [snapshot, setSnapshot] = useState<Snapshot>({ cars: [], schedules: [], visits: [] });
+  const garage = useGarageSession();
+  const { repository, snapshot, user, loading, transferring, error, setError } = garage;
   const [page, setPage] = useState<Page>("dashboard");
   const [modal, setModal] = useState<ModalState>(null);
   const [selectedCarId, setSelectedCarId] = useState<string>("");
-  const [userEmail, setUserEmail] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [authView, setAuthView] = useState<"signin" | "signup" | null>(null);
+  const [notice, setNotice] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    let active = true;
-    if (!supabase) {
-      const local = createRepository();
-      local.load().then((data) => { if (active) { setRepository(local); setSnapshot(data); setLoading(false); } })
-        .catch((cause) => { if (active) { setError(messageOf(cause)); setLoading(false); } });
-      return () => { active = false; };
-    }
-    const client = supabase;
-    const initialize = async () => {
-      const { data, error: authError } = await client.auth.getUser();
-      if (!active) return;
-      if (authError && !authError.message.includes("Auth session missing")) setError(authError.message);
-      if (data.user) {
-        const cloud = createRepository(data.user.id);
-        try { setSnapshot(await cloud.load()); setRepository(cloud); setUserEmail(data.user.email ?? ""); }
-        catch (cause) { setError(messageOf(cause)); }
-      }
-      setLoading(false);
-    };
-    void initialize();
-    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      if (!session?.user) { setRepository(null); setSnapshot({ cars: [], schedules: [], visits: [] }); setUserEmail(""); }
-      else { const cloud = createRepository(session.user.id); setRepository(cloud); setUserEmail(session.user.email ?? "");
-        void cloud.load().then(setSnapshot).catch((cause) => setError(messageOf(cause))); }
-    });
-    return () => { active = false; listener.subscription.unsubscribe(); };
-  }, []);
-
-  const reload = useCallback(async () => {
-    if (!repository) return;
-    setSnapshot(await repository.load());
-  }, [repository]);
+    if (loading) { setModal(null); setSelectedCarId(""); }
+    if (user) { setAuthView(null); setNotice(""); }
+  }, [loading, user]);
 
   async function perform(action: () => Promise<void>) {
-    setError("");
-    try { await action(); await reload(); setModal(null); }
-    catch (cause) { setError(messageOf(cause)); throw cause; }
+    await garage.run(action);
+    setModal(null);
   }
 
   const allDue = useMemo(() => getAllDue(snapshot.cars, snapshot.schedules, snapshot.visits, todayISO()), [snapshot]);
   const visits = useMemo(() => [...snapshot.visits].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)), [snapshot.visits]);
   const selectedCar = snapshot.cars.find((car) => car.id === selectedCarId) ?? null;
 
-  if (loading) return <div className="app-loading"><Wrench size={26} /><span>Opening your garage…</span></div>;
-  if (isCloudConfigured && !repository) return <SignIn onError={setError} error={error} />;
+  const accountActions = user
+    ? <button className="button secondary" onClick={() => void garage.signOut()}><LogOut size={17} />Sign out</button>
+    : isCloudConfigured && <div className="account-actions"><button className="button secondary" onClick={() => setAuthView("signin")}>Sign in</button><button className="button primary" onClick={() => setAuthView("signup")}>Create account</button></div>;
+
+  if (loading || !repository) return <div className="auth-page"><div className="auth-card"><h1>{transferring ? "Moving your garage to Supabase" : "Opening your garage"}</h1>{loading ? <p role="status">{transferring ? "Uploading your records and photos. Your browser copy is kept until the transfer is verified." : "Loading your records…"}</p> : <><p className="error-text" role="alert">{error}</p><button className="button primary" onClick={garage.retry}>Retry</button></>}{user && <div className="recovery-actions">{accountActions}</div>}</div></div>;
+  if (authView && !user) return <AccountForm mode={authView} onMode={setAuthView} onClose={() => setAuthView(null)} onSubmit={async (email, password) => {
+    if (authView === "signup") {
+      const confirmation = await garage.signUp(email, password);
+      if (confirmation) setNotice("Check your email to confirm your account, then sign in here. Until then, your data stays in this browser.");
+    } else await garage.signIn(email, password);
+    setAuthView(null);
+  }} />;
 
   return <div className="app-shell">
     <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
@@ -95,13 +74,15 @@ export function GarageApp() {
       </nav>
       <div className="sidebar-bottom">
         <div className="sidebar-summary"><span className="summary-icon"><CarFront size={18} /></span><div><strong>{snapshot.cars.length} {snapshot.cars.length === 1 ? "vehicle" : "vehicles"}</strong><small>in your garage</small></div></div>
-        <div className="account-line"><span className="avatar">{userEmail ? userEmail[0].toUpperCase() : "G"}</span><span className="account-text"><strong>{userEmail || "Local prototype"}</strong><small>{isCloudConfigured ? "Private account" : "Stored in this browser"}</small></span>{isCloudConfigured && <button className="icon-button" aria-label="Sign out" onClick={() => void supabase?.auth.signOut()}><LogOut size={17} /></button>}</div>
+        <div className="account-line"><span className="avatar">{user?.email ? user.email[0].toUpperCase() : "G"}</span><span className="account-text"><strong>{user?.email || (isCloudConfigured ? "Guest" : "Local prototype")}</strong><small>{user ? "Stored in Supabase" : "Stored in this browser"}</small></span></div>
       </div>
     </aside>
 
     <div className="main-wrap">
       <header className="topbar"><button className="mobile-menu icon-button" aria-label="Open menu" onClick={() => setMenuOpen(!menuOpen)}><Menu size={22} /></button><span className="breadcrumbs">YOUR GARAGE <span>/</span> <strong>{navigation.find((item) => item.id === page)?.label}</strong></span><span className="topbar-right"><span className="today-pill"><CalendarDays size={15} />{displayDate(todayISO())}</span></span></header>
       <main className="content">
+        {isCloudConfigured && <div className="storage-account"><span>{user ? "Stored in Supabase" : "Guest — stored in this browser"}</span>{accountActions}</div>}
+        {notice && <div className="demo-banner" role="status">{notice}</div>}
         {error && <div className="error-banner" role="alert"><CircleAlert size={18} />{error}<button aria-label="Dismiss error" onClick={() => setError("")}><X size={16} /></button></div>}
         {!isCloudConfigured && <div className="demo-banner"><CircleAlert size={17} /><span>Local prototype: your data stays in this browser. Add Supabase credentials to enable private cloud sync.</span></div>}
         {page === "dashboard" && <Dashboard cars={snapshot.cars} visits={visits} allDue={allDue} onAddCar={() => setModal({ kind: "car" })} onAddVisit={() => setModal({ kind: "visit" })} onViewCar={(id) => { setSelectedCarId(id); setPage("cars"); }} onViewAll={() => setPage("history")} />}
@@ -119,19 +100,21 @@ export function GarageApp() {
   </div>;
 }
 
-function messageOf(cause: unknown) { return cause instanceof Error ? cause.message : "Something went wrong. Please try again."; }
+const messageOf = errorMessage;
 
-function SignIn({ error, onError }: { error: string; onError: (message: string) => void }) {
+function AccountForm({ mode, onMode, onClose, onSubmit }: { mode: "signin" | "signup"; onMode: (mode: "signin" | "signup") => void; onClose: () => void; onSubmit: (email: string, password: string) => Promise<void> }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const signup = mode === "signup";
   async function submit(event: FormEvent) {
-    event.preventDefault(); setBusy(true); onError("");
-    const { error: authError } = await supabase!.auth.signInWithPassword({ email, password });
-    if (authError) onError(authError.message);
-    setBusy(false);
+    event.preventDefault(); setBusy(true); setError("");
+    try { await onSubmit(email.trim(), password); }
+    catch (cause) { setError(messageOf(cause)); }
+    finally { setBusy(false); }
   }
-  return <div className="auth-page"><div className="auth-card"><div className="brand"><div className="brand-mark"><GarageLogo /></div><div><strong>Garage Guardian</strong><small>CARE FOR THE DRIVE</small></div></div><h1>Welcome back</h1><p>Sign in to your private garage.</p>{error && <div className="error-banner" role="alert">{error}</div>}<form onSubmit={submit} className="form-stack"><label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></label><label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" /></label><button className="button primary full" disabled={busy}>{busy ? "Signing in…" : "Sign in"}<ArrowRight size={17} /></button></form><p className="subtle">This prototype uses an invite-only account.</p></div></div>;
+  return <div className="auth-page"><div className="auth-card"><div className="brand"><div className="brand-mark"><GarageLogo /></div><div><strong>Garage Guardian</strong><small>CARE FOR THE DRIVE</small></div></div><h1>{signup ? "Create your account" : "Welcome back"}</h1><p>{signup ? "Your browser records and photos will move to your account after you sign up and sign in." : "Sign in to your cloud garage. Existing guest records stay in this browser."}</p>{error && <div className="error-banner" role="alert">{error}</div>}<form onSubmit={submit} className="form-stack"><label>Email<input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></label><label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={signup ? 6 : undefined} autoComplete={signup ? "new-password" : "current-password"} /></label><button className="button primary full" disabled={busy}>{busy ? "Please wait…" : signup ? "Create account" : "Sign in"}<ArrowRight size={17} /></button><button type="button" className="button secondary" disabled={busy} onClick={onClose}>Continue without an account</button><button type="button" className="text-link" disabled={busy} onClick={() => { setError(""); setPassword(""); onMode(signup ? "signin" : "signup"); }}>{signup ? "Already have an account? Sign in" : "Create an account"}</button></form></div></div>;
 }
 
 function PageHeading({ eyebrow, title, description, action }: { eyebrow: string; title: string; description: string; action?: ReactNode }) {

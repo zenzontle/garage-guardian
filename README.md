@@ -16,11 +16,21 @@ Open `http://localhost:3000`. Without environment variables the app runs in **lo
 ## Enable private cloud sync
 
 1. Create a free Supabase project. Run `supabase/migrations/0001_initial.sql` in its SQL editor, or apply it with the Supabase CLI.
-2. In Supabase Auth, create your own email/password user and disable **Allow new users to sign up**. The app deliberately has no public registration screen.
+2. Apply `supabase/migrations/0002_signup_photo_transfer.sql` as well. It permits owner-scoped photo updates so interrupted signup transfers can retry safely. In Supabase Auth, enable email/password authentication and **Allow new users to sign up**.
 3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the project API settings in `.env.local` for local development, and in the hosting environment for deployment. Restart the app. Do not expose the service role key in a `NEXT_PUBLIC_` variable.
 4. Deploy the Next.js app to a personal Vercel Hobby project. Add the two public Supabase variables there. The migration enables owner-scoped row security and a private photo bucket.
 
-With Supabase configured, the local browser data is not imported automatically. CSV export is available from **Service history** for a manual copy of service records; photos remain separate.
+Set Supabase Auth's **Site URL** to your app URL and allow your deployed URL and `http://localhost:3000` as confirmation redirect URLs. The app supports email confirmation being enabled or disabled. If confirmation is required, users can continue locally until they confirm their email and authenticate in the browser containing their guest data.
+
+| Configuration | Account | Application data |
+| --- | --- | --- |
+| No Supabase variables | No account required | Local prototype mode, browser IndexedDB |
+| Supabase configured | Signed out | Guest mode, browser IndexedDB |
+| Supabase configured | Signed in | Supabase database and private photo bucket |
+
+Guests can use all garage features without signing in. **Create account** automatically transfers their records and photos after the new account authenticates. Transfers preserve record relationships and can resume after a reload or failed upload. Editing pauses during transfer or while awaiting retry; errors offer **Retry** or **Sign out**. Browser records and photos are only cleared after the cloud copy is verified. After a successful transfer, signing out opens a fresh guest garage. Edits made in another tab or after signing out during an interrupted transfer are retained locally.
+
+Ordinary **Sign in** does not import or delete guest data; it opens the account's cloud garage. Signing out restores any guest records that have never been transferred. A pending signup transfer resumes only for the account that created it and the same Supabase project. Use the same browser and site origin for signup and transfer; guest data cannot be recovered from another browser or device. Authenticated cloud failures do not fall back to local writes. CSV export remains available from **Service history**.
 
 ## Optional free email digest
 
@@ -36,7 +46,7 @@ pnpm run typecheck
 pnpm run build
 ```
 
-The schedule is owner-entered. Starter tasks are names only; no interval is presented as an OEM recommendation. VIN lookup, automatic manufacturer schedules, spreadsheet import, public signup, and native apps are future work.
+The schedule is owner-entered. Starter tasks are names only; no interval is presented as an OEM recommendation. VIN lookup, automatic manufacturer schedules, spreadsheet import, and native apps are future work. Authenticated offline synchronization is not supported.
 
 ## License
 
