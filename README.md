@@ -22,6 +22,10 @@ Open `http://localhost:3000`. Without environment variables the app runs in **lo
 
 With Supabase configured, the local browser data is not imported automatically. CSV export is available from **Service history** for a manual copy of service records; photos remain separate.
 
+## Web analytics
+
+Vercel Web Analytics is included in the root layout to track page views. Enable **Web Analytics** for the project in the Vercel dashboard, then deploy the app to start collecting data. No additional environment variables are required. See the [Vercel setup guide](https://vercel.com/docs/analytics/quickstart).
+
 ## Optional free email digest
 
 In-app due reminders always work. To try a weekly Monday email digest, configure a Brevo free account and a sender that can deliver mail without paid setup. Set `SUPABASE_SECRET_KEY`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `REMINDER_TO_EMAIL` (the account email), and a random `CRON_SECRET` on Vercel. Vercel invokes `/api/reminders` daily; the route sends at most one digest per Monday when tasks are upcoming or due. Test actual delivery before relying on it. If any variable is absent, email is disabled and the in-app due list remains available.
