@@ -107,6 +107,8 @@ jobs:
                 )
               );
 
+              // Safe to only search for new reactions since Codex will
+              // automatically clear stale reactions after a change is pushed
               const approval = codexReactions.find(reaction =>
                 new Date(reaction.created_at).getTime() >= revisionStartedAt
               );
