@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getAllDue } from '@/lib/due';
-import type { Car, ScheduleItem, Visit } from '@/lib/model';
+import { normalizeCar, type Car, type ScheduleItem, type Visit } from '@/lib/model';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,13 +34,14 @@ export async function GET(request: NextRequest) {
   if (carResult.error || scheduleResult.error || visitResult.error)
     return NextResponse.json({ error: 'Could not load maintenance' }, { status: 500 });
   if (now.getUTCDay() !== 1) return NextResponse.json({ status: 'not_digest_day' });
-  const cars: Car[] = (carResult.data ?? []).map((row) => ({
+  const cars: Car[] = (carResult.data ?? []).map((row) => normalizeCar({
     id: row.id,
     name: row.name,
     year: row.year,
     make: row.make,
     model: row.model,
     vin: row.vin,
+    distanceUnit: row.distance_unit,
     odometer: row.odometer,
     reminderDays: row.reminder_days,
     reminderMiles: row.reminder_miles,
@@ -93,7 +94,7 @@ export async function GET(request: NextRequest) {
         sender: { email: sender, name: 'Garage Guardian' },
         to: [{ email: recipient }],
         subject: `Garage Guardian: ${relevant.length} maintenance ${relevant.length === 1 ? 'item' : 'items'} to review`,
-        htmlContent: `<p>Your garage has maintenance to review:</p><ul>${lines}</ul><p>Open Garage Guardian for due dates, mileage, and your full service history.</p>`,
+        htmlContent: `<p>Your garage has maintenance to review:</p><ul>${lines}</ul><p>Open Garage Guardian for due dates, odometer readings, and your full service history.</p>`,
       }),
     });
     if (!response.ok) throw new Error(`Email provider returned ${response.status}`);

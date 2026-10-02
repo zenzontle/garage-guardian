@@ -3,7 +3,7 @@
 import { del, get, set, update } from 'idb-keyval';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { LocalRepository, SupabaseRepository, sameRecord } from './repository';
-import type { Snapshot } from './model';
+import { normalizeSnapshot, type Snapshot } from './model';
 
 type Transfer = {
   userId: string;
@@ -59,8 +59,8 @@ async function runTransfer(client: SupabaseClient, project: string, userId: stri
     transfer = { ...transfer, status: 'uploading', snapshot };
     await set(transferKey(project), transfer);
   }
-  const snapshot = transfer.snapshot;
-  if (!snapshot) throw new Error('The transfer could not be resumed. Your browser data has been kept.');
+  if (!transfer.snapshot) throw new Error('The transfer could not be resumed. Your browser data has been kept.');
+  const snapshot = normalizeSnapshot(transfer.snapshot);
 
   if (transfer.status !== 'uploaded') {
     const expected = structuredClone(snapshot);

@@ -1,3 +1,6 @@
+export type DistanceUnit = "miles" | "kilometers";
+
+// All distance values, including legacy *Miles fields, use the owning car's unit.
 export type Car = {
   id: string;
   name: string;
@@ -5,6 +8,7 @@ export type Car = {
   make: string;
   model: string;
   vin: string;
+  distanceUnit: DistanceUnit;
   odometer: number;
   reminderDays: number;
   reminderMiles: number;
@@ -82,8 +86,33 @@ export function money(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }
 
-export function formatMiles(miles: number): string {
-  return `${new Intl.NumberFormat("en-US").format(miles)} mi`;
+export function distanceUnitOrDefault(unit?: DistanceUnit | null): DistanceUnit {
+  return unit ?? "miles";
+}
+
+export function distanceAbbreviation(unit?: DistanceUnit): string {
+  return distanceUnitOrDefault(unit) === "kilometers" ? "km" : "mi";
+}
+
+export function defaultReminderDistance(unit?: DistanceUnit): number {
+  return distanceUnitOrDefault(unit) === "kilometers" ? 1000 : 500;
+}
+
+export function formatDistance(distance: number, unit?: DistanceUnit): string {
+  return `${new Intl.NumberFormat("en-US").format(distance)} ${distanceAbbreviation(unit)}`;
+}
+
+export function distanceInMiles(distance: number, unit?: DistanceUnit): number {
+  return distanceUnitOrDefault(unit) === "kilometers" ? distance / 1.609344 : distance;
+}
+
+export function normalizeCar(car: Car): Car {
+  const distanceUnit = distanceUnitOrDefault(car.distanceUnit);
+  return { ...car, distanceUnit, reminderMiles: car.reminderMiles ?? defaultReminderDistance(distanceUnit) };
+}
+
+export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
+  return { ...snapshot, cars: snapshot.cars.map(normalizeCar) };
 }
 
 export function displayDate(iso: string): string {
