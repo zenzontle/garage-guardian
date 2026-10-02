@@ -18,6 +18,31 @@ async function seedLocal(withPhoto = true) {
 }
 
 describe('signup transfer', () => {
+  it.each(['pending', 'uploading', 'uploaded'])('resumes a legacy %s transfer and cleans up equivalent guest records', async (status) => {
+    const { distanceUnit: _unit, ...legacyCar } = car;
+    const snapshot = { cars: [legacyCar], schedules: [schedule], visits: [visit] };
+    await set('garage-guardian:local:v1', snapshot);
+    await set(`garage-guardian:signup-transfer:v1:${project}`, { userId: account().id, status, snapshot });
+    const cloud = fakeSupabase(); cloud.emit(account());
+    await transferSignupData(cloud.client, project, account().id);
+    expect(await new LocalRepository().load()).toEqual({ cars: [], schedules: [], visits: [] });
+    expect(await pendingTransfer(project)).toBeUndefined();
+    if (status !== 'uploaded') {
+      expect((await new SupabaseRepository(cloud.client, account().id).load()).cars).toEqual([car]);
+    }
+  });
+
+  it('preserves kilometer units, readings, and maintenance intervals during signup transfer', async () => {
+    const { local } = await seedLocal(false);
+    const metric = { ...car, distanceUnit: 'kilometers' as const, reminderMiles: 1000 };
+    await local.saveCar(metric);
+    const cloud = fakeSupabase(); cloud.emit(account());
+    await registerSignup(project, account(), true);
+    await transferSignupData(cloud.client, project, account().id);
+    expect(await new SupabaseRepository(cloud.client, account().id).load()).toEqual({ cars: [metric], schedules: [schedule], visits: [visit] });
+    expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+  });
+
   it('uploads the whole garage and photo blobs, preserves relationships, and clears the browser copy', async () => {
     const { local, snapshot, photo } = await seedLocal();
     const cloud = fakeSupabase();

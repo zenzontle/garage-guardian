@@ -1,4 +1,4 @@
-import type { Car, ScheduleItem, Visit } from "./model";
+import { defaultReminderDistance, formatDistance, type Car, type ScheduleItem, type Visit } from "./model";
 
 export type DueStatus = "setup" | "upcoming" | "due" | "later" | "completed";
 export type DueItem = {
@@ -52,7 +52,7 @@ export function getDueItem(schedule: ScheduleItem, car: Car, visits: Visit[], to
   let status: DueStatus = "later";
   if (dueDate === null && dueMiles === null) status = "setup";
   else if ((daysRemaining !== null && daysRemaining <= 0) || (milesRemaining !== null && milesRemaining <= 0)) status = "due";
-  else if ((daysRemaining !== null && daysRemaining <= (car.reminderDays ?? 30)) || (milesRemaining !== null && milesRemaining <= (car.reminderMiles ?? 500))) status = "upcoming";
+  else if ((daysRemaining !== null && daysRemaining <= (car.reminderDays ?? 30)) || (milesRemaining !== null && milesRemaining <= (car.reminderMiles ?? defaultReminderDistance(car.distanceUnit)))) status = "upcoming";
   return { schedule, car, status, dueDate, dueMiles, daysRemaining, milesRemaining, lastDone };
 }
 
@@ -66,10 +66,10 @@ export function getAllDue(cars: Car[], schedules: ScheduleItem[], visits: Visit[
 }
 
 export function dueDescription(item: DueItem): string {
-  if (item.status === "setup") return "Add a due date or mileage";
+  if (item.status === "setup") return "Add a due date or odometer reading";
   if (item.status === "completed") return "One-time task completed";
   const pieces: string[] = [];
   if (item.dueDate) pieces.push(`by ${item.dueDate}`);
-  if (item.dueMiles !== null) pieces.push(`at ${new Intl.NumberFormat("en-US").format(item.dueMiles)} mi`);
+  if (item.dueMiles !== null) pieces.push(`at ${formatDistance(item.dueMiles, item.car.distanceUnit)}`);
   return pieces.join(" or ");
 }

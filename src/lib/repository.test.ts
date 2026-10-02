@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clear, get } from 'idb-keyval';
+import { clear, get, set } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../test/fake-supabase';
 import { car, schedule, visit } from '../test/fixtures';
@@ -28,6 +28,8 @@ describe.each([
     await repository.saveVisit({ ...visit, photos: [photo] });
     const reloaded = createRepository(authenticated ? account().id : undefined);
     expect(await reloaded.load()).toEqual({ cars: [car], schedules: [schedule], visits: [{ ...visit, photos: [photo] }] });
+    await reloaded.saveCar({ ...car, distanceUnit: 'kilometers', reminderMiles: 1000 });
+    expect((await reloaded.load()).cars[0]).toEqual({ ...car, distanceUnit: 'kilometers', reminderMiles: 1000 });
     await reloaded.saveCar({ ...car, name: 'Updated driver' });
     await reloaded.saveSchedule({ ...schedule, intervalMiles: 6000 });
     await reloaded.saveVisit({ ...visit, notes: 'Updated notes', photos: [photo] });
@@ -53,6 +55,31 @@ describe.each([
     await reloaded.deleteCar(car.id);
     expect(await reloaded.load()).toEqual({ cars: [], schedules: [], visits: [] });
   });
+});
+
+it('loads legacy guest records as Miles without rewriting readings or custom windows', async () => {
+  const { distanceUnit: _unit, ...legacy } = car;
+  await set('garage-guardian:local:v1', { cars: [{ ...legacy, reminderMiles: 123 }], schedules: [schedule], visits: [visit] });
+  const { LocalRepository } = await import('./repository');
+  const local = new LocalRepository();
+  expect(await local.load()).toEqual({ cars: [{ ...car, reminderMiles: 123 }], schedules: [schedule], visits: [visit] });
+  await local.saveCar({ ...(await local.load()).cars[0], name: 'Edited legacy' });
+  expect((await get<{ cars: typeof car[] }>('garage-guardian:local:v1'))?.cars[0]).toMatchObject({ distanceUnit: 'miles', odometer: car.odometer, reminderMiles: 123 });
+});
+
+it('normalizes legacy cloud records and preserves zero kilometer reminder windows', async () => {
+  const cloud = fakeSupabase(); cloud.emit(account());
+  const { SupabaseRepository } = await import('./repository');
+  const repository = new SupabaseRepository(cloud.client, account().id);
+  await repository.saveCar(car);
+  const row = cloud.tables.get('cars')!.get(car.id)!;
+  delete row.distance_unit;
+  expect((await repository.load()).cars[0]).toEqual(car);
+  await repository.saveCar({ ...car, distanceUnit: 'kilometers', reminderMiles: 0 });
+  expect((await repository.load()).cars[0]).toMatchObject({ distanceUnit: 'kilometers', reminderMiles: 0 });
+  row.distance_unit = 'kilometers'; row.reminder_miles = null;
+  cloud.tables.get('cars')!.set(car.id, row);
+  expect((await repository.load()).cars[0].reminderMiles).toBe(1000);
 });
 
 it('does not lose simultaneous local writes', async () => {

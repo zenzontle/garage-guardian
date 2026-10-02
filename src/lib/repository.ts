@@ -2,7 +2,7 @@
 
 import { del, get, set, update } from 'idb-keyval';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { EMPTY_SNAPSHOT, type Car, type Photo, type ScheduleItem, type Snapshot, type Visit } from './model';
+import { EMPTY_SNAPSHOT, normalizeCar, normalizeSnapshot, type Car, type Photo, type ScheduleItem, type Snapshot, type Visit } from './model';
 
 export type Repository = {
   load(): Promise<Snapshot>;
@@ -22,14 +22,14 @@ const clone = <T>(value: T): T => structuredClone(value);
 
 export class LocalRepository implements Repository {
   async load(): Promise<Snapshot> {
-    return clone((await get<Snapshot>(SNAPSHOT_KEY)) ?? EMPTY_SNAPSHOT);
+    return normalizeSnapshot(clone((await get<Snapshot>(SNAPSHOT_KEY)) ?? EMPTY_SNAPSHOT));
   }
   private async write(update: (snapshot: Snapshot) => void) {
     await mutateLocalSnapshot(update);
   }
   saveCar(car: Car) {
     return this.write((snapshot) => {
-      snapshot.cars = upsert(snapshot.cars, car);
+      snapshot.cars = upsert(snapshot.cars, normalizeCar(car));
     });
   }
   async deleteCar(id: string) {
@@ -84,6 +84,7 @@ export class LocalRepository implements Repository {
     return file;
   }
   async clearTransferred(transferred: Snapshot) {
+    transferred = normalizeSnapshot(transferred);
     // Preserve anything edited in another tab or after signing out during a transfer.
     await this.write((current) => {
       const changed = <T extends { id: string }>(item: T, originals: T[]) => !originals.some((original) => original.id === item.id && sameRecord(item, original));
@@ -106,7 +107,7 @@ export class LocalRepository implements Repository {
 
 async function mutateLocalSnapshot(mutate: (snapshot: Snapshot) => void) {
   await update<Snapshot>(SNAPSHOT_KEY, (saved) => {
-    const snapshot = clone(saved ?? EMPTY_SNAPSHOT);
+    const snapshot = normalizeSnapshot(clone(saved ?? EMPTY_SNAPSHOT));
     mutate(snapshot);
     return snapshot;
   });
@@ -137,6 +138,7 @@ const carToRow = (car: Car, userId: string) => ({
   make: car.make,
   model: car.model,
   vin: car.vin,
+  distance_unit: car.distanceUnit,
   odometer: car.odometer,
   reminder_days: car.reminderDays,
   reminder_miles: car.reminderMiles,
@@ -183,13 +185,14 @@ export class SupabaseRepository implements Repository {
     ]);
     for (const result of [cars, schedules, visits]) if (result.error) throw result.error;
     return {
-      cars: (cars.data ?? []).map((row) => ({
+      cars: (cars.data ?? []).map((row) => normalizeCar({
         id: row.id,
         name: row.name,
         year: row.year,
         make: row.make,
         model: row.model,
         vin: row.vin,
+        distanceUnit: row.distance_unit,
         odometer: row.odometer,
         reminderDays: row.reminder_days,
         reminderMiles: row.reminder_miles,
@@ -223,7 +226,7 @@ export class SupabaseRepository implements Repository {
   }
 
   async saveCar(car: Car) {
-    const { error } = await this.client.from('cars').upsert(carToRow(car, this.userId));
+    const { error } = await this.client.from('cars').upsert(carToRow(normalizeCar(car), this.userId));
     if (error) throw error;
   }
   async deleteCar(id: string) {

@@ -1,4 +1,4 @@
-import type { Car, Visit } from "./model";
+import { distanceAbbreviation, type Car, type Visit } from "./model";
 
 export function reportTotals(visits: Visit[], cars: Car[]) {
   const byMonth = new Map<string, number>();
@@ -31,11 +31,12 @@ function escapeCsv(value: string | number): string {
 }
 
 export function visitsToCsv(visits: Visit[], cars: Car[]): string {
-  const headers = ["Date", "Car", "Odometer (mi)", "Provider", "Items", "Total cost (USD)", "Item costs (USD)", "Notes", "Photo count"];
+  const headers = ["Date", "Car", "Odometer", "Distance unit", "Provider", "Items", "Total cost (USD)", "Item costs (USD)", "Notes", "Photo count"];
   const rows = visits.map((visit) => [
     visit.date,
     cars.find((car) => car.id === visit.carId)?.name ?? "Unknown car",
     visit.odometer,
+    distanceAbbreviation(cars.find((car) => car.id === visit.carId)?.distanceUnit),
     visit.provider,
     visit.items.map((item) => item.name).join("; "),
     (visit.totalCostCents / 100).toFixed(2),

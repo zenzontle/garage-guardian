@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clear, get } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../test/fake-supabase';
+import { car, visit } from '../test/fixtures';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 let cloud: ReturnType<typeof fakeSupabase>;
@@ -29,6 +30,8 @@ describe.each([
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Add a car' }));
     const dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
+    expect((dialog.getByLabelText('Distance unit') as HTMLSelectElement).value).toBe('miles');
+    expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe('500');
     await user.type(dialog.getByLabelText('Nickname'), 'Daily driver');
     await user.type(dialog.getByLabelText('Make'), 'Toyota');
     await user.type(dialog.getByLabelText('Model'), 'RAV4');
@@ -65,6 +68,112 @@ describe.each([
     expect((await new LocalRepository().load()).cars).toEqual([]);
     expect(cloud.tables.get('cars')?.size ?? 0).toBe(0);
   });
+});
+
+it('switches creation defaults while preserving typed odometer readings and customized reminder windows', async () => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
+  const { GarageApp } = await import('./garage-app');
+  render(<GarageApp />);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Add a car' }));
+  const dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
+  fireEvent.change(dialog.getByLabelText('Current odometer (miles)'), { target: { value: '12345' } });
+  await user.selectOptions(dialog.getByLabelText('Distance unit'), 'kilometers');
+  expect((dialog.getByLabelText('Coming up: kilometers before due') as HTMLInputElement).value).toBe('1000');
+  expect((dialog.getByLabelText('Current odometer (kilometers)') as HTMLInputElement).value).toBe('12345');
+  await user.selectOptions(dialog.getByLabelText('Distance unit'), 'miles');
+  expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe('500');
+  fireEvent.change(dialog.getByLabelText('Coming up: miles before due'), { target: { value: '0' } });
+  await user.selectOptions(dialog.getByLabelText('Distance unit'), 'kilometers');
+  expect((dialog.getByLabelText('Coming up: kilometers before due') as HTMLInputElement).value).toBe('0');
+  fireEvent.change(dialog.getByLabelText('Coming up: kilometers before due'), { target: { value: '750' } });
+  await user.selectOptions(dialog.getByLabelText('Distance unit'), 'miles');
+  expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe('750');
+});
+
+describe.each([['guest', false], ['cloud', true]] as const)('%s kilometer workflow', (_mode, authenticated) => {
+  it('persists the unit, cascades it to tasks and visits, and keeps it read-only after reload', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', authenticated ? 'https://garage.supabase.co' : '');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', authenticated ? 'test-key' : '');
+    if (authenticated) cloud.emit(account());
+    const { GarageApp } = await import('./garage-app');
+    const app = render(<GarageApp />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Add a car' }));
+    let dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
+    for (const [label, value] of [['Nickname', 'Metric driver'], ['Make', 'Toyota'], ['Model', 'RAV4'], ['Current odometer (miles)', '100']]) {
+      fireEvent.change(dialog.getByLabelText(label), { target: { value } });
+    }
+    await user.selectOptions(dialog.getByLabelText('Distance unit'), 'kilometers');
+    await user.click(dialog.getByRole('button', { name: 'Add car' }));
+    await screen.findByRole('tab', { name: 'Metric driver' });
+    expect(screen.getByText(/100 km current odometer/)).toBeDefined();
+    await user.click(screen.getByRole('button', { name: 'Add task' }));
+    dialog = within(screen.getByRole('dialog', { name: 'Add maintenance task' }));
+    fireEvent.change(dialog.getByLabelText('Task name'), { target: { value: 'Brake check' } });
+    fireEvent.change(dialog.getByLabelText(/First due at odometer \(kilometers\)/), { target: { value: '1100' } });
+    fireEvent.change(dialog.getByLabelText(/Repeat every kilometers/), { target: { value: '5000' } });
+    await user.click(dialog.getByRole('button', { name: 'Save task' }));
+    await screen.findByText('at 1,100 km');
+    expect(screen.getByText('Soon')).toBeDefined();
+    await user.click(screen.getByRole('button', { name: 'Log service' }));
+    dialog = within(screen.getByRole('dialog', { name: 'Log service' }));
+    expect((dialog.getByLabelText('Odometer (kilometers)') as HTMLInputElement).value).toBe('100');
+    fireEvent.change(dialog.getByLabelText('Odometer (kilometers)'), { target: { value: '1200' } });
+    fireEvent.change(dialog.getByLabelText('Total cost (USD)'), { target: { value: '50' } });
+    const taskOption = dialog.getByRole('option', { name: 'Brake check' }) as HTMLOptionElement;
+    await user.selectOptions(dialog.getByLabelText('Choose scheduled task'), taskOption.value);
+    await user.click(dialog.getByRole('button', { name: 'Save visit' }));
+    await screen.findByText('at 6,200 km');
+    expect(screen.getByText('Later')).toBeDefined();
+    expect(screen.getByText(/1,200 km current odometer/)).toBeDefined();
+    const { createRepository } = await import('../lib/repository');
+    const saved = await createRepository(authenticated ? account().id : undefined).load();
+    expect(saved.cars[0]).toMatchObject({ distanceUnit: 'kilometers', reminderMiles: 1000, odometer: 100 });
+    expect(saved.schedules.find((item) => item.name === 'Brake check')).toMatchObject({ intervalMiles: 5000, firstDueMiles: 1100 });
+    expect(saved.visits[0].odometer).toBe(1200);
+    app.unmount();
+    render(<GarageApp />);
+    await screen.findByText('Metric driver');
+    await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Edit car' }));
+    dialog = within(screen.getByRole('dialog', { name: 'Edit car' }));
+    const unit = dialog.getByLabelText('Distance unit') as HTMLInputElement;
+    expect(unit.value).toBe('Kilometers'); expect(unit.readOnly).toBe(true);
+    expect((dialog.getByLabelText('Coming up: kilometers before due') as HTMLInputElement).value).toBe('1000');
+    fireEvent.change(dialog.getByLabelText('Coming up: kilometers before due'), { target: { value: '250' } });
+    await user.click(dialog.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect((await createRepository(authenticated ? account().id : undefined).load()).cars[0]).toMatchObject({ distanceUnit: 'kilometers', reminderMiles: 250 });
+  });
+});
+
+it('sorts mixed-unit history by equivalent distance and refreshes a new visit reading when switching vehicles', async () => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
+  const { LocalRepository } = await import('../lib/repository');
+  const local = new LocalRepository();
+  await local.saveCar(car);
+  await local.saveCar({ ...car, id: 'metric', name: 'Metric driver', distanceUnit: 'kilometers', reminderMiles: 1000 });
+  await local.saveVisit({ ...visit, odometer: 1000 });
+  await local.saveVisit({ ...visit, id: 'metric-visit', carId: 'metric', odometer: 1600 });
+  const { GarageApp } = await import('./garage-app');
+  render(<GarageApp />);
+  const user = userEvent.setup();
+  await user.click((await screen.findAllByRole('button', { name: 'Service history' }))[0]);
+  await user.selectOptions(screen.getByLabelText('Sort service history'), 'odometer_high');
+  const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
+  expect(rows[0].textContent).toContain('1,000 mi');
+  expect(rows[1].textContent).toContain('1,600 km');
+  await user.click(screen.getByRole('button', { name: 'Log service' }));
+  const dialog = within(screen.getByRole('dialog', { name: 'Log service' }));
+  expect((dialog.getByLabelText('Odometer (miles)') as HTMLInputElement).value).toBe('1000');
+  fireEvent.change(dialog.getByLabelText('Odometer (miles)'), { target: { value: '99' } });
+  await user.selectOptions(dialog.getByLabelText('Vehicle'), 'metric');
+  expect((dialog.getByLabelText('Odometer (kilometers)') as HTMLInputElement).value).toBe('1600');
+  await user.selectOptions(dialog.getByLabelText('Vehicle'), car.id);
+  expect((dialog.getByLabelText('Odometer (miles)') as HTMLInputElement).value).toBe('1000');
 });
 
 it('lets guests leave the auth form and shows confirmation-pending signup feedback', async () => {
