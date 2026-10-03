@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
 
-type Row = Record<string, unknown> & { id: string; user_id: string };
+type Row = Record<string, unknown> & { id: string; user_id?: string };
 type Result = { data: unknown; error: Error | null };
 export const account = (id = '44444444-4444-4444-8444-444444444444'): User => ({ id, email: `${id}@example.com`, identities: [{ id: 'identity' }] }) as User;
 
@@ -21,8 +21,13 @@ export function fakeSupabase() {
     if (!tables.has(name)) tables.set(name, new Map());
     return tables.get(name)!;
   };
-  const execute = vi.fn(async (name: string, operation: string, filters: [string, unknown][], row?: Row): Promise<Result> => {
+  const execute = vi.fn(async (name: string, operation: string, filters: [string, unknown][], row?: Row, range?: [number, number]): Promise<Result> => {
     const table = getTable(name);
+    if (name === 'vehicle_makes' || name === 'vehicle_models') {
+      if (operation !== 'select') return { data: null, error: new Error('Catalog write denied') };
+      const entries = [...table.values()].filter((entry) => filters.every(([key, value]) => entry[key] === value)).sort((a, b) => String(a.lookup_key).localeCompare(String(b.lookup_key)));
+      return { data: entries.slice(range?.[0] ?? 0, range ? range[1] + 1 : undefined), error: null };
+    }
     if (!user) return { data: null, error: new Error('Not authenticated') };
     if (operation === 'upsert') {
       if (row?.user_id !== user.id) return { data: null, error: new Error('Owner policy denied write') };
@@ -44,18 +49,20 @@ export function fakeSupabase() {
   const from = vi.fn((name: string) => {
     let operation = 'select';
     let row: Row | undefined;
+    let range: [number, number] | undefined;
     const filters: [string, unknown][] = [];
     const builder = {
       select: vi.fn(() => builder),
       eq: vi.fn((key: string, value: unknown) => { filters.push([key, value]); return builder; }),
       order: vi.fn(() => builder),
+      range: vi.fn((start: number, end: number) => { range = [start, end]; return builder; }),
       upsert: vi.fn((value: Row) => { operation = 'upsert'; row = value; return builder; }),
       delete: vi.fn(() => { operation = 'delete'; return builder; }),
       maybeSingle: vi.fn(async () => {
         const result = await execute(name, operation, filters, row);
         return { ...result, data: (result.data as Row[] | null)?.[0] ?? null };
       }),
-      then: (resolve: (result: Result) => unknown, reject: (cause: unknown) => unknown) => execute(name, operation, filters, row).then(resolve, reject),
+      then: (resolve: (result: Result) => unknown, reject: (cause: unknown) => unknown) => execute(name, operation, filters, row, range).then(resolve, reject),
     };
     return builder;
   });

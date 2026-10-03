@@ -1,0 +1,104 @@
+{
+  "sourceUrl": "https://www.fueleconomy.gov/feg/download.shtml",
+  "fieldDocumentation": "https://www.fueleconomy.gov/feg/ws/index.shtml",
+  "sourceFile": "vehicles.csv",
+  "receivedDate": "2026-10-03",
+  "retrievalDate": "unknown",
+  "sha256": "b1ff0e3071c46cdc1c99e0015878b98a01851462d7e447237ce2fc1294ccf303",
+  "coverage": "Consolidated EPA US passenger-car and light-truck data from 1984 onward. Not exhaustive: historical gaps, heavy vehicles, imports, and new models may be missing. Years are discarded. No vehicle verification.",
+  "normalization": "Trim, collapse whitespace, lowercase lookup keys; preserve punctuation. Prefer baseModel (case-insensitive header), fallback to model. Conflicting display names choose the first in code-point order; all variants reported for review.",
+  "errors": [],
+  "conflicts": [
+    {
+      "key": "mini",
+      "names": [
+        "MINI",
+        "Mini"
+      ],
+      "chosen": "MINI"
+    },
+    {
+      "key": "[\"aston martin\",\"saloon/vantage/volante\"]",
+      "names": [
+        "Saloon/Vantage/Volante",
+        "Saloon/vantage/volante"
+      ],
+      "chosen": "Saloon/Vantage/Volante"
+    },
+    {
+      "key": "[\"chevrolet\",\"trailblazer\"]",
+      "names": [
+        "TrailBlazer",
+        "Trailblazer"
+      ],
+      "chosen": "TrailBlazer"
+    },
+    {
+      "key": "[\"import trade services\",\"bmw 325i\"]",
+      "names": [
+        "BMW 325I",
+        "BMW 325i"
+      ],
+      "chosen": "BMW 325I"
+    },
+    {
+      "key": "[\"jaguar\",\"s-type\"]",
+      "names": [
+        "S-Type",
+        "S-type"
+      ],
+      "chosen": "S-Type"
+    },
+    {
+      "key": "[\"lotus\",\"elise/exige\"]",
+      "names": [
+        "Elise/Exige",
+        "Elise/exige"
+      ],
+      "chosen": "Elise/Exige"
+    },
+    {
+      "key": "[\"maserati\",\"coupe cambiocorsa/coupe gt\"]",
+      "names": [
+        "Coupe Cambiocorsa/Coupe GT",
+        "Coupe Cambiocorsa/coupe GT"
+      ],
+      "chosen": "Coupe Cambiocorsa/Coupe GT"
+    },
+    {
+      "key": "[\"maserati\",\"granturismo\"]",
+      "names": [
+        "GranTurismo",
+        "Granturismo"
+      ],
+      "chosen": "GranTurismo"
+    },
+    {
+      "key": "[\"nissan\",\"370z\"]",
+      "names": [
+        "370Z",
+        "370z"
+      ],
+      "chosen": "370Z"
+    },
+    {
+      "key": "[\"nissan\",\"leaf\"]",
+      "names": [
+        "LEAF",
+        "Leaf"
+      ],
+      "chosen": "LEAF"
+    },
+    {
+      "key": "[\"porsche\",\"turbo 2 911 gt2\"]",
+      "names": [
+        "Turbo 2 911 GT2",
+        "Turbo 2 911 Gt2"
+      ],
+      "chosen": "Turbo 2 911 GT2"
+    }
+  ],
+  "makeCount": 145,
+  "modelCount": 1560,
+  "sourceRecords": 50407
+}

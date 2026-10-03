@@ -12,6 +12,14 @@ let cloud: ReturnType<typeof fakeSupabase>;
 beforeEach(async () => {
   await clear(); vi.resetModules(); vi.doMock('react', () => React);
   cloud = fakeSupabase();
+  cloud.tables.set('vehicle_makes', new Map([
+    ['toyota', { id: 'toyota', lookup_key: 'toyota', display_name: 'Toyota' }],
+    ['honda', { id: 'honda', lookup_key: 'honda', display_name: 'Honda' }],
+  ]));
+  cloud.tables.set('vehicle_models', new Map([
+    ['rav4', { id: 'rav4', make_id: 'toyota', lookup_key: 'rav4', display_name: 'RAV4' }],
+    ['civic', { id: 'civic', make_id: 'honda', lookup_key: 'civic', display_name: 'Civic' }],
+  ]));
   vi.mocked(createClient).mockReturnValue(cloud.client as unknown as ReturnType<typeof createClient>);
 });
 
@@ -30,17 +38,23 @@ describe.each([
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Add a car' }));
     const dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
+    expect(dialog.queryAllByRole('combobox')).toHaveLength(configured ? 3 : 1); // Includes distance-unit select.
     expect((dialog.getByLabelText('Distance unit') as HTMLSelectElement).value).toBe('miles');
     expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe('500');
     await user.type(dialog.getByLabelText('Nickname'), 'Daily driver');
     await user.type(dialog.getByLabelText('Make'), 'Toyota');
+    if (configured) await user.click(await dialog.findByRole('option', { name: 'Toyota' }));
     await user.type(dialog.getByLabelText('Model'), 'RAV4');
+    if (configured) await user.click(await dialog.findByRole('option', { name: 'RAV4' }));
     await user.type(dialog.getByLabelText('Current odometer (miles)'), '100');
     await user.click(dialog.getByRole('button', { name: 'Add car' }));
     await screen.findByRole('tab', { name: 'Daily driver' });
     expect(screen.queryByText(/^Plate:/)).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Edit car' }));
     const edit = within(screen.getByRole('dialog', { name: 'Edit car' }));
+    expect((edit.getByLabelText('Make') as HTMLInputElement).value).toBe('Toyota');
+    expect((edit.getByLabelText('Model') as HTMLInputElement).value).toBe('RAV4');
+    expect(edit.queryAllByRole('combobox')).toHaveLength(configured ? 2 : 0);
     await user.clear(edit.getByLabelText('Nickname'));
     await user.type(edit.getByLabelText('Nickname'), 'Updated driver');
     await user.click(edit.getByRole('button', { name: 'Save changes' }));
@@ -55,7 +69,8 @@ describe.each([
     } else {
       expect(local.cars[0].name).toBe('Updated driver');
       expect(local.schedules).toHaveLength(6);
-      expect(cloud.from).not.toHaveBeenCalled();
+      if (configured) expect(cloud.from.mock.calls.every(([table]) => table.startsWith('vehicle_'))).toBe(true);
+      else expect(cloud.from).not.toHaveBeenCalled();
       if (configured) expect(screen.getByText('Guest — stored in this browser')).toBeDefined();
       else expect(screen.getByText('Local prototype')).toBeDefined();
     }
@@ -63,12 +78,89 @@ describe.each([
     render(<GarageApp />);
     await screen.findByText('Updated driver');
     await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Edit car' }));
+    expect((screen.getByLabelText('Make') as HTMLInputElement).value).toBe('Toyota');
+    expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('RAV4');
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     await user.click(screen.getByRole('button', { name: 'Delete car and records' }));
     await screen.findByText('No cars yet');
     expect((await new LocalRepository().load()).cars).toEqual([]);
     expect(cloud.tables.get('cars')?.size ?? 0).toBe(0);
   });
+});
+
+it('preserves free text in add/edit, scopes models after make changes, and dismisses suggestions before the modal', async () => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://garage.supabase.co');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
+  const { GarageApp } = await import('./garage-app');
+  const { LocalRepository } = await import('../lib/repository');
+  render(<GarageApp />);
+  const user = userEvent.setup();
+  const opener = await screen.findByRole('button', { name: 'Add a car' });
+  await user.click(opener);
+  expect(document.activeElement).toBe(screen.getByLabelText('Nickname'));
+  fireEvent.change(screen.getByLabelText('Nickname'), { target: { value: 'Unlisted' } });
+  fireEvent.change(screen.getByLabelText('Current odometer (miles)'), { target: { value: '10' } });
+  await user.type(screen.getByLabelText('Make'), 'Toyota');
+  await screen.findByRole('option', { name: 'Toyota' });
+  await user.keyboard('{ArrowDown}{Enter}');
+  expect(screen.getByRole('dialog')).toBeDefined();
+  await user.type(screen.getByLabelText('Model'), 'Custom model');
+  await user.clear(screen.getByLabelText('Make'));
+  await user.type(screen.getByLabelText('Make'), 'Honda');
+  expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('Custom model');
+  await user.keyboard('{Escape}');
+  expect(screen.getByRole('dialog')).toBeDefined();
+  await user.clear(screen.getByLabelText('Model'));
+  await screen.findByRole('option', { name: 'Civic' });
+  expect(screen.queryByRole('option', { name: 'RAV4' })).toBeNull();
+  await user.type(screen.getByLabelText('Model'), ' RAV4 '); // Deliberately arbitrary Honda/model pair.
+  await user.click(screen.getByRole('button', { name: 'Add car' }));
+  await screen.findByRole('tab', { name: 'Unlisted' });
+  expect((await new LocalRepository().load()).cars[0]).toMatchObject({ make: 'Honda', model: 'RAV4' });
+  await user.click(screen.getByRole('button', { name: 'Edit car' }));
+  expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('RAV4');
+  await user.clear(screen.getByLabelText('Make'));
+  await user.type(screen.getByLabelText('Make'), ' Unknown maker ');
+  expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('RAV4');
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  expect((await new LocalRepository().load()).cars[0]).toMatchObject({ make: 'Unknown maker', model: 'RAV4' });
+  await user.click(screen.getByRole('button', { name: 'Edit car' }));
+  await user.click(screen.getByLabelText('Make'));
+  expect(screen.queryByRole('listbox')).toBeNull();
+  await user.keyboard('{Escape}');
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
+
+it('a catalog outage allows guest save and a later retry without altering saved edit values', async () => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://garage.supabase.co');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
+  cloud.execute.mockRejectedValueOnce(new Error('catalog offline'));
+  const { GarageApp } = await import('./garage-app');
+  const { LocalRepository } = await import('../lib/repository');
+  render(<GarageApp />);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Add a car' }));
+  await screen.findByText('Suggestions unavailable. You can still type any value.');
+  for (const [label, value] of [['Nickname', 'Free text'], ['Make', 'unknown'], ['Model', 'existing custom'], ['Current odometer (miles)', '1']]) {
+    fireEvent.change(screen.getByLabelText(label), { target: { value } });
+  }
+  await user.click(screen.getByRole('button', { name: 'Add car' }));
+  await screen.findByRole('tab', { name: 'Free text' });
+  expect((await new LocalRepository().load()).cars[0]).toMatchObject({ make: 'unknown', model: 'existing custom' });
+  cloud.execute.mockRejectedValueOnce(new Error('catalog still offline'));
+  await user.click(screen.getByRole('button', { name: 'Edit car' }));
+  await screen.findByText('Suggestions unavailable. You can still type any value.');
+  await user.click(screen.getByRole('button', { name: 'Retry make suggestions' }));
+  await waitFor(() => expect(screen.queryByText('Suggestions unavailable. You can still type any value.')).toBeNull());
+  await waitFor(() => expect(screen.queryByText('Loading suggestions. You can still type.')).toBeNull());
+  expect((screen.getByLabelText('Make') as HTMLInputElement).value).toBe('unknown');
+  expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('existing custom');
+  await user.click(screen.getByRole('button', { name: 'Save changes' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });
 
 describe.each([['guest', false], ['authenticated cloud', true]] as const)('%s plate workflow', (_mode, authenticated) => {

@@ -21,8 +21,9 @@ Open `http://localhost:3000`. Without environment variables the app runs in **lo
 2. Apply `supabase/migrations/0002_signup_photo_transfer.sql` as well. It permits owner-scoped photo updates so interrupted signup transfers can retry safely. In Supabase Auth, enable email/password authentication and **Allow new users to sign up**.
 3. Apply `supabase/migrations/0003_vehicle_distance_units.sql` before deploying the distance-unit update. It adds the unit with a Miles default; existing numeric values are preserved. All distance fields (including legacy `*_miles` columns) use the parent vehicle’s unit. The app writes the 500-mile or 1,000-kilometer reminder default explicitly.
 4. Apply `supabase/migrations/0004_car_plate.sql` **before deploying this plate update**. It adds an empty-default, non-null `cars.plate` column and a 20-character database constraint without changing owner-scoped RLS. Existing cars receive an empty plate. Deploy application writes only after this migration succeeds.
-5. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the project API settings in `.env.local` for local development, and in the hosting environment for deployment. Restart the app. Do not expose the service role key in a `NEXT_PUBLIC_` variable.
-6. Deploy the Next.js app to a personal Vercel Hobby project. Add the two public Supabase variables there. The migration enables owner-scoped row security and a private photo bucket.
+5. Apply `supabase/migrations/0005_vehicle_catalog.sql`, then run `supabase/seeds/vehicle-catalog.sql` as an administrator before deploying autocomplete. Run `supabase/tests/vehicle_catalog.sql` in the SQL editor to verify public reads, blocked browser writes, and owner-scoped car access. The check rolls back its fixtures.
+6. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the project API settings in `.env.local` for local development, and in the hosting environment for deployment. Restart the app. Do not expose the service role key in a `NEXT_PUBLIC_` variable.
+7. Deploy the Next.js app to a personal Vercel Hobby project. Add the two public Supabase variables there. The migration enables owner-scoped row security and a private photo bucket.
 
 Set Supabase Auth's **Site URL** to your app URL and allow your deployed URL and `http://localhost:3000` as confirmation redirect URLs. The app supports email confirmation being enabled or disabled. If confirmation is required, users can continue locally until they confirm their email and authenticate in the browser containing their guest data.
 
@@ -35,6 +36,26 @@ Set Supabase Auth's **Site URL** to your app URL and allow your deployed URL and
 Guests can use all garage features without signing in. **Create account** automatically transfers their records and photos after the new account authenticates. Transfers preserve record relationships and can resume after a reload or failed upload. Editing pauses during transfer or while awaiting retry; errors offer **Retry** or **Sign out**. Browser records and photos are only cleared after the cloud copy is verified. After a successful transfer, signing out opens a fresh guest garage. Edits made in another tab or after signing out during an interrupted transfer are retained locally.
 
 Ordinary **Sign in** does not import or delete guest data; it opens the account's cloud garage. Signing out restores any guest records that have never been transferred. A pending signup transfer resumes only for the account that created it and the same Supabase project. Use the same browser and site origin for signup and transfer; guest data cannot be recovered from another browser or device. Authenticated cloud failures do not fall back to local writes. CSV export remains available from **Service history**.
+
+## Optional make/model suggestions
+
+**Add a car** and **Edit car** offer editable Make and Model suggestions whenever Supabase is configured, including signed-out guests. Prototype mode keeps plain inputs and performs zero catalog requests. Makes load when the modal opens; models load only for the exact make after trimming, collapsing whitespace, and ignoring case. Year does not filter suggestions. Changing make preserves the typed model. Lists are paginated and cached in memory per project and make; typing filters locally. Failed reads offer a retry and never block car entry or saving.
+
+Up to ten suggestions appear, ordered by exact match, prefix, then substring, alphabetically within each group. Use Arrow Up/Down and Enter to choose, Escape to dismiss, or tap/click an option. Tab and blur preserve free text. Suggestions are optional: unknown names and arbitrary make/model pairs are accepted, with the existing required/50-character fields and trim-on-save behavior. There is no VIN lookup or vehicle verification, and cars have no catalog foreign keys.
+
+The initial catalog contains **145 makes and 1,560 models**, generated from the supplied [FuelEconomy.gov consolidated CSV](https://www.fueleconomy.gov/feg/download.shtml) (50,407 source records). The source covers US passenger cars and light trucks from 1984 onward; historical gaps, heavier vehicles, imports, and newly introduced models may be missing. See [field documentation](https://www.fueleconomy.gov/feg/ws/index.shtml). The import uses `baseModel` when nonempty and `model` otherwise, retaining meaningful punctuation and discarding years. It collapses whitespace, deduplicates normalized make/model pairs, and reports capitalization conflicts rather than inventing aliases.
+
+The file was supplied/imported on **2026-10-03**; its original retrieval date is unknown. SHA-256: `b1ff0e3071c46cdc1c99e0015878b98a01851462d7e447237ce2fc1294ccf303`. Full provenance, counts, and the 11 reviewed capitalization conflicts are in `supabase/seeds/vehicle-catalog.provenance.json`. Output chooses the first display name in code-point order for conflicts. The original CSV is not bundled into the browser or committed.
+
+Refresh explicitly after downloading a new CSV (no runtime source dependency or scheduled refresh):
+
+```powershell
+node scripts/generate-vehicle-catalog.mjs C:/path/to/vehicles.csv supabase/seeds/vehicle-catalog.sql 2026-10-03 2026-10-03
+```
+
+Use the actual received/import and retrieval dates as the final two arguments; omit the last date if unknown. Review the SQL and provenance diff before applying. Malformed, empty, invalid-control-character, or overlength names reject the generation and leave the previous seed intact; details are written to the report. Repeated generation with the same input and dates is deterministic. Apply the SQL through Supabase's administrative SQL editor or `psql` with `ON_ERROR_STOP=1`. Upserts preserve identifiers and prevent duplicates; refreshes add/update entries and do not delete historical entries. Browser roles (`anon`, `authenticated`) can only SELECT the catalog.
+
+Deployment order: migration, seed, database permission check, then UI. Smoke-test add/edit in configured guest and authenticated environments and in an unconfigured prototype; check desktop/narrow-screen dropdown scrolling, touch selection, focus return, and screen-reader active-option announcements. Keyboard/ARIA behavior is covered by component tests; an actual screen-reader pass remains part of release verification.
 
 ## Web analytics
 
