@@ -4,6 +4,8 @@ A private, responsive car maintenance tracker. Record multiple cars and service 
 
 Choose **Miles** (default) or **Kilometers** when adding a car. The distance unit is read-only in **Edit car**. Odometer readings, maintenance intervals, and service history use that vehicle’s chosen unit. Each car starts with a 30-day upcoming window and a distance window of **500 miles** or **1,000 kilometers**, adjustable in **Edit car**. Distance reminders use the latest entered odometer rather than an estimate. Existing vehicles remain Miles with their saved readings and reminder settings unchanged. CSV exports include a numeric Odometer column and a per-row Distance unit (`mi` or `km`).
 
+Each car can have an optional **License plate**, shown in its detail header when present. Add, edit, or clear it alongside VIN. Plates are free text up to **20 characters** after trimming leading and trailing whitespace; case, internal spaces, and punctuation are preserved. Blank input means no plate. No country-specific format, uniqueness rule, registration jurisdiction, or plate lookup is used. Older records load with no plate, and signup transfers preserve saved plates, including interrupted transfers resumed after a reload.
+
 ## Run locally
 
 ```powershell
@@ -18,9 +20,10 @@ Open `http://localhost:3000`. Without environment variables the app runs in **lo
 1. Create a free Supabase project. Run `supabase/migrations/0001_initial.sql` in its SQL editor, or apply it with the Supabase CLI.
 2. Apply `supabase/migrations/0002_signup_photo_transfer.sql` as well. It permits owner-scoped photo updates so interrupted signup transfers can retry safely. In Supabase Auth, enable email/password authentication and **Allow new users to sign up**.
 3. Apply `supabase/migrations/0003_vehicle_distance_units.sql` before deploying the distance-unit update. It adds the unit with a Miles default; existing numeric values are preserved. All distance fields (including legacy `*_miles` columns) use the parent vehicle’s unit. The app writes the 500-mile or 1,000-kilometer reminder default explicitly.
-4. Apply `supabase/migrations/0004_vehicle_catalog.sql`, then run `supabase/seeds/vehicle-catalog.sql` as an administrator before deploying autocomplete. Run `supabase/tests/vehicle_catalog.sql` in the SQL editor to verify public reads, blocked browser writes, and owner-scoped car access. The check rolls back its fixtures.
-5. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the project API settings in `.env.local` for local development, and in the hosting environment for deployment. Restart the app. Do not expose the service role key in a `NEXT_PUBLIC_` variable.
-6. Deploy the Next.js app to a personal Vercel Hobby project. Add the two public Supabase variables there. The migration enables owner-scoped row security and a private photo bucket.
+4. Apply `supabase/migrations/0004_car_plate.sql` **before deploying this plate update**. It adds an empty-default, non-null `cars.plate` column and a 20-character database constraint without changing owner-scoped RLS. Existing cars receive an empty plate. Deploy application writes only after this migration succeeds.
+5. Apply `supabase/migrations/0005_vehicle_catalog.sql`, then run `supabase/seeds/vehicle-catalog.sql` as an administrator before deploying autocomplete. Run `supabase/tests/vehicle_catalog.sql` in the SQL editor to verify public reads, blocked browser writes, and owner-scoped car access. The check rolls back its fixtures.
+6. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the project API settings in `.env.local` for local development, and in the hosting environment for deployment. Restart the app. Do not expose the service role key in a `NEXT_PUBLIC_` variable.
+7. Deploy the Next.js app to a personal Vercel Hobby project. Add the two public Supabase variables there. The migration enables owner-scoped row security and a private photo bucket.
 
 Set Supabase Auth's **Site URL** to your app URL and allow your deployed URL and `http://localhost:3000` as confirmation redirect URLs. The app supports email confirmation being enabled or disabled. If confirmation is required, users can continue locally until they confirm their email and authenticate in the browser containing their guest data.
 

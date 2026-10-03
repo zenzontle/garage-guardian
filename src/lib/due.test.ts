@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addMonths, dueDescription, getDueItem, latestOdometer } from "./due";
 import type { Car, ScheduleItem, Visit } from "./model";
 
-const car: Car = { id: "car-1", name: "RAV4", year: 2020, make: "Toyota", model: "RAV4", vin: "", distanceUnit: "miles", odometer: 19_500, reminderDays: 30, reminderMiles: 500, createdAt: "2026-01-01T00:00:00Z" };
+const car: Car = { id: "car-1", name: "RAV4", year: 2020, make: "Toyota", model: "RAV4", vin: "", plate: "", distanceUnit: "miles", odometer: 19_500, reminderDays: 30, reminderMiles: 500, createdAt: "2026-01-01T00:00:00Z" };
 const schedule: ScheduleItem = { id: "oil", carId: car.id, name: "Oil change", intervalMiles: 5_000, intervalMonths: 6, firstDueMiles: 20_000, firstDueDate: "2026-11-01", sourceNote: "Manual", isActive: true, createdAt: "2026-01-01T00:00:00Z" };
 const visit: Visit = { id: "visit-1", carId: car.id, date: "2026-09-25", odometer: 20_050, totalCostCents: 8500, provider: "Dealer", notes: "", items: [{ id: "item-1", name: "Oil change", scheduleItemId: schedule.id, costCents: null }], photos: [], createdAt: "2026-09-25T00:00:00Z" };
 

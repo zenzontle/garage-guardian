@@ -10,9 +10,9 @@ The change adds optional make/model suggestions to the shared car modal. No cata
 
 ## Database verification
 
-Ran all four repository migrations, the generated seed twice, and `supabase/tests/vehicle_catalog.sql` in an isolated PGlite PostgreSQL engine. Minimal `auth`/`storage` schema stand-ins supported the existing migrations; Supabase-style default table grants were present before migration 0004. Verified stable make IDs and unchanged counts after reseeding, RLS enabled on both catalog tables, complete anonymous/authenticated reads, no browser write grants, rejected catalog write attempts, anonymous car isolation, owner-only car reads/updates, and free-text car updates. The SQL verification fixtures roll back.
+Ran all five repository migrations, the generated seed twice, and `supabase/tests/vehicle_catalog.sql` in an isolated PGlite PostgreSQL engine. Minimal `auth`/`storage` schema stand-ins supported the existing migrations; Supabase-style default table grants were present before catalog migration 0005. Verified stable make IDs and unchanged counts after reseeding, RLS enabled on both catalog tables, complete anonymous/authenticated reads, no browser write grants, rejected catalog write attempts, anonymous car isolation, owner-only car reads/updates, and free-text car updates. The SQL verification fixtures roll back.
 
-This validates SQL behavior locally. The actual target Supabase project must apply migration 0004 and the seed, then run the SQL check before UI deployment. No live Supabase configuration or hosting target was provided in this worktree.
+This validates SQL behavior locally. The actual target Supabase project must apply catalog migration 0005 and the seed, then run the SQL check before UI deployment. No live Supabase configuration or hosting target was provided in this worktree.
 
 ## Browser verification
 

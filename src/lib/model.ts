@@ -8,6 +8,7 @@ export type Car = {
   make: string;
   model: string;
   vin: string;
+  plate: string;
   distanceUnit: DistanceUnit;
   odometer: number;
   reminderDays: number;
@@ -108,7 +109,18 @@ export function distanceInMiles(distance: number, unit?: DistanceUnit): number {
 
 export function normalizeCar(car: Car): Car {
   const distanceUnit = distanceUnitOrDefault(car.distanceUnit);
-  return { ...car, distanceUnit, reminderMiles: car.reminderMiles ?? defaultReminderDistance(distanceUnit) };
+  return { ...car, plate: car.plate ?? "", distanceUnit, reminderMiles: car.reminderMiles ?? defaultReminderDistance(distanceUnit) };
+}
+
+export const PLATE_MAX_LENGTH = 20;
+
+export function normalizePlate(plate?: string | null): string {
+  const value = (plate ?? "").trim();
+  // Count Unicode characters like PostgreSQL char_length, rather than UTF-16 units.
+  if (Array.from(value).length > PLATE_MAX_LENGTH) {
+    throw new Error(`License plate must be ${PLATE_MAX_LENGTH} characters or fewer.`);
+  }
+  return value;
 }
 
 export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
