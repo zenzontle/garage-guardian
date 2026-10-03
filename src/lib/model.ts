@@ -1,3 +1,5 @@
+import { AppError } from "./app-error";
+
 export type DistanceUnit = "miles" | "kilometers";
 
 // All distance values, including legacy *Miles fields, use the owning car's unit.
@@ -75,8 +77,8 @@ export const STARTER_TASKS = [
 
 export const newId = () => crypto.randomUUID();
 
-export function makeStarterSchedules(carId: string): ScheduleItem[] {
-  return STARTER_TASKS.map((name) => ({
+export function makeStarterSchedules(carId: string, names: readonly string[] = STARTER_TASKS): ScheduleItem[] {
+  return names.map((name) => ({
     id: newId(), carId, name, intervalMiles: null, intervalMonths: null,
     firstDueMiles: null, firstDueDate: null, sourceNote: "", isActive: true,
     createdAt: new Date().toISOString(),
@@ -118,7 +120,7 @@ export function normalizePlate(plate?: string | null): string {
   const value = (plate ?? "").trim();
   // Count Unicode characters like PostgreSQL char_length, rather than UTF-16 units.
   if (Array.from(value).length > PLATE_MAX_LENGTH) {
-    throw new Error(`License plate must be ${PLATE_MAX_LENGTH} characters or fewer.`);
+    throw new AppError("plateLength", { count: PLATE_MAX_LENGTH });
   }
   return value;
 }

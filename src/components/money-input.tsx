@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
 type MoneyInputProps = {
@@ -11,6 +12,7 @@ type MoneyInputProps = {
 };
 
 export function MoneyInput({ label, value, onChange, placeholder, required }: MoneyInputProps) {
+  const t = useTranslations("money");
   function increment(amount: number) {
     const current = Number(value || 0);
     if (!Number.isFinite(current)) return;
@@ -36,8 +38,8 @@ export function MoneyInput({ label, value, onChange, placeholder, required }: Mo
       required={required}
     />
     <div className="money-steppers">
-      <button type="button" aria-label={`Increase ${label.toLowerCase()} by one dollar`} onClick={() => increment(1)}><ChevronUp size={12} /></button>
-      <button type="button" aria-label={`Decrease ${label.toLowerCase()} by one dollar`} onClick={() => increment(-1)}><ChevronDown size={12} /></button>
+      <button type="button" aria-label={t("increase", { label: label.toLowerCase() })} onClick={() => increment(1)}><ChevronUp size={12} /></button>
+      <button type="button" aria-label={t("decrease", { label: label.toLowerCase() })} onClick={() => increment(-1)}><ChevronDown size={12} /></button>
     </div>
   </div>;
 }

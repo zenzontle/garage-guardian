@@ -1,6 +1,7 @@
 'use client';
 
 import { del, get, set, update } from 'idb-keyval';
+import { AppError } from './app-error';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { LocalRepository, SupabaseRepository, sameRecord } from './repository';
 import { normalizeSnapshot, type Snapshot } from './model';
@@ -20,7 +21,7 @@ export async function registerSignup(project: string, user: User, hasSession: bo
   // Supabase can return an obfuscated user with no identities for an existing email.
   if (!hasSession && !user.identities?.length) return;
   await update<Transfer>(transferKey(project), (previous) => {
-    if (previous && previous.userId !== user.id) throw new Error('Finish the previous account transfer before creating another account.');
+    if (previous && previous.userId !== user.id) throw new AppError('previousTransfer');
     return previous ?? { userId: user.id, status: 'pending' };
   });
 }
@@ -59,7 +60,7 @@ async function runTransfer(client: SupabaseClient, project: string, userId: stri
     transfer = { ...transfer, status: 'uploading', snapshot };
     await set(transferKey(project), transfer);
   }
-  if (!transfer.snapshot) throw new Error('The transfer could not be resumed. Your browser data has been kept.');
+  if (!transfer.snapshot) throw new AppError('transferResume');
   const snapshot = transfer.snapshot;
 
   if (transfer.status !== 'uploaded') {
@@ -79,11 +80,11 @@ async function runTransfer(client: SupabaseClient, project: string, userId: stri
         assertActive();
         const { data: uploaded, error: readError } = await client.storage.from('visit-photos').download(path);
         if (readError) throw readError;
-        if (!uploaded || uploaded.size !== file.size) throw new Error('A photo upload could not be verified. Your browser data has been kept.');
+        if (!uploaded || uploaded.size !== file.size) throw new AppError('photoVerification');
         const [originalBytes, uploadedBytes] = await Promise.all([file.arrayBuffer(), uploaded.arrayBuffer()]);
         const verifiedBytes = new Uint8Array(uploadedBytes);
         if (!new Uint8Array(originalBytes).every((byte, index) => byte === verifiedBytes[index])) {
-          throw new Error('A photo upload could not be verified. Your browser data has been kept.');
+          throw new AppError('photoVerification');
         }
         photo.path = path;
       }
@@ -95,7 +96,7 @@ async function runTransfer(client: SupabaseClient, project: string, userId: stri
     for (const key of ['cars', 'schedules', 'visits'] as const) {
       for (const item of expected[key]) {
         if (!sameRecord(item, saved[key].find((entry) => entry.id === item.id))) {
-          throw new Error('The upload could not be verified. Your browser data has been kept. Retry the transfer.');
+          throw new AppError('transferVerification');
         }
       }
     }

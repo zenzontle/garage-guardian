@@ -1,6 +1,7 @@
 'use client';
 
 import { del, get, set, update } from 'idb-keyval';
+import { AppError } from './app-error';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { EMPTY_SNAPSHOT, normalizeCar, normalizePlate, normalizeSnapshot, type Car, type Photo, type ScheduleItem, type Snapshot, type Visit } from './model';
 
@@ -81,7 +82,7 @@ export class LocalRepository implements Repository {
   }
   async readPhoto(photo: Photo): Promise<Blob> {
     const file = await get<Blob>(`photo:${photo.path}`);
-    if (!file) throw new Error(`Photo ${photo.name} is no longer available. Your local records have been kept.`);
+    if (!file) throw new AppError("photoMissing", { name: photo.name });
     return file;
   }
   async clearTransferred(transferred: Snapshot) {

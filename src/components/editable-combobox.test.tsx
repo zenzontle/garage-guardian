@@ -3,11 +3,13 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { EditableCombobox } from './editable-combobox';
+import { NextIntlClientProvider } from 'next-intl';
+import en from '../../messages/en.json';
 
 const suggestions = ['Honda', 'Toyota', 'Toyland'].map((name) => ({ id: name, lookup_key: name.toLowerCase(), display_name: name }));
 function Harness({ failed = false, loading = false, entries = suggestions, retry = vi.fn() }) {
   const [value, setValue] = useState('');
-  return <form onSubmit={(event) => event.preventDefault()}><EditableCombobox label="Make" value={value} onChange={setValue} suggestions={entries} failed={failed} loading={loading} onRetry={retry} /><button>Save</button></form>;
+  return <NextIntlClientProvider locale="en" messages={en} timeZone="UTC"><form onSubmit={(event) => event.preventDefault()}><EditableCombobox label="Make" value={value} onChange={setValue} suggestions={entries} failed={failed} loading={loading} onRetry={retry} /><button>Save</button></form></NextIntlClientProvider>;
 }
 describe('editable combobox', () => {
   it('announces the active option, wraps navigation, selects with Enter without submission, and closes with Escape', async () => {
