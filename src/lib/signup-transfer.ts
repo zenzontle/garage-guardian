@@ -60,10 +60,11 @@ async function runTransfer(client: SupabaseClient, project: string, userId: stri
     await set(transferKey(project), transfer);
   }
   if (!transfer.snapshot) throw new Error('The transfer could not be resumed. Your browser data has been kept.');
-  const snapshot = normalizeSnapshot(transfer.snapshot);
+  const snapshot = transfer.snapshot;
 
   if (transfer.status !== 'uploaded') {
-    const expected = structuredClone(snapshot);
+    // Normalize old pending snapshots for verification; keep the cleanup original frozen.
+    const expected = normalizeSnapshot(structuredClone(snapshot));
     // Each await is a cancellation boundary: never continue under another session.
     for (const car of expected.cars) { assertActive(); await cloud.saveCar(car); }
     for (const item of expected.schedules) { assertActive(); await cloud.saveSchedule(item); }

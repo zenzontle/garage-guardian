@@ -19,7 +19,7 @@ async function seedLocal(withPhoto = true) {
 
 describe('signup transfer', () => {
   it.each(['pending', 'uploading', 'uploaded'])('resumes a legacy %s transfer and cleans up equivalent guest records', async (status) => {
-    const { distanceUnit: _unit, ...legacyCar } = car;
+    const { distanceUnit: _unit, plate: _plate, ...legacyCar } = car;
     const snapshot = { cars: [legacyCar], schedules: [schedule], visits: [visit] };
     await set('garage-guardian:local:v1', snapshot);
     await set(`garage-guardian:signup-transfer:v1:${project}`, { userId: account().id, status, snapshot });
@@ -30,6 +30,56 @@ describe('signup transfer', () => {
     if (status !== 'uploaded') {
       expect((await new SupabaseRepository(cloud.client, account().id).load()).cars).toEqual([car]);
     }
+  });
+
+  it('preserves a saved plate through a failed upload and a reload retry', async () => {
+    const { local, photo } = await seedLocal();
+    const plated = { ...car, plate: 'AbC  - 123' };
+    await local.saveCar(plated);
+    const cloud = fakeSupabase(); cloud.emit(account());
+    await registerSignup(project, account(), true);
+    cloud.bucket.upload.mockResolvedValueOnce({ error: new Error('Upload failed') });
+    await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow('Upload failed');
+    expect((await pendingTransfer(project))?.snapshot?.cars).toEqual([plated]);
+    expect((await local.load()).cars).toEqual([plated]);
+    expect(await local.readPhoto(photo)).toBeInstanceOf(Blob);
+    vi.resetModules();
+    const reloaded = await import('./signup-transfer');
+    await reloaded.transferSignupData(cloud.client, project, account().id);
+    expect((await new SupabaseRepository(cloud.client, account().id).load()).cars).toEqual([plated]);
+    expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+    expect(await pendingTransfer(project)).toBeUndefined();
+  });
+
+  it('keeps a legacy pending snapshot frozen and preserves a concurrent guest plate edit', async () => {
+    const { plate: _plate, ...legacyCar } = car;
+    const snapshot = { cars: [legacyCar], schedules: [], visits: [] };
+    await set('garage-guardian:local:v1', snapshot);
+    await set(`garage-guardian:signup-transfer:v1:${project}`, { userId: account().id, status: 'uploading', snapshot });
+    const cloud = fakeSupabase(); cloud.emit(account());
+    const local = new LocalRepository();
+    const originalLoad = SupabaseRepository.prototype.load;
+    vi.spyOn(SupabaseRepository.prototype, 'load').mockImplementationOnce(async function (this: SupabaseRepository) {
+      expect((await pendingTransfer(project))?.snapshot).toEqual(snapshot);
+      await local.saveCar({ ...car, plate: 'New local plate' });
+      return originalLoad.call(this);
+    });
+    await transferSignupData(cloud.client, project, account().id);
+    expect((await new SupabaseRepository(cloud.client, account().id).load()).cars).toEqual([car]);
+    expect((await local.load()).cars).toEqual([{ ...car, plate: 'New local plate' }]);
+    expect(await pendingTransfer(project)).toBeUndefined();
+  });
+
+  it('retains a populated plate when cloud verification returns a different value', async () => {
+    const { local } = await seedLocal(false);
+    const plated = { ...car, plate: 'AbC-123' };
+    await local.saveCar(plated);
+    const cloud = fakeSupabase(); cloud.emit(account());
+    vi.spyOn(SupabaseRepository.prototype, 'load').mockResolvedValueOnce({ cars: [car], schedules: [schedule], visits: [visit] });
+    await registerSignup(project, account(), true);
+    await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow('upload could not be verified');
+    expect((await local.load()).cars).toEqual([plated]);
+    expect((await pendingTransfer(project))?.status).toBe('uploading');
   });
 
   it('preserves kilometer units, readings, and maintenance intervals during signup transfer', async () => {
