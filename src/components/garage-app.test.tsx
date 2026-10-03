@@ -10,6 +10,8 @@ import { car, visit } from '../test/fixtures';
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 let cloud: ReturnType<typeof fakeSupabase>;
 beforeEach(async () => {
+  localStorage.clear();
+  vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['en-US']);
   await clear(); vi.resetModules(); vi.doMock('react', () => React);
   cloud = fakeSupabase();
   cloud.tables.set('vehicle_makes', new Map([
@@ -21,6 +23,88 @@ beforeEach(async () => {
     ['civic', { id: 'civic', make_id: 'honda', lookup_key: 'civic', display_name: 'Civic' }],
   ]));
   vi.mocked(createClient).mockReturnValue(cloud.client as unknown as ReturnType<typeof createClient>);
+});
+
+describe.each([
+  ['prototype', false, false], ['guest', true, false], ['cloud', true, true],
+] as const)('%s Spanish workflows', (_mode, configured, authenticated) => {
+  it('saves canonical car/task/visit values, preserves drafts and errors, and keeps exports and calculations unchanged', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', configured ? 'https://garage.supabase.co' : '');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', configured ? 'test-key' : '');
+    localStorage.setItem('garage-guardian:locale', 'es');
+    if (authenticated) cloud.emit(account());
+    const { GarageApp } = await import('./garage-app');
+    const { createRepository } = await import('../lib/repository');
+    const { visitsToCsv, reportTotals } = await import('../lib/reports');
+    const { getAllDue } = await import('../lib/due');
+    const backend = createRepository(authenticated ? account().id : undefined);
+    const saveCar = vi.spyOn(backend.constructor.prototype, 'saveCar');
+    const saveSchedule = vi.spyOn(backend.constructor.prototype, 'saveSchedule');
+    const saveVisit = vi.spyOn(backend.constructor.prototype, 'saveVisit');
+    const app = render(<GarageApp />), user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Añadir un auto' }));
+    const dialogElement = screen.getByRole('dialog'), dialog = within(dialogElement);
+    await user.type(dialog.getByLabelText('Nombre del auto'), 'Mi auto / My car');
+    await user.type(dialog.getByLabelText('Marca'), 'Toyota');
+    await user.type(dialog.getByLabelText('Modelo'), 'RAV4');
+    await user.selectOptions(dialog.getByLabelText('Unidad de distancia'), 'kilometers');
+    await user.type(dialog.getByLabelText('Odómetro actual (kilómetros)'), '48250');
+    fireEvent.change(dialog.getByLabelText(/Matrícula/), { target: { value: 'A'.repeat(21) } });
+    await user.click(dialog.getByRole('button', { name: 'Añadir auto' }));
+    expect((await dialog.findByRole('alert')).textContent).toBe('La matrícula debe tener 20 caracteres o menos.');
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Idioma' }), 'en');
+    expect(screen.getByRole('dialog')).toBe(dialogElement);
+    expect(dialog.getByRole('alert').textContent).toBe('License plate must be 20 characters or fewer.');
+    expect((dialog.getByLabelText('Nickname') as HTMLInputElement).value).toBe('Mi auto / My car');
+    expect((dialog.getByLabelText('Current odometer (kilometers)') as HTMLInputElement).value).toBe('48250');
+    expect(saveCar).not.toHaveBeenCalled();
+    await user.selectOptions(dialog.getByRole('combobox', { name: 'Language' }), 'es');
+    fireEvent.change(dialog.getByLabelText(/Matrícula/), { target: { value: ' AbC-123 ' } });
+    await user.click(dialog.getByRole('button', { name: 'Añadir auto' }));
+    await screen.findByRole('tab', { name: 'Mi auto / My car' });
+    const created = await backend.load();
+    expect(created.cars[0]).toMatchObject({ name: 'Mi auto / My car', odometer: 48250, distanceUnit: 'kilometers', reminderMiles: 1000, plate: 'AbC-123' });
+    expect(created.schedules.map((task) => task.name)).toContain('Cambio de aceite');
+    await user.click(screen.getByRole('button', { name: 'Añadir tarea' }));
+    const task = within(screen.getByRole('dialog'));
+    await user.type(task.getByLabelText('Nombre de la tarea'), 'User-owned task');
+    fireEvent.change(task.getByLabelText(/Primer vencimiento en el odómetro/), { target: { value: '49000' } });
+    fireEvent.change(task.getByLabelText(/Fecha del primer vencimiento/), { target: { value: '2026-12-31' } });
+    await user.click(task.getByRole('button', { name: 'Guardar tarea' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await user.click(screen.getByRole('button', { name: 'Registrar servicio' }));
+    const visitElement = screen.getByRole('dialog'), visitDialog = within(visitElement);
+    fireEvent.change(visitDialog.getByLabelText('Fecha'), { target: { value: '2026-09-25' } });
+    fireEvent.change(visitDialog.getByLabelText('Odómetro (kilómetros)'), { target: { value: '48500' } });
+    fireEvent.change(visitDialog.getByRole('spinbutton', { name: 'Costo total (USD)' }), { target: { value: '1234.56' } });
+    fireEvent.change(visitDialog.getByRole('textbox', { name: 'Nombre de la tarea de servicio' }), { target: { value: 'Unallocated' } });
+    fireEvent.change(visitDialog.getByRole('spinbutton', { name: 'Costo de la tarea en dólares' }), { target: { value: '100.25' } });
+    await user.selectOptions(visitDialog.getByRole('combobox', { name: 'Idioma' }), 'en');
+    expect(screen.getByRole('dialog')).toBe(visitElement);
+    expect((visitDialog.getByRole('spinbutton', { name: 'Total cost (USD)' }) as HTMLInputElement).value).toBe('1234.56');
+    await user.selectOptions(visitDialog.getByRole('combobox', { name: 'Language' }), 'es');
+    await user.click(visitDialog.getByRole('button', { name: 'Guardar visita' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const saved = await backend.load();
+    expect(saved.visits[0]).toMatchObject({ date: '2026-09-25', odometer: 48500, totalCostCents: 123456, items: [{ name: 'Unallocated', costCents: 10025 }] });
+    const csv = visitsToCsv(saved.visits, saved.cars), totals = reportTotals(saved.visits, saved.cars);
+    const due = getAllDue(saved.cars, saved.schedules, saved.visits, '2026-10-03');
+    const counts = [saveCar.mock.calls.length, saveSchedule.mock.calls.length, saveVisit.mock.calls.length, cloud.execute.mock.calls.length];
+    await user.click(within(screen.getByRole('navigation', { name: 'Navegación principal' })).getByRole('button', { name: 'Informes' }));
+    expect(screen.getByText('Sin asignar')).toBeDefined();
+    expect(screen.getByText('Unallocated')).toBeDefined();
+    expect(screen.getAllByText(new Intl.NumberFormat('es', { style: 'currency', currency: 'USD' }).format(1234.56), { normalizer: (value) => value }).length).toBeGreaterThan(0);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
+    expect(screen.getByRole('heading', { name: 'Reports' })).toBeDefined();
+    expect([saveCar.mock.calls.length, saveSchedule.mock.calls.length, saveVisit.mock.calls.length, cloud.execute.mock.calls.length]).toEqual(counts);
+    expect(await backend.load()).toEqual(saved);
+    expect(visitsToCsv(saved.visits, saved.cars)).toBe(csv);
+    expect(reportTotals(saved.visits, saved.cars)).toEqual(totals);
+    expect(getAllDue(saved.cars, saved.schedules, saved.visits, '2026-10-03')).toEqual(due);
+    app.unmount(); render(<GarageApp />);
+    await screen.findByRole('heading', { name: 'Your garage at a glance' });
+    expect(document.documentElement.lang).toBe('en');
+  }, 20000);
 });
 
 describe.each([
@@ -38,7 +122,7 @@ describe.each([
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Add a car' }));
     const dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
-    expect(dialog.queryAllByRole('combobox')).toHaveLength(configured ? 3 : 1); // Includes distance-unit select.
+    expect(dialog.queryAllByRole('combobox')).toHaveLength(configured ? 4 : 2); // Includes language and distance-unit selects.
     expect((dialog.getByLabelText('Distance unit') as HTMLSelectElement).value).toBe('miles');
     expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe('500');
     await user.type(dialog.getByLabelText('Nickname'), 'Daily driver');
@@ -54,7 +138,7 @@ describe.each([
     const edit = within(screen.getByRole('dialog', { name: 'Edit car' }));
     expect((edit.getByLabelText('Make') as HTMLInputElement).value).toBe('Toyota');
     expect((edit.getByLabelText('Model') as HTMLInputElement).value).toBe('RAV4');
-    expect(edit.queryAllByRole('combobox')).toHaveLength(configured ? 2 : 0);
+    expect(edit.queryAllByRole('combobox')).toHaveLength(configured ? 3 : 1);
     await user.clear(edit.getByLabelText('Nickname'));
     await user.type(edit.getByLabelText('Nickname'), 'Updated driver');
     await user.click(edit.getByRole('button', { name: 'Save changes' }));
@@ -360,4 +444,85 @@ it('offers retry and sign-out after an authenticated cloud load failure', async 
   expect(screen.getByRole('button', { name: 'Sign out' })).toBeDefined();
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
   await waitFor(() => expect(screen.getByRole('button', { name: 'Add a car' })).toBeDefined());
+});
+
+it('updates an existing missing-photo error when the language changes', async () => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
+  localStorage.setItem('garage-guardian:locale', 'es');
+  const { LocalRepository } = await import('../lib/repository');
+  const local = new LocalRepository(); await local.saveCar(car);
+  await local.saveVisit({ ...visit, photos: [{ id: 'missing', name: 'receipt.webp', path: 'missing', contentType: 'image/webp' }] });
+  const { GarageApp } = await import('./garage-app');
+  render(<GarageApp />); const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Historial de servicio' }));
+  await user.click(screen.getByRole('button', { name: 'Oil change' }));
+  await user.click(screen.getByRole('button', { name: 'receipt.webp' }));
+  await screen.findByText('La foto receipt.webp ya no está disponible. Tus registros locales se conservan.');
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
+  expect(screen.getByText('Photo receipt.webp is no longer available. Your local records have been kept.')).toBeDefined();
+  expect(screen.getByRole('button', { name: 'Oil change' }).getAttribute('aria-expanded')).toBe('true');
+});
+
+it('localizes a recognized auth failure and confirmation notice while preserving account drafts', async () => {
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://garage.supabase.co');
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
+  cloud.auth.signInWithPassword.mockRejectedValueOnce({ code: 'invalid_credentials', message: 'Private diagnostic' });
+  const { GarageApp } = await import('./garage-app');
+  render(<GarageApp />); const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Sign in' }));
+  await user.type(screen.getByLabelText('Email'), 'new@example.com');
+  await user.type(screen.getByLabelText('Password'), 'password');
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+  expect((await screen.findByRole('alert')).textContent).toContain('The email or password is incorrect');
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
+  expect(screen.getByRole('alert').textContent).toContain('El correo o la contraseña son incorrectos');
+  expect(screen.getByLabelText('Correo electrónico')).toHaveProperty('value', 'new@example.com');
+  expect(screen.getByLabelText('Contraseña')).toHaveProperty('value', 'password');
+  expect(cloud.auth.signInWithPassword).toHaveBeenCalledOnce();
+  await user.click(screen.getByRole('button', { name: 'Crear una cuenta' }));
+  cloud.requireConfirmation();
+  await user.type(screen.getByLabelText('Contraseña'), 'password');
+  await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));
+  await screen.findByText(/Revisa tu correo para confirmar/);
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
+  await screen.findByText(/Check your email to confirm/);
+  expect(cloud.auth.signUp).toHaveBeenCalledOnce();
+});
+
+it('switches languages during a transfer and its recovery without restarting work, then retains the choice on logout', async () => {
+  const project = 'https://garage.supabase.co';
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', project);
+  vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
+  const { LocalRepository, createRepository } = await import('../lib/repository');
+  const { registerSignup } = await import('../lib/signup-transfer');
+  const local = new LocalRepository(); await local.saveCar(car); await local.saveVisit(visit);
+  await registerSignup(project, account(), true);
+  cloud.emit(account());
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  cloud.execute.mockImplementationOnce(async () => { await gate; return { data: null, error: new Error('Private provider details') }; });
+  const { GarageApp } = await import('./garage-app');
+  const user = userEvent.setup(); render(<GarageApp />);
+  await screen.findByRole('heading', { name: 'Moving your garage to Supabase' });
+  await waitFor(() => expect(cloud.execute).toHaveBeenCalledOnce());
+  const runningCalls = cloud.execute.mock.calls.length;
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
+  expect(screen.getByRole('heading', { name: 'Transfiriendo tu garaje a Supabase' })).toBeDefined();
+  expect(cloud.execute.mock.calls.length).toBe(runningCalls);
+  release();
+  expect((await screen.findByRole('alert')).textContent).toContain('Se conserva la copia del navegador');
+  const failedCalls = cloud.execute.mock.calls.length;
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
+  expect(screen.getByRole('alert').textContent).toContain('Your browser copy has been kept');
+  expect(cloud.execute.mock.calls.length).toBe(failedCalls);
+  expect(await local.load()).toMatchObject({ cars: [car], visits: [visit] });
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
+  await user.click(screen.getByRole('button', { name: 'Reintentar' }));
+  await screen.findByRole('heading', { name: 'Tu garaje de un vistazo' });
+  expect((await createRepository(account().id).load()).cars).toEqual([car]);
+  await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
+  await screen.findByRole('button', { name: 'Crear cuenta' });
+  expect(screen.getByRole('combobox', { name: 'Idioma' })).toHaveProperty('value', 'es');
+  expect(localStorage.getItem('garage-guardian:locale')).toBe('es');
 });

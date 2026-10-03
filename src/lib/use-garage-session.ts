@@ -1,15 +1,11 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppError, failureOf, type AppFailure } from './app-error';
 import type { User } from '@supabase/supabase-js';
 import { EMPTY_SNAPSHOT, type Snapshot } from './model';
 import { createRepository, supabase, type Repository } from './repository';
 import { pendingTransfer, registerSignup, transferSignupData } from './signup-transfer';
-
-export function errorMessage(cause: unknown): string {
-  if (cause && typeof cause === 'object' && 'message' in cause && typeof cause.message === 'string') return cause.message;
-  return 'Something went wrong. Please try again.';
-}
 
 export function useGarageSession() {
   const [repository, setRepository] = useState<Repository | null>(null);
@@ -17,7 +13,7 @@ export function useGarageSession() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [transferring, setTransferring] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<AppFailure | null>(null);
   const generation = useRef(0);
   const operations = useRef(new Set<Promise<unknown>>());
   const signupWork = useRef<Promise<unknown> | null>(null);
@@ -37,18 +33,19 @@ export function useGarageSession() {
       currentUser.current = nextUser;
       const version = ++generation.current;
       const assertActive = () => {
-        if (!active || generation.current !== version) throw new Error('Your session changed. Please try again.');
+        if (!active || generation.current !== version) throw new AppError('sessionChanged');
       };
       setUser(nextUser);
       setRepository(null);
       setSnapshot(EMPTY_SNAPSHOT);
-      setError('');
+      setError(null);
       setLoading(true);
       setTransferring(false);
 
       // The auth callback only schedules work; Supabase calls happen after it returns.
       setTimeout(() => {
         void (async () => {
+          let failureContext: 'load' | 'transfer' = 'load';
           try {
             await signupWork.current;
             await Promise.allSettled([...operations.current]);
@@ -57,7 +54,9 @@ export function useGarageSession() {
               const pending = await pendingTransfer(project);
               assertActive();
               setTransferring(pending?.userId === nextUser.id);
+              if (pending?.userId === nextUser.id) failureContext = 'transfer';
               await transferSignupData(supabase, project, nextUser.id, assertActive);
+              failureContext = 'load';
             }
             assertActive();
             const backend = createRepository(nextUser?.id);
@@ -83,7 +82,7 @@ export function useGarageSession() {
             setRepository(guarded);
             setTransferring(false);
           } catch (cause) {
-            if (active && generation.current === version) setError(errorMessage(cause));
+            if (active && generation.current === version) setError(failureOf(cause, failureContext));
           } finally {
             if (active && generation.current === version) setLoading(false);
           }
@@ -103,7 +102,7 @@ export function useGarageSession() {
           if (error) throw error;
           receive(data.session?.user ?? null);
         } catch (cause) {
-          if (active && identity === undefined) { setError(errorMessage(cause)); setLoading(false); }
+          if (active && identity === undefined) { setError(failureOf(cause, 'load')); setLoading(false); }
         }
       };
       retry.current = () => { if (identity === undefined) void initialize(); else receive(currentUser.current, true); };
@@ -114,17 +113,17 @@ export function useGarageSession() {
   }, [project]);
 
   const run = useCallback(async (action: () => Promise<void>) => {
-    if (!repository || mutationBusy.current) throw new Error('Please wait for the current operation to finish.');
+    if (!repository || mutationBusy.current) throw new AppError('operationBusy');
     mutationBusy.current = true;
     const version = generation.current;
-    setError('');
+    setError(null);
     const work = (async () => {
       try {
         await action();
         const data = await repository.load();
         if (generation.current === version) setSnapshot(data);
       } catch (cause) {
-        if (generation.current === version) setError(errorMessage(cause));
+        if (generation.current === version) setError(failureOf(cause, 'save'));
         throw cause;
       } finally { mutationBusy.current = false; }
     })();
@@ -134,12 +133,12 @@ export function useGarageSession() {
   }, [repository]);
 
   async function signUp(email: string, password: string): Promise<boolean> {
-    if (!supabase) throw new Error('Cloud accounts are not configured.');
-    if (signupWork.current) throw new Error('Account creation is already in progress.');
+    if (!supabase) throw new AppError('cloudNotConfigured');
+    if (signupWork.current) throw new AppError('signupBusy');
     const client = supabase;
     const work = (async () => {
       const pending = await pendingTransfer(project);
-      if (pending) throw new Error('Sign in to finish the previous account transfer before creating another account.');
+      if (pending) throw new AppError('previousTransfer');
       const { data, error } = await client.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
       if (error) throw error;
       if (data.user) await registerSignup(project, data.user, Boolean(data.session));
@@ -152,7 +151,7 @@ export function useGarageSession() {
   }
 
   async function signIn(email: string, password: string) {
-    if (!supabase) throw new Error('Cloud accounts are not configured.');
+    if (!supabase) throw new AppError('cloudNotConfigured');
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     transition.current(data.user);
@@ -161,7 +160,7 @@ export function useGarageSession() {
   async function signOut() {
     if (!supabase) return;
     const { error } = await supabase.auth.signOut();
-    if (error) setError(errorMessage(error));
+    if (error) setError(failureOf(error, 'auth'));
     else transition.current(null);
   }
 

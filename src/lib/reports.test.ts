@@ -6,6 +6,14 @@ const car: Car = { id: "car", name: "Daily, driver", year: 2020, make: "Toyota",
 const visit: Visit = { id: "visit", carId: car.id, date: "2026-09-25", odometer: 100, totalCostCents: 15000, provider: "Dealer", notes: "Oil, tires\nchecked", items: [{ id: "a", name: "Oil change", scheduleItemId: null, costCents: 8000 }, { id: "b", name: "Tire rotation", scheduleItemId: null, costCents: null }], photos: [], createdAt: "2026-09-25T00:00:00Z" };
 
 describe("reports and export", () => {
+  it('keeps built-in categories and missing cars separate from identically named user entries', () => {
+    const named = { ...car, name: 'Unknown car' };
+    const categorized = { ...visit, items: [{ ...visit.items[0], name: 'Unallocated', costCents: 8000 }] };
+    const result = reportTotals([categorized, { ...visit, id: 'missing', carId: 'missing', items: [] }], [named]);
+    expect(result.byCategory).toContainEqual({ kind: 'category', name: 'Unallocated', amount: 8000 });
+    expect(result.byCategory).toContainEqual({ kind: 'unallocated', name: null, amount: 22000 });
+    expect(result.byCar).toEqual([{ id: car.id, name: 'Unknown car', amount: 15000 }, { id: 'missing', name: null, amount: 15000 }]);
+  });
   it("exports native numeric readings with per-row units for a mixed-unit garage", () => {
     const metric: Car = { ...car, id: "metric", name: "Metric car", distanceUnit: "kilometers" };
     const csv = visitsToCsv([visit, { ...visit, id: "metric-visit", carId: metric.id, odometer: 160 }], [car, metric]);
@@ -17,8 +25,8 @@ describe("reports and export", () => {
   it("does not double-count a multi-item visit", () => {
     const result = reportTotals([visit], [car]);
     expect(result.totalCents).toBe(15000);
-    expect(result.byCategory).toContainEqual(["Oil change", 8000]);
-    expect(result.byCategory).toContainEqual(["Unallocated", 7000]);
+    expect(result.byCategory).toContainEqual({ kind: 'category', name: 'Oil change', amount: 8000 });
+    expect(result.byCategory).toContainEqual({ kind: 'unallocated', name: null, amount: 7000 });
   });
 
   it("exports quoted values and photo count in a spreadsheet-friendly CSV", () => {

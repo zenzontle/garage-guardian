@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useTranslations } from "next-intl";
 import { rankVehicleSuggestions, type CatalogEntry } from '@/lib/vehicle-catalog';
 
 type Props = {
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export function EditableCombobox({ label, value, onChange, suggestions, placeholder, loading, failed, onRetry }: Props) {
+  const t = useTranslations();
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
   const list = useRef<HTMLUListElement>(null);
@@ -55,15 +57,15 @@ export function EditableCombobox({ label, value, onChange, suggestions, placehol
             event.preventDefault(); event.stopPropagation(); setOpen(false); setActive(-1);
           } else if (event.key === 'Tab') { setOpen(false); setActive(-1); }
         }} />
-      {expanded && <ul ref={list} id={`${id}-list`} role="listbox" aria-label={`${label} suggestions`} className="combobox-list">
+      {expanded && <ul ref={list} id={`${id}-list`} role="listbox" aria-label={t('autocomplete.suggestions', { label })} className="combobox-list">
         {matches.map((entry, index) => <li id={`${id}-option-${index}`} key={entry.id} role="option" aria-selected={index === activeIndex}
           onPointerDown={(event) => event.preventDefault()}
           onClick={() => choose(entry)}>{entry.display_name}</li>)}
       </ul>}
     </div>
     <span id={`${id}-help`} className="combobox-help" role="status">
-      {failed ? 'Suggestions unavailable. You can still type any value.' : loading ? 'Loading suggestions. You can still type.' : 'Choose a suggestion or type your own.'}
+      {failed ? t('autocomplete.unavailable') : loading ? t('autocomplete.loading') : t('autocomplete.hint')}
     </span>
-    {failed && <button type="button" className="combobox-retry" onClick={onRetry}>Retry {label.toLowerCase()} suggestions</button>}
+    {failed && <button type="button" className="combobox-retry" onClick={onRetry}>{t('autocomplete.retry', { label: label.toLowerCase() })}</button>}
   </div>;
 }
