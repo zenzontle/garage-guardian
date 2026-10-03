@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { reportTotals, visitsToCsv } from "./reports";
 import type { Car, Visit } from "./model";
 
-const car: Car = { id: "car", name: "Daily, driver", year: 2020, make: "Toyota", model: "RAV4", vin: "", distanceUnit: "miles", odometer: 100, reminderDays: 30, reminderMiles: 500, createdAt: "2026-01-01T00:00:00Z" };
+const car: Car = { id: "car", name: "Daily, driver", year: 2020, make: "Toyota", model: "RAV4", vin: "", plate: "", distanceUnit: "miles", odometer: 100, reminderDays: 30, reminderMiles: 500, createdAt: "2026-01-01T00:00:00Z" };
 const visit: Visit = { id: "visit", carId: car.id, date: "2026-09-25", odometer: 100, totalCostCents: 15000, provider: "Dealer", notes: "Oil, tires\nchecked", items: [{ id: "a", name: "Oil change", scheduleItemId: null, costCents: 8000 }, { id: "b", name: "Tire rotation", scheduleItemId: null, costCents: null }], photos: [], createdAt: "2026-09-25T00:00:00Z" };
 
 describe("reports and export", () => {

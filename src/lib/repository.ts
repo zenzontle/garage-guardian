@@ -2,7 +2,7 @@
 
 import { del, get, set, update } from 'idb-keyval';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { EMPTY_SNAPSHOT, normalizeCar, normalizeSnapshot, type Car, type Photo, type ScheduleItem, type Snapshot, type Visit } from './model';
+import { EMPTY_SNAPSHOT, normalizeCar, normalizePlate, normalizeSnapshot, type Car, type Photo, type ScheduleItem, type Snapshot, type Visit } from './model';
 
 export type Repository = {
   load(): Promise<Snapshot>;
@@ -27,9 +27,10 @@ export class LocalRepository implements Repository {
   private async write(update: (snapshot: Snapshot) => void) {
     await mutateLocalSnapshot(update);
   }
-  saveCar(car: Car) {
+  async saveCar(car: Car) {
+    const normalized = { ...normalizeCar(car), plate: normalizePlate(car.plate) };
     return this.write((snapshot) => {
-      snapshot.cars = upsert(snapshot.cars, normalizeCar(car));
+      snapshot.cars = upsert(snapshot.cars, normalized);
     });
   }
   async deleteCar(id: string) {
@@ -138,6 +139,7 @@ const carToRow = (car: Car, userId: string) => ({
   make: car.make,
   model: car.model,
   vin: car.vin,
+  plate: car.plate,
   distance_unit: car.distanceUnit,
   odometer: car.odometer,
   reminder_days: car.reminderDays,
@@ -192,6 +194,7 @@ export class SupabaseRepository implements Repository {
         make: row.make,
         model: row.model,
         vin: row.vin,
+        plate: row.plate,
         distanceUnit: row.distance_unit,
         odometer: row.odometer,
         reminderDays: row.reminder_days,
@@ -226,7 +229,8 @@ export class SupabaseRepository implements Repository {
   }
 
   async saveCar(car: Car) {
-    const { error } = await this.client.from('cars').upsert(carToRow(normalizeCar(car), this.userId));
+    const normalized = { ...normalizeCar(car), plate: normalizePlate(car.plate) };
+    const { error } = await this.client.from('cars').upsert(carToRow(normalized, this.userId));
     if (error) throw error;
   }
   async deleteCar(id: string) {

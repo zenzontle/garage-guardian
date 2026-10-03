@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
     make: row.make,
     model: row.model,
     vin: row.vin,
+    plate: row.plate,
     distanceUnit: row.distance_unit,
     odometer: row.odometer,
     reminderDays: row.reminder_days,

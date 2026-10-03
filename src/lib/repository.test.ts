@@ -3,10 +3,57 @@ import { clear, get, set } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../test/fake-supabase';
 import { car, schedule, visit } from '../test/fixtures';
+import type { Car } from './model';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 
 beforeEach(async () => { await clear(); vi.resetModules(); });
+
+describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
+  async function setup() {
+    const { LocalRepository, SupabaseRepository } = await import('./repository');
+    const cloud = fakeSupabase(); cloud.emit(account());
+    return { cloud, repository: mode === 'local' ? new LocalRepository() : new SupabaseRepository(cloud.client, account().id) };
+  }
+
+  it.each([undefined, null, '', 'AbC  - 123'])('loads legacy or saved plate %s without losing other records', async (plate) => {
+    const { repository, cloud } = await setup();
+    await repository.saveCar(car);
+    await repository.saveSchedule(schedule);
+    await repository.saveVisit(visit);
+    if (mode === 'local') {
+      const legacy = { ...car, plate };
+      if (plate === undefined) delete (legacy as Partial<typeof legacy>).plate;
+      await set('garage-guardian:local:v1', { cars: [legacy], schedules: [schedule], visits: [visit] });
+    } else {
+      const row = cloud.tables.get('cars')!.get(car.id)!;
+      row.plate = plate;
+      if (plate === undefined) delete row.plate;
+    }
+    expect(await repository.load()).toEqual({ cars: [{ ...car, plate: plate ?? '' }], schedules: [schedule], visits: [visit] });
+  });
+
+  it.each([undefined, null, '', '   ', '  AbC  - 123  ', 'x'.repeat(20), '🚗'.repeat(20)])('normalizes and round-trips plate %s on save', async (plate) => {
+    const { repository, cloud } = await setup();
+    const input = { ...car, plate } as unknown as Car;
+    await repository.saveCar(input);
+    const expected = (plate ?? '').trim();
+    expect((await repository.load()).cars).toEqual([{ ...car, plate: expected }]);
+    expect(input.plate).toBe(plate);
+    if (mode === 'cloud') expect(cloud.tables.get('cars')!.get(car.id)!.plate).toBe(expected);
+    await repository.saveCar({ ...car, plate: '' });
+    expect((await repository.load()).cars[0].plate).toBe('');
+  });
+
+  it.each(['x'.repeat(21), '🚗'.repeat(21)])('rejects overlength plates without overwriting the saved car', async (plate) => {
+    const { repository, cloud } = await setup();
+    await repository.saveCar({ ...car, plate: 'Original' });
+    cloud.from.mockClear();
+    await expect(repository.saveCar({ ...car, plate: ` ${plate} ` })).rejects.toThrow('License plate must be 20 characters or fewer.');
+    expect(cloud.from).not.toHaveBeenCalled();
+    expect((await repository.load()).cars[0]).toEqual({ ...car, plate: 'Original' });
+  });
+});
 
 describe.each([
   ['local prototype', false, false],

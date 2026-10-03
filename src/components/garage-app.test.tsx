@@ -38,6 +38,7 @@ describe.each([
     await user.type(dialog.getByLabelText('Current odometer (miles)'), '100');
     await user.click(dialog.getByRole('button', { name: 'Add car' }));
     await screen.findByRole('tab', { name: 'Daily driver' });
+    expect(screen.queryByText(/^Plate:/)).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Edit car' }));
     const edit = within(screen.getByRole('dialog', { name: 'Edit car' }));
     await user.clear(edit.getByLabelText('Nickname'));
@@ -67,6 +68,66 @@ describe.each([
     await screen.findByText('No cars yet');
     expect((await new LocalRepository().load()).cars).toEqual([]);
     expect(cloud.tables.get('cars')?.size ?? 0).toBe(0);
+  });
+});
+
+describe.each([['guest', false], ['authenticated cloud', true]] as const)('%s plate workflow', (_mode, authenticated) => {
+  it('creates, edits, clears, and reloads a plate while preserving unrelated fields', async () => {
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://garage.supabase.co');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
+    if (authenticated) cloud.emit(account());
+    const { GarageApp } = await import('./garage-app');
+    const { createRepository } = await import('../lib/repository');
+    const repository = createRepository(authenticated ? account().id : undefined);
+    let app = render(<GarageApp />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Add a car' }));
+    let dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
+    for (const [label, value] of [['Nickname', 'Plate driver'], ['Make', 'Toyota'], ['Model', 'RAV4'], ['Current odometer (miles)', '100'], ['Coming up: days before due', '15'], ['Coming up: miles before due', '123']]) {
+      fireEvent.change(dialog.getByLabelText(label), { target: { value } });
+    }
+    const vin = dialog.getByLabelText(/VIN/);
+    await user.type(vin, '12345678901234567');
+    await user.tab();
+    const plateInput = dialog.getByLabelText(/License plate/);
+    expect(document.activeElement).toBe(plateInput);
+    await user.type(plateInput, '  AbC  - 123  ');
+    await user.click(dialog.getByRole('button', { name: 'Add car' }));
+    await screen.findByRole('tab', { name: 'Plate driver' });
+    expect(screen.getByText('Plate: AbC - 123').textContent).toBe('Plate: AbC  - 123');
+    const created = (await repository.load()).cars[0];
+    expect(created).toMatchObject({ plate: 'AbC  - 123', vin: '12345678901234567', reminderDays: 15, reminderMiles: 123 });
+
+    await user.click(screen.getByRole('button', { name: 'Edit car' }));
+    dialog = within(screen.getByRole('dialog', { name: 'Edit car' }));
+    expect((dialog.getByLabelText(/License plate/) as HTMLInputElement).value).toBe(created.plate);
+    fireEvent.change(dialog.getByLabelText(/License plate/), { target: { value: 'W'.repeat(21) } });
+    await user.click(dialog.getByRole('button', { name: 'Save changes' }));
+    expect(await dialog.findByRole('alert')).toHaveProperty('textContent', 'License plate must be 20 characters or fewer.');
+    expect((await repository.load()).cars[0]).toEqual(created);
+    fireEvent.change(dialog.getByLabelText(/License plate/), { target: { value: `  ${'W'.repeat(20)}  ` } });
+    await user.click(dialog.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect((await repository.load()).cars[0]).toEqual({ ...created, plate: 'W'.repeat(20) });
+
+    app.unmount(); app = render(<GarageApp />);
+    await screen.findByText('Plate driver');
+    await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
+    expect(screen.getByText(`Plate: ${'W'.repeat(20)}`)).toBeDefined();
+    await user.click(screen.getByRole('button', { name: 'Edit car' }));
+    dialog = within(screen.getByRole('dialog', { name: 'Edit car' }));
+    expect((dialog.getByLabelText(/License plate/) as HTMLInputElement).value).toBe('W'.repeat(20));
+    await user.clear(dialog.getByLabelText(/License plate/));
+    await user.click(dialog.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.queryByText(/^Plate:/)).toBeNull();
+    expect((await repository.load()).cars[0]).toEqual({ ...created, plate: '' });
+    app.unmount(); render(<GarageApp />);
+    await screen.findByText('Plate driver');
+    await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
+    expect(screen.queryByText(/^Plate:/)).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Edit car' }));
+    expect((screen.getByLabelText(/License plate/) as HTMLInputElement).value).toBe('');
   });
 });
 
