@@ -5,6 +5,21 @@ import { oversizedReport, report } from './fixtures.test-helper';
 
 describe('public report diagnostics', () => {
   it.each([
+    ['Cookie: session=abc; connect.sid=private', 'Cookie=[REDACTED]'],
+    ['cookie=session=abc; other=private; third=hidden', 'cookie=[REDACTED]'],
+    ['COOKIE: session=abc; connect.sid=private\r\nX-Request-ID: synthetic', 'COOKIE=[REDACTED]\r\nX-Request-ID: synthetic'],
+    ['Cookie: session="abc"; connect.sid=private', 'Cookie=[REDACTED]'],
+    ['Cookie: [REDACTED]; connect.sid=private', 'Cookie=[REDACTED]'],
+    ['Cookie="session=abc; connect.sid=private"\nNext diagnostic', 'Cookie=[REDACTED]\nNext diagnostic'],
+  ])('redacts the complete cookie header without consuming the next line: %s', (source, expected) => {
+    expect(redact(source)).toBe(expected);
+    expect(redact(expected)).toBe(expected);
+    const entry = { source: 'operation' as const, timestamp: Date.now(), message: source, stack: source };
+    const sanitized = cleanDiagnostic(entry);
+    expect(sanitized).toMatchObject({ message: expected, stack: expected });
+    expect(cleanDiagnostic(sanitized)).toEqual(sanitized);
+  });
+  it.each([
     ['client=2001:db8::1234', 'client=[IP]'],
     ['remote/2001:0DB8:0000:0000:0000:0000:0000:1234', 'remote/[IP]'],
     ['::1', '[IP]'],

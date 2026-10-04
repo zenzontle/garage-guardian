@@ -60,6 +60,8 @@ export function redact(value: string): string {
     })
     // Consume escaped/multiline quotes in full, including values cut off by capture.
     .replace(/\b(password|passwd|(?:access_|refresh_)?token|secret|api[_-]?key|authorization|cookie)["']?\s*[:=]\s*(?:\[REDACTED\]|"(?:\\[\s\S]|[^"\\])*(?:"|\\?$)|'(?:\\[\s\S]|[^'\\])*(?:'|\\?$)|(?:Basic|Bearer|Digest|Negotiate)\s+[^\r\n]+|[^\s,;"']+)/gi, '$1=[REDACTED]')
+    // After quoted-value cleaning, remove every cookie pair through the end of the header line.
+    .replace(/\b(cookie)[ \t]*[:=][^\r\n]*/gi, '$1=[REDACTED]')
     .replace(/\b(?:Bearer\s+)[\w.\-+/=]+/gi, 'Bearer [REDACTED]')
     .replace(/\b(?:eyJ[\w-]+\.[\w-]+\.[\w-]+|(?:gh[pousr]_|github_pat_)[\w]+)\b/g, '[TOKEN]')
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[EMAIL]')
