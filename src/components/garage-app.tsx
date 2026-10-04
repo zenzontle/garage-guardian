@@ -16,6 +16,7 @@ import { GarageLogo } from "./garage-logo";
 import { EditableCombobox } from "./editable-combobox";
 import { useVehicleCatalog } from "@/lib/use-vehicle-catalog";
 import { normalizeVehicleKey } from "@/lib/vehicle-catalog";
+import { BugReporter } from "./bug-reporter";
 
 type Page = "dashboard" | "cars" | "history" | "reports";
 type ModalState = { kind: "car"; item?: Car } | { kind: "schedule"; item?: ScheduleItem; carId: string } | { kind: "visit"; item?: Visit; carId?: string } | null;
@@ -54,12 +55,13 @@ export function GarageApp() {
   const allDue = useMemo(() => getAllDue(snapshot.cars, snapshot.schedules, snapshot.visits, todayISO()), [snapshot]);
   const visits = useMemo(() => [...snapshot.visits].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)), [snapshot.visits]);
   const selectedCar = snapshot.cars.find((car) => car.id === selectedCarId) ?? null;
+  const reporter = <BugReporter key={user?.id ?? 'guest'} userId={user?.id} screen={loading ? 'loading' : !repository ? 'recovery' : page} dialog={modal?.kind === 'car' ? modal.item ? 'edit-car' : 'add-car' : modal?.kind ?? 'none'} />;
 
   const accountActions = user
     ? <button className="button secondary" onClick={() => void garage.signOut()}><LogOut size={17} />Sign out</button>
     : isCloudConfigured && <div className="account-actions"><button className="button secondary" onClick={() => setAuthView("signin")}>Sign in</button><button className="button primary" onClick={() => setAuthView("signup")}>Create account</button></div>;
 
-  if (loading || !repository) return <div className="auth-page"><div className="auth-card"><h1>{transferring ? "Moving your garage to Supabase" : "Opening your garage"}</h1>{loading ? <p role="status">{transferring ? "Uploading your records and photos. Your browser copy is kept until the transfer is verified." : "Loading your records…"}</p> : <><p className="error-text" role="alert">{error}</p><button className="button primary" onClick={garage.retry}>Retry</button></>}{user && <div className="recovery-actions">{accountActions}</div>}</div></div>;
+  if (loading || !repository) return <>{reporter}<div className="auth-page"><div className="auth-card"><h1>{transferring ? "Moving your garage to Supabase" : "Opening your garage"}</h1>{loading ? <p role="status">{transferring ? "Uploading your records and photos. Your browser copy is kept until the transfer is verified." : "Loading your records…"}</p> : <><p className="error-text" role="alert">{error}</p><button className="button primary" onClick={garage.retry}>Retry</button></>}{user && <div className="recovery-actions">{accountActions}</div>}</div></div></>;
   if (authView && !user) return <AccountForm mode={authView} onMode={setAuthView} onClose={() => setAuthView(null)} onSubmit={async (email, password) => {
     if (authView === "signup") {
       const confirmation = await garage.signUp(email, password);
@@ -68,7 +70,7 @@ export function GarageApp() {
     setAuthView(null);
   }} />;
 
-  return <div className="app-shell">
+  return <>{reporter}<div className="app-shell">
     <aside className={`sidebar ${menuOpen ? "open" : ""}`}>
       <div className="brand"><div className="brand-mark"><GarageLogo /></div><div><strong>Garage Guardian</strong><small>CARE FOR THE DRIVE</small></div></div>
       <div className="sidebar-label">WORKSPACE</div>
@@ -100,7 +102,7 @@ export function GarageApp() {
     {modal?.kind === "car" && <CarModal item={modal.item} onClose={() => setModal(null)} onSave={async (car, starter) => { await perform(async () => { await repository!.saveCar(car); if (starter) for (const item of makeStarterSchedules(car.id)) await repository!.saveSchedule(item); }); setSelectedCarId(car.id); setPage("cars"); }} />}
     {modal?.kind === "schedule" && <ScheduleModal item={modal.item} carId={modal.carId} distanceUnit={snapshot.cars.find((car) => car.id === modal.carId)?.distanceUnit ?? "miles"} onClose={() => setModal(null)} onSave={async (item) => perform(() => repository!.saveSchedule(item))} />}
     {modal?.kind === "visit" && <VisitModal item={modal.item} carId={modal.carId} cars={snapshot.cars} visits={visits} schedules={snapshot.schedules} repository={repository!} onClose={() => setModal(null)} onSave={async (item) => perform(() => repository!.saveVisit(item))} />}
-  </div>;
+  </div></>;
 }
 
 const messageOf = errorMessage;

@@ -1,0 +1,59 @@
+import { Redis } from '@upstash/redis';
+import { Ratelimit } from '@upstash/ratelimit';
+import { z } from 'zod';
+import { ReportError, identifier, type ReportConfig } from './server-config';
+import { GITHUB_ASSET_URL, SUBMISSION_RETENTION_MS } from './shared';
+
+const receiptSchema = z.strictObject({
+  hash: z.string().min(1).max(128), state: z.enum(['uploading', 'creating', 'unknown', 'failed', 'succeeded']),
+  assets: z.array(z.string().regex(GITHUB_ASSET_URL)).max(2), issueUrl: z.string().regex(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+$/).optional(), createdAt: z.number().int().nonnegative(),
+});
+export type Receipt = z.infer<typeof receiptSchema>;
+export const RECEIPT_TTL = SUBMISSION_RETENTION_MS / 1000;
+export function reportStore(config: ReportConfig) {
+  const redis = new Redis({ url: config.redisUrl, token: config.redisToken, retry: false });
+  const limiter = (name: string, count: number, duration: '10 m' | '1 d' | '1 m') => new Ratelimit({
+    redis, limiter: Ratelimit.slidingWindow(count, duration), prefix: `${config.prefix}:${name}`, analytics: false, timeout: 3000,
+  });
+  const userShort = limiter('user-short', 3, '10 m'), userDaily = limiter('user-daily', 10, '1 d');
+  const ipShort = limiter('ip-short', 10, '10 m'), ipDaily = limiter('ip-daily', 50, '1 d');
+  const controls = limiter('controls', 30, '1 m');
+  async function check(limits: { limiter: Ratelimit; key: string }[]) {
+    const results = await Promise.all(limits.map(async ({ limiter: limit, key }) => {
+      const result = await limit.limit(key);
+      if (result.reason === 'timeout') throw new ReportError(503, 'LIMITER_UNAVAILABLE', 'Bug reporting is temporarily unavailable. Try again later.');
+      await result.pending;
+      return result;
+    }));
+    const denied = results.filter((result) => !result.success);
+    if (denied.length) throw new ReportError(429, 'RATE_LIMITED', 'Too many reports. Please try again later.', Math.max(1, Math.ceil((Math.max(...denied.map((result) => result.reset)) - Date.now()) / 1000)));
+  }
+  const receiptKey = (userId: string, submissionId: string) => `${config.prefix}:receipt:${identifier(config, 'user', userId)}:${submissionId}`;
+  return {
+    async limit(userId: string, ip: string) {
+      const user = identifier(config, 'user', userId), address = identifier(config, 'ip', ip);
+      await check([{ limiter: userShort, key: user }, { limiter: userDaily, key: user }, { limiter: ipShort, key: address }, { limiter: ipDaily, key: address }]);
+    },
+    async control(userId: string) { await check([{ limiter: controls, key: identifier(config, 'user', userId) }]); },
+    async get(userId: string, submissionId: string): Promise<Receipt | null> {
+      const value = await redis.get(receiptKey(userId, submissionId));
+      if (value === null) return null;
+      const receipt = receiptSchema.parse(value);
+      if (receipt.issueUrl && !receipt.issueUrl.startsWith(`https://github.com/${config.repository}/issues/`)) throw new ReportError(503, 'INVALID_RECEIPT', 'Submission status is unavailable.');
+      return receipt;
+    },
+    async claim(userId: string, submissionId: string, receipt: Receipt): Promise<boolean> {
+      return (await redis.set(receiptKey(userId, submissionId), receipt, { nx: true, ex: RECEIPT_TTL })) === 'OK';
+    },
+    async save(userId: string, submissionId: string, receipt: Receipt) {
+      // Keep the original expiry: updates must not extend the retry safety window.
+      const ttl = Math.max(1, RECEIPT_TTL - Math.floor((Date.now() - receipt.createdAt) / 1000));
+      await redis.set(receiptKey(userId, submissionId), receipt, { ex: ttl });
+    },
+    async lock(userId: string, submissionId: string) {
+      return (await redis.set(`${receiptKey(userId, submissionId)}:lock`, 'locked', { nx: true, ex: RECEIPT_TTL })) === 'OK';
+    },
+    async unlock(userId: string, submissionId: string) { await redis.del(`${receiptKey(userId, submissionId)}:lock`); },
+  };
+}
+export type ReportStore = ReturnType<typeof reportStore>;

@@ -5,8 +5,10 @@ import type { User } from '@supabase/supabase-js';
 import { EMPTY_SNAPSHOT, type Snapshot } from './model';
 import { createRepository, supabase, type Repository } from './repository';
 import { pendingTransfer, registerSignup, transferSignupData } from './signup-transfer';
+import { recordDiagnostic } from './bug-reports/diagnostics';
 
 export function errorMessage(cause: unknown): string {
+  recordDiagnostic(cause);
   if (cause && typeof cause === 'object' && 'message' in cause && typeof cause.message === 'string') return cause.message;
   return 'Something went wrong. Please try again.';
 }
