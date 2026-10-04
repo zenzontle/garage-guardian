@@ -30,6 +30,10 @@ async function review(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Description'), 'Open the car dialog. Expected readable fields; actual fields are clipped.');
   await user.click(screen.getByRole('button', { name: 'Review report' }));
 }
+function failSessionLookup(failure: 'missing' | 'rejected') {
+  if (failure === 'rejected') auth.getSession.mockRejectedValueOnce(new Error('private storage failure'));
+  else auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+}
 describe('authenticated public bug reporter', () => {
   it('keeps oversized reports reviewable and blocks publication until diagnostics are removed', async () => {
     const user = await openReport(), large = oversizedReport();
@@ -101,13 +105,15 @@ describe('authenticated public bug reporter', () => {
     expect(fetchMock.mock.calls.at(-1)![0]).toBe(`/api/bug-reports/${submission.submissionId}`);
     expect(screen.queryByRole('button', { name: 'Edit report' })).toBeNull();
   });
-  it('unfreezes the reviewed draft when the initial publish has no local session before fetch', async () => {
+  it.each(['missing', 'rejected'] as const)('unfreezes the reviewed draft when the initial session lookup is %s before fetch', async (failure) => {
     const user = await openReport(); recordDiagnostic('Synthetic error'); await review(user); await user.click(screen.getByRole('checkbox'));
     const preview = screen.getByText(/Release:/).textContent;
     const callsBeforePublish = fetchMock.mock.calls.length;
-    auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    failSessionLookup(failure);
     await user.click(screen.getByRole('button', { name: 'Publish report' }));
     await screen.findByRole('alert');
+    expect(screen.getByRole('alert').textContent).toContain(failure === 'rejected' ? 'Account verification is unavailable' : 'Sign in again');
+    expect(screen.getByRole('alert').textContent).not.toContain('private storage failure');
     expect(fetchMock).toHaveBeenCalledTimes(callsBeforePublish);
     expect(screen.queryByRole('button', { name: 'Edit report' })).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Remove all diagnostics' }).matches(':disabled')).toBe(false);
@@ -120,14 +126,15 @@ describe('authenticated public bug reporter', () => {
     const report = JSON.parse(init.body.get('report'));
     expect(preview).toContain(report.submissionId); expect(report.diagnostics).toHaveLength(1);
   });
-  it('keeps uncertain submissions frozen when a status check has no local session before fetch', async () => {
+  it.each(['missing', 'rejected'] as const)('keeps uncertain submissions frozen when the status session lookup is %s before fetch', async (failure) => {
     const user = await openReport(); await review(user); await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
     await user.click(screen.getByRole('button', { name: 'Publish report' }));
     const callsBeforeCheck = fetchMock.mock.calls.length;
-    auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    failSessionLookup(failure);
     await user.click(screen.getByRole('button', { name: 'Check submission status' }));
     await screen.findByRole('alert');
+    expect(screen.getByRole('alert').textContent).toContain(failure === 'rejected' ? 'Account verification is unavailable' : 'Sign in again');
     expect(fetchMock).toHaveBeenCalledTimes(callsBeforeCheck);
     expect(screen.queryByRole('button', { name: 'Edit report' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Publish report' })).toBeNull();

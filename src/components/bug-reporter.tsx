@@ -20,7 +20,9 @@ function isReporterErrorCode(value: unknown): value is ReporterErrorCode {
 }
 
 async function authenticatedFetch(url: string, init: RequestInit = {}) {
-  const { data } = await supabase!.auth.getSession();
+  const { data } = await supabase!.auth.getSession().catch(() => {
+    throw new ReporterFailure('AUTH_UNAVAILABLE');
+  });
   if (!data.session) throw new ReporterFailure('UNAUTHENTICATED');
   return fetch(url, { ...init, cache: 'no-store', headers: { ...init.headers, Authorization: `Bearer ${data.session.access_token}` } });
 }
@@ -144,7 +146,7 @@ export function BugReporter({ userId, screen, dialog: appDialog }: { userId?: st
       else setStatus('unknown');
     } catch (cause) {
       // Authentication rejection cannot create an issue on the initial attempt.
-      if (!checking && cause instanceof ReporterFailure && cause.code === 'UNAUTHENTICATED') setSent(false);
+      if (!checking && cause instanceof ReporterFailure && ['UNAUTHENTICATED', 'AUTH_UNAVAILABLE'].includes(cause.code)) setSent(false);
       setError(cause instanceof ReporterFailure ? { code: cause.code, retryAfter: cause.retryAfter } : { code: 'SUBMIT_FAILED' });
     }
     finally { setBusy(false); }
