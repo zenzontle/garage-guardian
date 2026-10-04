@@ -132,6 +132,7 @@ export function BugReporter({ userId, screen, dialog: appDialog }: { userId?: st
         // A status failure says nothing about whether the original write succeeded.
         if (!checking && ([401, 404, 413, 415, 422, 429].includes(response.status) || ['GITHUB_FAILED', 'LIMITER_UNAVAILABLE', 'AUTH_UNAVAILABLE', 'IP_UNAVAILABLE', 'NOT_CONFIGURED'].includes(result.code))) setSent(false);
         if (!checking && result.code === 'PREVIEW_CHANGED') {
+          setSent(false);
           const fresh = await authenticatedFetch('/api/bug-reports/config');
           const configuration = await fresh.json();
           const parsed = publicMetadataSchema.safeParse(configuration.metadata);

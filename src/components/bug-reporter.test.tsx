@@ -161,6 +161,26 @@ describe('authenticated public bug reporter', () => {
     expect(JSON.parse(init.body.get('report'))).toEqual(submission);
     expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(2);
   });
+  it.each(['network', 'non-json', 'disabled', 'http-error'] as const)('unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with %s', async (failure) => {
+    const user = await openReport(); recordDiagnostic('Synthetic error'); await review(user); await user.click(screen.getByRole('checkbox'));
+    fetchMock.mockResolvedValueOnce(Response.json({ code: 'PREVIEW_CHANGED' }, { status: 409 }));
+    if (failure === 'network') fetchMock.mockRejectedValueOnce(new Error('network error'));
+    else if (failure === 'non-json') fetchMock.mockResolvedValueOnce(new Response('Not JSON'));
+    else if (failure === 'disabled') fetchMock.mockResolvedValueOnce(Response.json({ enabled: false }));
+    else fetchMock.mockResolvedValueOnce(Response.json({ code: 'UNAVAILABLE' }, { status: 503 }));
+    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await screen.findByRole('alert');
+    const submission = JSON.parse(fetchMock.mock.calls.find((call) => call[1]?.method === 'POST')![1].body.get('report'));
+    expect(screen.queryByRole('button', { name: 'Edit report' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove all diagnostics' }).matches(':disabled')).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Check submission status' })).toBeNull();
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` }, { status: 201 }));
+    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await screen.findByRole('link', { name: 'View GitHub issue' });
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe('/api/bug-reports'); expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body.get('report'))).toEqual(submission);
+  });
   it('never invites a new POST when a previously uncertain receipt disappears', async () => {
     const user = await openReport(); await review(user); await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));

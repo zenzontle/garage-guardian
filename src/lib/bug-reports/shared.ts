@@ -40,10 +40,14 @@ export function redact(value: string): string {
       try { const parsed = new URL(url); parsed.username = ''; parsed.password = ''; parsed.search = ''; parsed.hash = ''; return parsed.toString(); } catch { return '[URL]'; }
     })
     .replace(/(?:\/|\.\.?\/)[^\s<>"']*[?#][^\s<>"']*/g, (path) => path.split(/[?#]/, 1)[0])
-    .replace(/\b(?:[A-Za-z][\w-]*\/)?(?:\d{1,3}\.){3}\d{1,3}\b/g, (address) => /^[A-Za-z]/.test(address) ? address : address.split('.').every((part) => Number(part) <= 255) ? '[IP]' : address)
+    .replace(/\b([A-Za-z][\w-]*\/)?((?:\d{1,3}\.){3}\d{1,3})\b/g, (match, prefix: string | undefined, address: string) => {
+      if (prefix && /^(?:Chrome|Chromium|HeadlessChrome|CriOS|Firefox|FxiOS|Safari|Version|Edg|EdgA|EdgiOS|OPR|Opera)\/$/i.test(prefix)) return match;
+      return address.split('.').every((part) => Number(part) <= 255) ? `${prefix ?? ''}[IP]` : match;
+    })
+    // Consume escaped/multiline quotes in full, including values cut off by capture.
+    .replace(/\b(password|passwd|(?:access_|refresh_)?token|secret|api[_-]?key|authorization|cookie)["']?\s*[:=]\s*(?:\[REDACTED\]|"(?:\\[\s\S]|[^"\\])*(?:"|\\?$)|'(?:\\[\s\S]|[^'\\])*(?:'|\\?$)|(?:Basic|Bearer|Digest|Negotiate)\s+[^\r\n]+|[^\s,;"']+)/gi, '$1=[REDACTED]')
     .replace(/\b(?:Bearer\s+)[\w.\-+/=]+/gi, 'Bearer [REDACTED]')
     .replace(/\b(?:eyJ[\w-]+\.[\w-]+\.[\w-]+|(?:gh[pousr]_|github_pat_)[\w]+)\b/g, '[TOKEN]')
-    .replace(/\b(password|passwd|(?:access_|refresh_)?token|secret|api[_-]?key|authorization|cookie)["']?\s*[:=]\s*["']?[^\s,;"']+/gi, '$1=[REDACTED]')
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[EMAIL]')
     .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '[ID]')
     .replace(/\b[A-HJ-NPR-Z0-9]{17}\b/gi, '[VIN]')

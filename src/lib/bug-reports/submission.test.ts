@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
-import { REPORT_LIMITS } from './shared';
+import { REPORT_LIMITS, cleanDiagnostic } from './shared';
 import { GitHubFailure } from './github';
 import { decodeReport, readReport as parseReport, reconcileReceipt, submitReport } from './submission';
 import { memoryStore, metadata, oversizedReport, report } from './fixtures.test-helper';
@@ -15,6 +15,13 @@ function request(value: unknown = report(), files: File[] = []) {
 function adapter() { return { upload: vi.fn(async (_bytes: Uint8Array, index: number) => `https://github.com/user-attachments/assets/${index}`), create: vi.fn(async () => 'https://github.com/zenzontle/garage-guardian/issues/1'), reconcile: vi.fn(async (): Promise<string | null> => null) }; }
 
 describe('submission validation', () => {
+  it.each(['password="correct horse battery staple"', 'Authorization: Basic dXNlcjpwYXNz', 'remote/203.0.113.5 client/192.168.1.20'])('rejects raw sensitive diagnostics and accepts their complete redaction: %s', async (message) => {
+    const entry = { source: 'operation' as const, timestamp: Date.now(), message, stack: message };
+    await expect(readReport(request({ ...report(), diagnostics: [entry] }), metadata)).rejects.toHaveProperty('code', 'UNSAFE_DIAGNOSTICS');
+    const sanitized = cleanDiagnostic(entry);
+    const input = await readReport(request({ ...report(), diagnostics: [sanitized] }), metadata);
+    expect(input.report.diagnostics).toEqual([sanitized]);
+  });
   it('rejects an oversized formatted body before image decoding', async () => {
     const corrupt = new File(['broken'], 'x.png', { type: 'image/png' });
     await expect(readReport(request(oversizedReport(), [corrupt]), metadata)).rejects.toHaveProperty('code', 'ISSUE_TOO_LARGE');

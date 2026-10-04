@@ -4,6 +4,35 @@ import { clearDiagnostics, recentDiagnostics, recordDiagnostic, startDiagnostics
 import { oversizedReport, report } from './fixtures.test-helper';
 
 describe('public report diagnostics', () => {
+  it.each([
+    'password="correct horse battery staple"',
+    "secret='correct horse battery staple'",
+    '{"access_token":"first second third"}',
+    'api_key="first \\"quoted\\" second"',
+    "passwd='first \\'quoted\\' second'",
+    'password="first second third',
+    'password="first second third\\',
+    'secret="first\nsecond\nthird"',
+    'Authorization: Basic dXNlcjpwYXNz',
+    'authorization=Bearer first second third',
+    'Authorization: Digest username="first", response="second third"',
+    'authorization="Negotiate first second third"',
+    'Cookie="session=first; other=second third"',
+  ])('redacts complete quoted credentials and authorization values: %s', (source) => {
+    const sanitized = redact(source);
+    expect(sanitized).toContain('[REDACTED]');
+    for (const secret of ['correct', 'horse', 'battery', 'staple', 'first', 'second', 'third', 'quoted', 'dXNlcjpwYXNz']) expect(sanitized).not.toContain(secret);
+    expect(redact(sanitized)).toBe(sanitized);
+    const entry = { source: 'operation' as const, timestamp: Date.now(), message: source, stack: source };
+    expect(cleanDiagnostic(cleanDiagnostic(entry))).toEqual(cleanDiagnostic(entry));
+  });
+  it('redacts IPv4 addresses after arbitrary labels while preserving known browser versions', () => {
+    const source = 'remote/203.0.113.5 client/192.168.1.20 custom-label/10.0.0.1 203.0.113.6 Chrome/154.0.0.0 Firefox/128.0.0.0 Edg/129.0.0.0 Safari/537.36';
+    const sanitized = redact(source);
+    expect(sanitized).toBe('remote/[IP] client/[IP] custom-label/[IP] [IP] Chrome/154.0.0.0 Firefox/128.0.0.0 Edg/129.0.0.0 Safari/537.36');
+    expect(redact(sanitized)).toBe(sanitized);
+    expect(redact('remote/999.0.0.1')).toBe('remote/999.0.0.1');
+  });
   it('bounds the complete body including maximum attachment markup at the character boundary', () => {
     const draft = oversizedReport(), assets = Array(2).fill('x'.repeat(REPORT_LIMITS.assetUrl));
     expect(reportSchema.safeParse(draft).success).toBe(true);
