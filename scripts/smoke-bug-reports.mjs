@@ -2,10 +2,12 @@ import sharp from 'sharp';
 
 const base = process.env.BUG_REPORT_SMOKE_URL;
 const token = process.env.BUG_REPORT_SMOKE_ACCESS_TOKEN;
+const bypassToken = process.env.BUG_REPORT_SMOKE_BYPASS_TOKEN;
 if (!base || !token) throw new Error('Set BUG_REPORT_SMOKE_URL and BUG_REPORT_SMOKE_ACCESS_TOKEN for a signed-in test account.');
 const url = new URL(base);
 if (url.protocol !== 'https:') throw new Error('Use an HTTPS preview deployment.');
 const headers = { Authorization: `Bearer ${token}`, 'User-Agent': 'GarageGuardianSyntheticSmoke/1.0' };
+if (bypassToken) headers['x-vercel-protection-bypass'] = bypassToken;
 const configResponse = await fetch(new URL('/api/bug-reports/config', url), { headers });
 const configuration = await configResponse.json();
 if (!configResponse.ok || !configuration.enabled) throw new Error('The preview reporter is not configured.');

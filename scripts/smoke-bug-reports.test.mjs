@@ -6,6 +6,7 @@ describe('bug report smoke destination guard', () => {
     vi.resetModules();
     vi.stubEnv('BUG_REPORT_SMOKE_URL', 'https://preview.example.test');
     vi.stubEnv('BUG_REPORT_SMOKE_ACCESS_TOKEN', 'synthetic-test-token');
+    vi.stubEnv('BUG_REPORT_SMOKE_BYPASS_TOKEN', undefined);
     vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
@@ -27,7 +28,8 @@ describe('bug report smoke destination guard', () => {
     expect(fetchMock.mock.calls[0][0].pathname).toBe('/api/bug-reports/config');
   });
 
-  it('allows a separate test repository and verifies its receipt', async () => {
+  it.each([undefined, 'synthetic-bypass-token'])('allows a separate test repository and verifies its receipt with bypass token %s', async (bypassToken) => {
+    vi.stubEnv('BUG_REPORT_SMOKE_BYPASS_TOKEN', bypassToken);
     const issueUrl = 'https://github.com/zenzontle/bug-report-test/issues/1';
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(Response.json({
@@ -41,6 +43,12 @@ describe('bug report smoke destination guard', () => {
     await import('./smoke-bug-reports.mjs');
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    for (const [requestUrl, request] of fetchMock.mock.calls) {
+      expect(request.headers['x-vercel-protection-bypass']).toBe(bypassToken);
+      expect(request.headers.Authorization).toBe('Bearer synthetic-test-token');
+      expect(requestUrl.search).toBe('');
+    }
+    if (bypassToken) expect(console.log.mock.calls.flat().join('\n')).not.toContain(bypassToken);
     const [submissionUrl, submissionRequest] = fetchMock.mock.calls[1];
     expect(submissionUrl.pathname).toBe('/api/bug-reports');
     expect(submissionRequest.method).toBe('POST');

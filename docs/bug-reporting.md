@@ -45,8 +45,8 @@ The UI preserves drafts when closed or on errors, but drafts are not written to 
 ## Preview smoke test and rollout
 
 1. Configure a Vercel **Preview** deployment with reporting enabled, an Upstash Free database, and a PAT scoped to a separate public **test** repository. Keep Production `BUG_REPORTS_ENABLED=false`.
-2. Sign in with a test Supabase account. Supply its current access token privately as `BUG_REPORT_SMOKE_ACCESS_TOKEN` and the preview origin as `BUG_REPORT_SMOKE_URL`. Do not paste tokens into tickets or commit them.
-3. Run `node scripts/smoke-bug-reports.mjs`. The script refuses the real tracker and non-preview reporting environments. It publishes synthetic text plus a generated green image and verifies the returned receipt URL. For protected previews, use an approved deployment-protection bypass before running the script.
+2. Sign in with a test Supabase account. Supply its current access token privately as `BUG_REPORT_SMOKE_ACCESS_TOKEN` and the preview origin as `BUG_REPORT_SMOKE_URL`. For previews with Vercel Deployment Protection, also set `BUG_REPORT_SMOKE_BYPASS_TOKEN` to the project's [automation bypass secret](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation). The script forwards it as `x-vercel-protection-bypass` on configuration, submission, and status requests. Keep both tokens private; do not place them in URLs, paste them into tickets, or commit them.
+3. Run `node scripts/smoke-bug-reports.mjs`. The script refuses the real tracker and non-preview reporting environments. It publishes synthetic text plus a generated green image and verifies the returned receipt URL. The bypass token is optional for unprotected previews.
 4. Open the resulting test issue and verify screenshot rendering and all context fields. Close the synthetic issue. Also exercise the real UI at desktop and narrow mobile widths: screenshot selection/removal, public preview, focus trap/return, layered dialogs and errors.
 5. Run `pnpm test`, `pnpm run typecheck`, and `pnpm run build`. Only enable production after the real smoke test passes.
 
