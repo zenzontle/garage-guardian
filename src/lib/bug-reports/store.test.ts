@@ -1,14 +1,16 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { reportStore } from './store';
-import { config } from './fixtures.test-helper';
+import { LOCK_TTL, RECEIPT_TTL, reportStore } from './store';
+import { config, report } from './fixtures.test-helper';
+import { reconcileReceipt, submitReport } from './submission';
 import { errorResponse, ReportError } from './server-config';
 
-const provider = vi.hoisted(() => ({ counts: new Map<string, number>(), values: new Map<string, unknown>(), calls: [] as { key: string; prefix: string; duration: string }[], mode: 'ok' }));
+const provider = vi.hoisted(() => ({ counts: new Map<string, number>(), values: new Map<string, unknown>(), expires: new Map<string, number>(), calls: [] as { key: string; prefix: string; duration: string }[], mode: 'ok' }));
 vi.mock('@upstash/redis', () => ({ Redis: class {
-  async get(key: string) { return provider.values.get(key) ?? null; }
-  async set(key: string, value: unknown, options: { nx?: boolean }) { if (options.nx && provider.values.has(key)) return null; provider.values.set(key, structuredClone(value)); return 'OK'; }
-  async del(key: string) { provider.values.delete(key); }
+  expire(key: string) { if ((provider.expires.get(key) ?? Infinity) <= Date.now()) { provider.values.delete(key); provider.expires.delete(key); } }
+  async get(key: string) { this.expire(key); return structuredClone(provider.values.get(key) ?? null); }
+  async set(key: string, value: unknown, options: { nx?: boolean; ex: number }) { this.expire(key); if (options.nx && provider.values.has(key)) return null; provider.values.set(key, structuredClone(value)); provider.expires.set(key, Date.now() + options.ex * 1000); return 'OK'; }
+  async eval(_script: string, [key]: string[], [token]: string[]) { this.expire(key); if (provider.values.get(key) !== token) return 0; provider.values.delete(key); provider.expires.delete(key); return 1; }
 } }));
 vi.mock('@upstash/ratelimit', () => ({ Ratelimit: class {
   static slidingWindow(count: number, duration: string) { return { count, duration }; }
@@ -23,7 +25,7 @@ vi.mock('@upstash/ratelimit', () => ({ Ratelimit: class {
   }
 } }));
 
-beforeEach(() => { provider.counts.clear(); provider.values.clear(); provider.calls = []; provider.mode = 'ok'; });
+beforeEach(() => { provider.counts.clear(); provider.values.clear(); provider.expires.clear(); provider.calls = []; provider.mode = 'ok'; });
 describe('shared rate limits', () => {
   it('reads successful receipts regardless of repository casing and refuses other repositories', async () => {
     const store = reportStore({ ...config, repository: 'ZenZontle/Garage-Guardian' });
@@ -69,5 +71,37 @@ describe('shared rate limits', () => {
     const receipt = { hash: 'hash', state: 'uploading' as const, assets: [], createdAt: Date.now() };
     expect(await Promise.all([first.claim('one', 'uuid', receipt), second.claim('one', 'uuid', receipt)])).toEqual([true, false]);
     expect(await first.get('two', 'uuid')).toBeNull();
+  });
+  it('recovers a terminated uploader after the lease expires and reuses its saved attachment', async () => {
+    let now = Date.now(); vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const first = reportStore(config), second = reportStore(config), value = report();
+    const receipt = { hash: 'hash', state: 'uploading' as const, assets: ['https://github.com/user-attachments/assets/first'], createdAt: now };
+    const github = { upload: vi.fn(async () => 'https://github.com/user-attachments/assets/second'), create: vi.fn(async () => 'https://github.com/zenzontle/garage-guardian/issues/1'), reconcile: vi.fn(async () => null) };
+    await first.lock('user', value.submissionId);
+    await first.claim('user', value.submissionId, receipt);
+    now += (LOCK_TTL - 1) * 1000;
+    expect((await reconcileReceipt(second, github, 'user', value.submissionId, receipt, value.metadata.reporterId)).state).toBe('uploading');
+    expect(github.create).not.toHaveBeenCalled();
+    now += 2000;
+    const recovered = await reconcileReceipt(second, github, 'user', value.submissionId, receipt, value.metadata.reporterId);
+    expect(recovered).toEqual({ ...receipt, state: 'failed' });
+    expect(provider.expires.values().next().value).toBe(receipt.createdAt + RECEIPT_TTL * 1000);
+    const result = await submitReport(second, github, 'user', 'ip', { report: value, images: [new Uint8Array([1]), new Uint8Array([2])], hash: 'hash' });
+    expect(result.status).toBe(201);
+    expect(github.upload).toHaveBeenCalledExactlyOnceWith(new Uint8Array([2]), 1);
+    expect(github.create).toHaveBeenCalledTimes(1);
+    expect(github.reconcile).not.toHaveBeenCalled();
+  });
+  it('does not let an expired lease owner release a newer lease', async () => {
+    let now = Date.now(); vi.spyOn(Date, 'now').mockImplementation(() => now);
+    const first = reportStore(config), second = reportStore(config);
+    const oldLease = await first.lock('user', 'uuid'); expect(oldLease).toBeTypeOf('string');
+    now += (LOCK_TTL + 1) * 1000;
+    const newLease = await second.lock('user', 'uuid'); expect(newLease).toBeTypeOf('string');
+    expect(newLease).not.toBe(oldLease);
+    await first.unlock('user', 'uuid', oldLease!);
+    expect(await first.lock('user', 'uuid')).toBeNull();
+    await second.unlock('user', 'uuid', newLease!);
+    expect(await first.lock('user', 'uuid')).toBeTypeOf('string');
   });
 });

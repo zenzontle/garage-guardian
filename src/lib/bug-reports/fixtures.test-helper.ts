@@ -8,13 +8,13 @@ export function report(): BugReport { return { submissionId: 'b3a37ad0-6f5a-4ca8
 export const config: ReportConfig = { repository: metadata.repository, environment: 'preview', release: metadata.release, githubToken: 'test-github-token', secret: 'x'.repeat(32), redisUrl: 'https://test.upstash.io', redisToken: 'test-redis', supabaseUrl: 'https://test.supabase.co', supabaseKey: 'test-key', prefix: 'test:preview' };
 export function memoryStore(): ReportStore {
   const receipts = new Map<string, Receipt>();
-  const locks = new Set<string>();
+  const locks = new Map<string, string>();
   return {
     limit: async () => {}, control: async () => {},
     get: async (user, id) => structuredClone(receipts.get(`${user}:${id}`) ?? null),
     claim: async (user, id, value) => { const key = `${user}:${id}`; if (receipts.has(key)) return false; receipts.set(key, structuredClone(value)); return true; },
     save: async (user, id, value) => { receipts.set(`${user}:${id}`, structuredClone(value)); },
-    lock: async (user, id) => { const key = `${user}:${id}`; if (locks.has(key)) return false; locks.add(key); return true; },
-    unlock: async (user, id) => { locks.delete(`${user}:${id}`); },
+    lock: async (user, id) => { const key = `${user}:${id}`; if (locks.has(key)) return null; const token = crypto.randomUUID(); locks.set(key, token); return token; },
+    unlock: async (user, id, token) => { const key = `${user}:${id}`; if (locks.get(key) === token) locks.delete(key); },
   };
 }

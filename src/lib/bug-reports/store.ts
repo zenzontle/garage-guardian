@@ -1,6 +1,7 @@
 import { Redis } from '@upstash/redis';
 import { Ratelimit } from '@upstash/ratelimit';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 import { ReportError, identifier, type ReportConfig } from './server-config';
 import { GITHUB_ASSET_URL, SUBMISSION_RETENTION_MS, isRepositoryIssueUrl } from './shared';
 
@@ -10,6 +11,8 @@ const receiptSchema = z.strictObject({
 });
 export type Receipt = z.infer<typeof receiptSchema>;
 export const RECEIPT_TTL = SUBMISSION_RETENTION_MS / 1000;
+// Outlive both routes' 60-second execution limits, but allow recovery.
+export const LOCK_TTL = 120;
 export function reportStore(config: ReportConfig) {
   const redis = new Redis({ url: config.redisUrl, token: config.redisToken, retry: false });
   const limiter = (name: string, count: number, duration: '10 m' | '1 d' | '1 m') => new Ratelimit({
@@ -50,10 +53,14 @@ export function reportStore(config: ReportConfig) {
       const ttl = Math.max(1, RECEIPT_TTL - Math.floor((Date.now() - receipt.createdAt) / 1000));
       await redis.set(receiptKey(userId, submissionId), receipt, { ex: ttl });
     },
-    async lock(userId: string, submissionId: string) {
-      return (await redis.set(`${receiptKey(userId, submissionId)}:lock`, 'locked', { nx: true, ex: RECEIPT_TTL })) === 'OK';
+    async lock(userId: string, submissionId: string): Promise<string | null> {
+      const token = randomUUID();
+      return (await redis.set(`${receiptKey(userId, submissionId)}:lock`, token, { nx: true, ex: LOCK_TTL })) === 'OK' ? token : null;
     },
-    async unlock(userId: string, submissionId: string) { await redis.del(`${receiptKey(userId, submissionId)}:lock`); },
+    async unlock(userId: string, submissionId: string, token: string) {
+      // An expired owner must not release a newer invocation's lease.
+      await redis.eval("if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end", [`${receiptKey(userId, submissionId)}:lock`], [token]);
+    },
   };
 }
 export type ReportStore = ReturnType<typeof reportStore>;

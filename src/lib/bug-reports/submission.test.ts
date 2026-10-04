@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { REPORT_LIMITS } from './shared';
 import { GitHubFailure } from './github';
-import { readReport, submitReport } from './submission';
+import { readReport, reconcileReceipt, submitReport } from './submission';
 import { memoryStore, metadata, report } from './fixtures.test-helper';
 
 function request(value: unknown = report(), files: File[] = []) {
@@ -80,6 +80,25 @@ describe('GitHub delivery and retries', () => {
     github.reconcile.mockResolvedValueOnce('https://github.com/zenzontle/garage-guardian/issues/1');
     expect((await submitReport(store, github, 'user', 'ip', value)).status).toBe(201);
     expect(github.create).toHaveBeenCalledTimes(1);
+  });
+  it.each(['creating', 'unknown'] as const)('re-reads an uploading receipt under the lease before recovering a now-%s submission', async (state) => {
+    const store = memoryStore(), github = adapter(), value = input();
+    const stale = { hash: value.hash, state: 'uploading' as const, assets: [], createdAt: Date.now() };
+    await store.claim('user', value.report.submissionId, { ...stale, state });
+    const result = await reconcileReceipt(store, github, 'user', value.report.submissionId, stale, metadata.reporterId);
+    expect(result.state).toBe('unknown');
+    expect((await store.get('user', value.report.submissionId))?.state).toBe('unknown');
+    expect(github.reconcile).toHaveBeenCalledExactlyOnceWith(value.report.submissionId, metadata.reporterId);
+    expect(github.upload).not.toHaveBeenCalled(); expect(github.create).not.toHaveBeenCalled();
+  });
+  it('does not make an uploading receipt retryable when the lease check fails', async () => {
+    const store = memoryStore(), github = adapter(), value = input();
+    const receipt = { hash: value.hash, state: 'uploading' as const, assets: [], createdAt: Date.now() };
+    await store.claim('user', value.report.submissionId, receipt);
+    store.lock = vi.fn().mockRejectedValue(new Error('Redis unavailable'));
+    await expect(reconcileReceipt(store, github, 'user', value.report.submissionId, receipt, metadata.reporterId)).rejects.toThrow('Redis unavailable');
+    expect(await store.get('user', value.report.submissionId)).toEqual(receipt);
+    expect(github.upload).not.toHaveBeenCalled(); expect(github.create).not.toHaveBeenCalled();
   });
   it('blocks GitHub writes when rate limiting fails', async () => {
     const store = memoryStore(), github = adapter();

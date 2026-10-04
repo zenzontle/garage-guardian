@@ -60,6 +60,20 @@ export function receiptResponse(receipt: Receipt): Response {
   return Response.json({ state: receipt.state, ...(receipt.issueUrl ? { issueUrl: receipt.issueUrl } : {}) }, { status: receipt.state === 'succeeded' ? 201 : 202, headers: { 'Cache-Control': 'no-store' } });
 }
 export async function reconcileReceipt(store: ReportStore, github: GitHubAdapter, userId: string, submissionId: string, receipt: Receipt, reporterId: string) {
+  if (receipt.state === 'uploading') {
+    const lease = await store.lock(userId, submissionId);
+    if (!lease) return receipt;
+    try {
+      // Re-read under the lease: the uploader may have advanced after the status read.
+      const current = await store.get(userId, submissionId);
+      if (!current) return receipt;
+      receipt = current;
+      if (receipt.state === 'uploading') {
+        receipt = { ...receipt, state: 'failed' };
+        await store.save(userId, submissionId, receipt);
+      }
+    } finally { await store.unlock(userId, submissionId, lease); }
+  }
   if (receipt.state !== 'creating' && receipt.state !== 'unknown') return receipt;
   const issueUrl = await github.reconcile(submissionId, reporterId);
   const updated: Receipt = { ...receipt, state: issueUrl ? 'succeeded' : 'unknown', ...(issueUrl ? { issueUrl } : {}) };
@@ -75,7 +89,8 @@ export async function submitReport(store: ReportStore, github: GitHubAdapter, us
     if (receipt.state === 'succeeded') return receiptResponse(receipt);
     if (receipt.state === 'creating' || receipt.state === 'unknown') return receiptResponse(await reconcileReceipt(store, github, userId, id, receipt, report.metadata.reporterId));
   }
-  if (!(await store.lock(userId, id))) throw new ReportError(409, 'IN_PROGRESS', 'This report is already being submitted. Check its status.');
+  const lease = await store.lock(userId, id);
+  if (!lease) throw new ReportError(409, 'IN_PROGRESS', 'This report is already being submitted. Check its status.');
   try {
     // Re-read under the lock; another worker may have finished between get and lock.
     receipt = await store.get(userId, id);
@@ -87,6 +102,7 @@ export async function submitReport(store: ReportStore, github: GitHubAdapter, us
       if (!(await store.claim(userId, id, receipt))) throw new ReportError(409, 'IN_PROGRESS', 'The report is already being submitted.');
     }
     receipt.state = 'uploading';
+    await store.save(userId, id, receipt);
     try {
       for (let index = receipt.assets.length; index < images.length; index++) {
         receipt.assets.push(await github.upload(images[index], index));
@@ -112,5 +128,5 @@ export async function submitReport(store: ReportStore, github: GitHubAdapter, us
       if (receipt.state === 'unknown') return receiptResponse(receipt);
       throw cause;
     }
-  } finally { await store.unlock(userId, id); }
+  } finally { await store.unlock(userId, id, lease); }
 }
