@@ -4,6 +4,13 @@ import { githubAdapter } from './github';
 import { config } from './fixtures.test-helper';
 
 describe('isolated GitHub adapter', () => {
+  it('accepts canonical repository casing on creation and reconciliation', async () => {
+    const url = 'https://github.com/zenzontle/garage-guardian/issues/12';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(Response.json({ html_url: url, body: 'report' })).mockResolvedValueOnce(Response.json([{ html_url: url, body: '\n\n<!-- garage-bug-report:reporter-test:abc -->' }])));
+    const github = githubAdapter({ ...config, repository: 'ZenZontle/Garage-Guardian' });
+    expect(await github.create('title', 'report')).toBe(url);
+    expect(await github.reconcile('abc', 'reporter-test')).toBe(url);
+  });
   it('uploads with the configured repository ID and a generic filename', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(Response.json({ id: 123, permissions: { push: true } })).mockResolvedValueOnce(Response.json({ url: 'https://github.com/user-attachments/assets/abc' }));
     vi.stubGlobal('fetch', fetch);

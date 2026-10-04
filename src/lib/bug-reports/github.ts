@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ReportError, type ReportConfig } from './server-config';
-import { GITHUB_ASSET_URL } from './shared';
+import { GITHUB_ASSET_URL, isRepositoryIssueUrl } from './shared';
 
 const assetSchema = z.object({ url: z.string().url() });
 const issueSchema = z.object({ html_url: z.string().url(), body: z.string().nullable() });
@@ -24,7 +24,7 @@ export function githubAdapter(config: ReportConfig) {
     }
   }
   function issueUrl(url: string) {
-    if (!url.startsWith(`https://github.com/${config.repository}/issues/`) || !/^\d+$/.test(url.split('/').at(-1) || '')) throw new GitHubFailure(true);
+    if (!isRepositoryIssueUrl(url, config.repository)) throw new GitHubFailure(true);
     return url;
   }
   return {

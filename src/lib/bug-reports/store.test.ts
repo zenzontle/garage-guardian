@@ -25,6 +25,14 @@ vi.mock('@upstash/ratelimit', () => ({ Ratelimit: class {
 
 beforeEach(() => { provider.counts.clear(); provider.values.clear(); provider.calls = []; provider.mode = 'ok'; });
 describe('shared rate limits', () => {
+  it('reads successful receipts regardless of repository casing and refuses other repositories', async () => {
+    const store = reportStore({ ...config, repository: 'ZenZontle/Garage-Guardian' });
+    const receipt = { hash: 'hash', state: 'succeeded' as const, assets: [], createdAt: Date.now(), issueUrl: 'https://github.com/zenzontle/garage-guardian/issues/12' };
+    await store.claim('user', 'uuid', receipt);
+    expect(await store.get('user', 'uuid')).toEqual(receipt);
+    await store.save('user', 'uuid', { ...receipt, issueUrl: 'https://github.com/other/repo/issues/12' });
+    await expect(store.get('user', 'uuid')).rejects.toHaveProperty('code', 'INVALID_RECEIPT');
+  });
   it('enforces user limits across instances independently of IPs', async () => {
     for (let index = 0; index < 3; index++) await reportStore(config).limit('private-user', `private-ip-${index}`);
     await expect(reportStore(config).limit('private-user', 'new-ip')).rejects.toHaveProperty('status', 429);

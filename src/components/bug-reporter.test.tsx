@@ -1,17 +1,22 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as renderUI, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BugReporter } from './bug-reporter';
+import { LocaleProvider } from './locale-provider';
 import { metadata } from '@/lib/bug-reports/fixtures.test-helper';
 import { recordDiagnostic } from '@/lib/bug-reports/diagnostics';
 
 vi.mock('@/lib/repository', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'verified-session-token' } } }) } } }));
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
+  localStorage.clear();
+  vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['en-US']);
   fetchMock = vi.fn().mockImplementation(async () => Response.json({ enabled: true, metadata }));
   vi.stubGlobal('fetch', fetchMock);
   Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:screenshot'), revokeObjectURL: vi.fn() });
 });
+function render(ui: ReactNode) { return renderUI(ui, { wrapper: LocaleProvider }); }
 async function openReport() {
   const user = userEvent.setup();
   render(<BugReporter userId="account" screen="cars" dialog="add-car" />);
@@ -44,7 +49,7 @@ describe('authenticated public bug reporter', () => {
     expect(screen.queryByText('token=secret broken layout')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Remove all diagnostics' }));
     await user.click(screen.getByRole('checkbox'));
-    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` }, { status: 201 }));
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded', issueUrl: 'https://github.com/ZenZontle/Garage-Guardian/issues/9' }, { status: 201 }));
     await user.click(button);
     await screen.findByRole('link', { name: 'View GitHub issue' });
     const [url, init] = fetchMock.mock.calls.at(-1)!;
@@ -84,6 +89,63 @@ describe('authenticated public bug reporter', () => {
     expect(screen.queryByRole('button', { name: 'Publish report' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit report' })).toBeNull();
     expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(1);
+  });
+  it('keeps an uncertain submission frozen through status errors and unlocks only an explicit failed receipt', async () => {
+    const user = await openReport(); recordDiagnostic('Synthetic error'); await review(user); await user.click(screen.getByRole('checkbox'));
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
+    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    const submission = JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report'));
+    for (const [status, code] of [[429, 'RATE_LIMITED'], [503, 'LIMITER_UNAVAILABLE'], [502, 'GITHUB_FAILED'], [401, 'UNAUTHENTICATED'], [409, 'PREVIEW_CHANGED']] as const) {
+      fetchMock.mockResolvedValueOnce(Response.json({ code, error: 'Do not render provider details' }, { status }));
+      await user.click(screen.getByRole('button', { name: 'Check submission status' }));
+      expect(screen.getByRole('alert').textContent).not.toContain('Do not render provider details');
+      expect(screen.queryByRole('button', { name: 'Edit report' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Remove all diagnostics' }).matches(':disabled')).toBe(true);
+      expect(fetchMock.mock.calls.at(-1)![0]).toBe(`/api/bug-reports/${submission.submissionId}`);
+      expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(1);
+    }
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'failed' }, { status: 202 }));
+    await user.click(screen.getByRole('button', { name: 'Check submission status' }));
+    expect(screen.getByRole('button', { name: 'Edit report' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Publish report' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Remove all diagnostics' }).matches(':disabled')).toBe(false);
+  });
+  it('translates open drafts, validation, provider errors and statuses when switching languages', async () => {
+    const user = await openReport();
+    await user.click(screen.getByRole('button', { name: 'Review report' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
+    expect(screen.getByRole('dialog').textContent).toContain('Reportar un error');
+    expect(screen.getByRole('alert').textContent).toContain('Escribe un título');
+    expect(screen.getByPlaceholderText(/Pasos para reproducir/)).toBeDefined();
+    expect(screen.getByRole('dialog').textContent).toContain('serán públicos');
+    await user.type(screen.getByLabelText('Título'), 'Mi reporte sin traducir');
+    await user.type(screen.getByLabelText('Descripción'), 'Mis pasos originales para reproducir el error.');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
+    expect((screen.getByLabelText('Title') as HTMLInputElement).value).toBe('Mi reporte sin traducir');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
+    await user.click(screen.getByRole('button', { name: 'Revisar reporte' }));
+    await user.click(screen.getByRole('checkbox'));
+    fetchMock.mockResolvedValueOnce(Response.json({ code: 'RATE_LIMITED', error: 'English provider text' }, { status: 429, headers: { 'Retry-After': '60' } }));
+    await user.click(screen.getByRole('button', { name: 'Publicar reporte' }));
+    expect(screen.getByRole('alert').textContent).toContain('demasiados reportes');
+    expect(screen.getByRole('alert').textContent).toContain('60 segundos');
+    expect(screen.getByRole('alert').textContent).not.toContain('English provider text');
+    const draft = JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report'));
+    expect(draft.context.locale).toBe('es');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
+    expect(screen.getByRole('alert').textContent).toContain('Too many reports');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
+    await user.click(screen.getByRole('button', { name: 'Publicar reporte' }));
+    expect(screen.getByRole('status').textContent).toContain('estado es desconocido');
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report')).submissionId).toBe(draft.submissionId);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
+    expect(screen.getByRole('status').textContent).toContain('status is unknown');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` }, { status: 201 }));
+    await user.click(screen.getByRole('button', { name: 'Consultar estado del envío' }));
+    expect(screen.getByRole('status').textContent).toBe('Tu reporte se ha publicado.');
+    expect(screen.getByRole('link', { name: 'Ver issue en GitHub' })).toBeDefined();
   });
   it('traps focus, isolates Escape from existing dialogs, and restores focus', async () => {
     const user = await openReport();

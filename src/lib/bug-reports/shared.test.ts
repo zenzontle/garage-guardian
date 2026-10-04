@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cleanDiagnostic, formatIssue, issueTitle, redact, reportSchema } from './shared';
+import { cleanDiagnostic, formatIssue, isRepositoryIssueUrl, issueTitle, redact, reportSchema } from './shared';
 import { clearDiagnostics, recentDiagnostics, recordDiagnostic, startDiagnostics } from './diagnostics';
 import { report } from './fixtures.test-helper';
 
 describe('public report diagnostics', () => {
+  it('compares issue repository names without casing while enforcing the URL boundary', () => {
+    expect(isRepositoryIssueUrl('https://github.com/ZenZontle/Garage-Guardian/issues/12', 'zenzontle/garage-guardian')).toBe(true);
+    for (const url of ['https://evil.test/zenzontle/garage-guardian/issues/12', 'https://github.com/zenzontle/other/issues/12', 'https://github.com/zenzontle/garage-guardian/issues/12/extra', 'https://github.com/zenzontle/garage-guardian/issues/12?token=x', 'https://token@github.com/zenzontle/garage-guardian/issues/12', 'not a URL']) {
+      expect(isRepositoryIssueUrl(url, 'zenzontle/garage-guardian')).toBe(false);
+    }
+  });
   it('strips URL credentials/queries/fragments and redacts recognizable secrets and identifiers', () => {
     const result = redact('https://user:pass@example.com/cars?token=secret#email /cars?query-private#fragment-private 192.168.1.20 token=abc password:hello test@example.org Bearer eyJabc.abcdef.signature 1HGCM82633A004352 github_pat_12345 {"access_token":"private-session"} b3a37ad0-6f5a-4ca8-96e1-499b169767df');
     expect(result).toContain('https://example.com/cars');

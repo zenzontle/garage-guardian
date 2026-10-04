@@ -2,7 +2,7 @@ import { Redis } from '@upstash/redis';
 import { Ratelimit } from '@upstash/ratelimit';
 import { z } from 'zod';
 import { ReportError, identifier, type ReportConfig } from './server-config';
-import { GITHUB_ASSET_URL, SUBMISSION_RETENTION_MS } from './shared';
+import { GITHUB_ASSET_URL, SUBMISSION_RETENTION_MS, isRepositoryIssueUrl } from './shared';
 
 const receiptSchema = z.strictObject({
   hash: z.string().min(1).max(128), state: z.enum(['uploading', 'creating', 'unknown', 'failed', 'succeeded']),
@@ -39,7 +39,7 @@ export function reportStore(config: ReportConfig) {
       const value = await redis.get(receiptKey(userId, submissionId));
       if (value === null) return null;
       const receipt = receiptSchema.parse(value);
-      if (receipt.issueUrl && !receipt.issueUrl.startsWith(`https://github.com/${config.repository}/issues/`)) throw new ReportError(503, 'INVALID_RECEIPT', 'Submission status is unavailable.');
+      if (receipt.issueUrl && !isRepositoryIssueUrl(receipt.issueUrl, config.repository)) throw new ReportError(503, 'INVALID_RECEIPT', 'Submission status is unavailable.');
       return receipt;
     },
     async claim(userId: string, submissionId: string, receipt: Receipt): Promise<boolean> {

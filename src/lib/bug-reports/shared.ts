@@ -2,9 +2,16 @@ import { z } from 'zod';
 
 export const REPORT_LIMITS = { file: 1.5 * 1024 * 1024, body: 3.25 * 1024 * 1024, pixels: 20_000_000 };
 export const SUBMISSION_RETENTION_MS = 24 * 60 * 60_000;
-export const PUBLIC_WARNING = 'This report and its attachments will be public. Do not include personal information, passwords, tokens, or private vehicle details.';
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 export const GITHUB_ASSET_URL = /^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/;
+export function isRepositoryIssueUrl(value: string, repository: string): boolean {
+  try {
+    const url = new URL(value);
+    const [, owner, repo, kind, number, extra] = url.pathname.split('/');
+    return url.origin === 'https://github.com' && !url.username && !url.password && !url.search && !url.hash
+      && `${owner}/${repo}`.toLowerCase() === repository.toLowerCase() && kind === 'issues' && /^\d+$/.test(number ?? '') && extra === undefined;
+  } catch { return false; }
+}
 const text = (max: number) => z.string().max(max).refine((value) => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value), 'Invalid control characters');
 export const publicMetadataSchema = z.strictObject({
   release: text(160), environment: text(60), repository: text(100), reporterId: z.string().regex(/^reporter-[a-f0-9]{24}$/), browserOS: text(512),
