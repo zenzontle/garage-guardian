@@ -4,6 +4,7 @@ export function reportTotals(visits: Visit[], cars: Car[]) {
   const byMonth = new Map<string, number>();
   const byCar = new Map<string, number>();
   const byCategory = new Map<string, number>();
+  let unallocatedCents = 0;
   for (const visit of visits) {
     byMonth.set(visit.date.slice(0, 7), (byMonth.get(visit.date.slice(0, 7)) ?? 0) + visit.totalCostCents);
     byCar.set(visit.carId, (byCar.get(visit.carId) ?? 0) + visit.totalCostCents);
@@ -15,13 +16,16 @@ export function reportTotals(visits: Visit[], cars: Car[]) {
       }
     }
     const unallocated = Math.max(0, visit.totalCostCents - allocated);
-    if (unallocated) byCategory.set("Unallocated", (byCategory.get("Unallocated") ?? 0) + unallocated);
+    unallocatedCents += unallocated;
   }
   return {
     totalCents: visits.reduce((sum, visit) => sum + visit.totalCostCents, 0),
     byMonth: [...byMonth].sort(([a], [b]) => a.localeCompare(b)),
-    byCar: [...byCar].map(([id, amount]) => [cars.find((car) => car.id === id)?.name ?? "Unknown car", amount] as const),
-    byCategory: [...byCategory].sort((a, b) => b[1] - a[1]),
+    byCar: [...byCar].map(([id, amount]) => ({ id, name: cars.find((car) => car.id === id)?.name ?? null, amount })),
+    byCategory: [
+      ...[...byCategory].map(([name, amount]) => ({ kind: 'category' as const, name, amount })),
+      ...(unallocatedCents ? [{ kind: 'unallocated' as const, name: null, amount: unallocatedCents }] : []),
+    ].sort((a, b) => b.amount - a.amount),
   };
 }
 

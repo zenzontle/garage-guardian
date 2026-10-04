@@ -105,7 +105,7 @@ it('leaves failed transfers blocked for retry and resumes after reload', async (
   const hook = await openGarage();
   cloud.bucket.upload.mockResolvedValueOnce({ error: new Error('Network unavailable') });
   await act(async () => { await hook.result.current.signUp('new@example.com', 'password'); });
-  await waitFor(() => expect(hook.result.current.error).toBe('Network unavailable'));
+  await waitFor(() => expect(hook.result.current.error).toEqual({ code: 'transfer' }));
   expect(hook.result.current.repository).toBeNull();
   expect(hook.result.current.user?.id).toBe(account().id);
   expect((await local.load()).visits).toHaveLength(1);
@@ -216,7 +216,7 @@ it('shows cloud load errors without opening a local garage, and retry reloads cl
   cloud.execute.mockResolvedValueOnce({ data: null, error: new Error('Cloud unavailable') });
   const hook = await openGarage();
   expect(hook.result.current.repository).toBeNull();
-  expect(hook.result.current.error).toBe('Cloud unavailable');
+  expect(hook.result.current.error).toEqual({ code: 'load' });
   act(() => hook.result.current.retry());
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.user?.id).toBe(account().id);

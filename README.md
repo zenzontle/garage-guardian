@@ -6,6 +6,16 @@ Choose **Miles** (default) or **Kilometers** when adding a car. The distance uni
 
 Each car can have an optional **License plate**, shown in its detail header when present. Add, edit, or clear it alongside VIN. Plates are free text up to **20 characters** after trimming leading and trailing whitespace; case, internal spaces, and punctuation are preserved. Blank input means no plate. No country-specific format, uniqueness rule, registration jurisdiction, or plate lookup is used. Older records load with no plate, and signup transfers preserve saved plates, including interrupted transfers resumed after a reload.
 
+## Languages
+
+Use the **English / Español** selector in the header, account screens, or open dialogs. The first render is English on both server and client. After mounting, the app uses a valid saved choice, otherwise the first supported browser language (including regional variants such as `es-MX`), with English fallback. Explicit choices are stored under `garage-guardian:locale` in local storage, independently of accounts and garage data, and survive reload, sign-in, and sign-out. If storage is unavailable, switching still works for the current session. The document's `lang` follows the resolved language. Switching updates provider values without remounting forms or restarting transfers.
+
+Neutral Spanish uses `es` number/date formatting. Currency stays **USD**, each vehicle keeps its **mi/km** unit, and form values remain canonical numbers, integer cents, and ISO dates. Date-only displays use UTC explicitly so the calendar day never shifts. Stored names, notes, categories, and other user-entered text are never translated or renamed. New starter tasks use the language selected when the car is saved. CSV headers, values, fallback labels, units, and escaping remain canonical English regardless of the export button's language. No database migration is needed. Provider-owned confirmation emails and the optional server email digest remain in their provider/server language.
+
+Translations live in `messages/en.json` and `messages/es.json`, grouped by feature and shared controls. Use `next-intl`'s `useTranslations` with typed keys and complete ICU sentences for interpolation/plurals; use `useDisplay` (backed by `useFormatter`) for display values, and keep calculations and storage independent of locale. Spanish messages recursively override English defaults; `next-intl`'s development diagnostics remain enabled for missing or malformed messages. Errors use stable `AppFailure` codes and values and are translated at render time, including errors already visible when language changes. Unknown provider details are replaced with actionable localized fallback copy.
+
+When adding another language, add a complete dictionary with the same nested keys and ICU placeholders, extend `Locale` and `isLocale` in `src/i18n/config.ts`, merge it over English defaults, add its selector option, and extend dictionary parity, pluralization, locale resolution, and workflow tests. Review terminology and text expansion in desktop/mobile dialogs and tables. The configuration follows the [next-intl client provider documentation](https://next-intl.dev/docs/usage/configuration#nextintlclientprovider); this browser-local release needs no locale routes or server request configuration.
+
 ## Run locally
 
 ```powershell
