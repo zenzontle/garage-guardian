@@ -8,7 +8,7 @@ import en from '../../messages/en.json';
 import { LocaleSelector } from './locale-provider';
 import { supabase } from '@/lib/repository';
 import { clearDiagnostics, recentDiagnostics, startDiagnostics } from '@/lib/bug-reports/diagnostics';
-import { IMAGE_TYPES, REPORT_LIMITS, formatIssue, isRepositoryIssueUrl, issueTitle, publicMetadataSchema, reportSchema, type BugReport, type PublicMetadata, type ReportContext } from '@/lib/bug-reports/shared';
+import { IMAGE_TYPES, REPORT_LIMITS, fitsIssueBody, formatIssue, isRepositoryIssueUrl, issueTitle, publicMetadataSchema, reportSchema, type BugReport, type PublicMetadata, type ReportContext } from '@/lib/bug-reports/shared';
 
 type ReporterErrorCode = keyof typeof en.bugReports.errors;
 type ReporterProblem = { code: ReporterErrorCode; retryAfter?: number };
@@ -112,6 +112,7 @@ export function BugReporter({ userId, screen, dialog: appDialog }: { userId?: st
   }
   async function deliver(check = false) {
     if (!draft || !acknowledged || busy) return;
+    if (!check && !sent && !fitsIssueBody(draft)) { setError({ code: 'ISSUE_TOO_LARGE' }); return; }
     setBusy(true); setError(null);
     try {
       const data = new FormData();

@@ -1,15 +1,21 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import sharp from 'sharp';
 import { POST } from './route';
 import { GET as configuration } from './config/route';
 import { GET as status } from './[submissionId]/route';
-import { memoryStore, report } from '@/lib/bug-reports/fixtures.test-helper';
+import { memoryStore, oversizedReport, report } from '@/lib/bug-reports/fixtures.test-helper';
 import type { ReportStore } from '@/lib/bug-reports/store';
+import { ReportError } from '@/lib/bug-reports/server-config';
 
 const runtime = vi.hoisted(() => ({ store: null as unknown as ReportStore, getUser: vi.fn(), create: vi.fn(), upload: vi.fn(), reconcile: vi.fn() }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ auth: { getUser: runtime.getUser } }) }));
 vi.mock('@/lib/bug-reports/store', () => ({ reportStore: () => runtime.store }));
 vi.mock('@/lib/bug-reports/github', async (original) => ({ ...await original<typeof import('@/lib/bug-reports/github')>(), githubAdapter: () => ({ create: runtime.create, upload: runtime.upload, reconcile: runtime.reconcile }) }));
+vi.mock('sharp', async (original) => {
+  const module = await original<typeof import('sharp')>();
+  return { ...module, default: vi.fn(module.default) };
+});
 const headers = { authorization: 'Bearer verified-token', 'user-agent': 'Test browser / OS', 'x-vercel-forwarded-for': '192.0.2.1' };
 
 beforeEach(() => {
@@ -17,15 +23,56 @@ beforeEach(() => {
   runtime.store = memoryStore();
   runtime.getUser.mockReset().mockResolvedValue({ data: { user: { id: 'verified-account' } }, error: null });
   runtime.create.mockReset().mockResolvedValue('https://github.com/zenzontle/garage-guardian/issues/7');
+  runtime.upload.mockReset().mockResolvedValue('https://github.com/user-attachments/assets/test');
   runtime.reconcile.mockReset().mockResolvedValue(null);
+  vi.mocked(sharp).mockClear();
 });
-async function postRequest(extra: Record<string, unknown> = {}) {
+async function postRequest(extra: Record<string, unknown> = {}, files: File[] = []) {
   const configResponse = await configuration(new Request('https://app.test/api/bug-reports/config', { headers }));
   const config = await configResponse.json();
   const form = new FormData(); form.append('report', JSON.stringify({ ...report(), metadata: config.metadata, ...extra }));
+  files.forEach((file) => form.append('screenshots', file));
   return new Request('https://app.test/api/bug-reports', { method: 'POST', headers, body: form });
 }
+async function screenshot() {
+  const bytes = await sharp({ create: { width: 20, height: 10, channels: 3, background: '#00ff00' } }).png().toBuffer();
+  return new File([bytes], 'synthetic.png', { type: 'image/png' });
+}
 describe('HTTP reporting boundary', () => {
+  it('rejects an oversized public body before processing, decoding or GitHub writes', async () => {
+    const draft = oversizedReport(), file = await screenshot();
+    const request = await postRequest({ description: draft.description, diagnostics: draft.diagnostics }, [file]);
+    runtime.store.processing = vi.fn(); vi.mocked(sharp).mockClear();
+    const response = await POST(request);
+    expect(response.status).toBe(422); expect((await response.json()).code).toBe('ISSUE_TOO_LARGE');
+    expect(runtime.store.processing).not.toHaveBeenCalled(); expect(sharp).not.toHaveBeenCalled();
+    expect(runtime.create).not.toHaveBeenCalled(); expect(runtime.upload).not.toHaveBeenCalled();
+  });
+  it.each([429, 503])('stops image decoding when processing limits return %s', async (code) => {
+    const file = await screenshot(), request = await postRequest({}, [file]);
+    runtime.store.processing = vi.fn().mockRejectedValue(new ReportError(code, code === 429 ? 'RATE_LIMITED' : 'LIMITER_UNAVAILABLE', 'Unavailable', code === 429 ? 120 : undefined));
+    runtime.store.limit = vi.fn(); vi.mocked(sharp).mockClear();
+    const response = await POST(request);
+    expect(response.status).toBe(code);
+    if (code === 429) expect(response.headers.get('Retry-After')).toBe('120');
+    expect(runtime.store.processing).toHaveBeenCalledExactlyOnceWith('verified-account', '192.0.2.1');
+    expect(sharp).not.toHaveBeenCalled(); expect(runtime.store.limit).not.toHaveBeenCalled();
+    expect(runtime.create).not.toHaveBeenCalled(); expect(runtime.upload).not.toHaveBeenCalled();
+  });
+  it.each(['succeeded', 'creating', 'unknown'] as const)('replays matching %s receipts without decoding or consuming processing/submission limits', async (state) => {
+    const file = await screenshot();
+    expect((await POST(await postRequest({}, [file]))).status).toBe(201);
+    const receipt = (await runtime.store.get('verified-account', report().submissionId))!;
+    await runtime.store.save('verified-account', report().submissionId, { ...receipt, state, issueUrl: state === 'succeeded' ? receipt.issueUrl : undefined });
+    runtime.store.processing = vi.fn().mockRejectedValue(new ReportError(429, 'RATE_LIMITED', 'Wait'));
+    runtime.store.limit = vi.fn().mockRejectedValue(new ReportError(429, 'RATE_LIMITED', 'Wait'));
+    vi.mocked(sharp).mockClear();
+    expect((await POST(await postRequest({}, [file]))).status).toBe(state === 'succeeded' ? 201 : 202);
+    expect(sharp).not.toHaveBeenCalled(); expect(runtime.store.processing).not.toHaveBeenCalled(); expect(runtime.store.limit).not.toHaveBeenCalled();
+    expect(runtime.create).toHaveBeenCalledTimes(1); expect(runtime.upload).toHaveBeenCalledTimes(1);
+    expect((await POST(await postRequest({ description: 'Changed report description' }, [file]))).status).toBe(409);
+    expect(sharp).not.toHaveBeenCalled();
+  });
   it('does not expose reporting when disabled or create issues with missing configuration', async () => {
     vi.stubEnv('BUG_REPORTS_ENABLED', 'false');
     expect(await (await configuration(new Request('https://app.test'))).json()).toEqual({ enabled: false });

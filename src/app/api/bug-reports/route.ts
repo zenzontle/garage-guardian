@@ -1,7 +1,7 @@
 import { authenticate, clientIp, errorResponse, publicMetadata, reportConfig, reportingEnabled } from '@/lib/bug-reports/server-config';
 import { reportStore } from '@/lib/bug-reports/store';
 import { githubAdapter } from '@/lib/bug-reports/github';
-import { readReport, submitReport } from '@/lib/bug-reports/submission';
+import { decodeReport, readReport, replayReport, submitReport } from '@/lib/bug-reports/submission';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,6 +15,10 @@ export async function POST(request: Request) {
     const store = reportStore(config);
     await store.control(userId);
     const input = await readReport(request, publicMetadata(request, config, userId));
-    return await submitReport(store, githubAdapter(config), userId, ip, input);
+    const github = githubAdapter(config);
+    const replay = await replayReport(store, github, userId, input.report, input.hash);
+    if (replay) return replay;
+    await store.processing(userId, ip);
+    return await submitReport(store, github, userId, ip, await decodeReport(input));
   } catch (cause) { return errorResponse(cause); }
 }

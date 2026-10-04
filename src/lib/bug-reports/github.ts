@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ReportError, type ReportConfig } from './server-config';
-import { GITHUB_ASSET_URL, isRepositoryIssueUrl } from './shared';
+import { GITHUB_ASSET_URL, REPORT_LIMITS, isRepositoryIssueUrl } from './shared';
 
 const assetSchema = z.object({ url: z.string().url() });
 const issueSchema = z.object({ html_url: z.string().url(), body: z.string().nullable() });
@@ -36,7 +36,7 @@ export function githubAdapter(config: ReportConfig) {
       url.search = new URLSearchParams({ repository_id: String(repo.id), name: `screenshot-${index + 1}.webp`, content_type: 'image/webp' }).toString();
       const response = await call(url.toString(), { method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: new Blob([new Uint8Array(bytes)]) });
       const asset = assetSchema.parse(await response.json());
-      if (!GITHUB_ASSET_URL.test(asset.url)) throw new GitHubFailure(false);
+      if (asset.url.length > REPORT_LIMITS.assetUrl || !GITHUB_ASSET_URL.test(asset.url)) throw new GitHubFailure(false);
       return asset.url;
     },
     async create(title: string, body: string): Promise<string> {

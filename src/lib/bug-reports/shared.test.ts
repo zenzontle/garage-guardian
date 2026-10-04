@@ -1,9 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cleanDiagnostic, formatIssue, isRepositoryIssueUrl, issueTitle, redact, reportSchema } from './shared';
+import { REPORT_LIMITS, cleanDiagnostic, fitsIssueBody, formatIssue, isRepositoryIssueUrl, issueTitle, redact, reportSchema } from './shared';
 import { clearDiagnostics, recentDiagnostics, recordDiagnostic, startDiagnostics } from './diagnostics';
-import { report } from './fixtures.test-helper';
+import { oversizedReport, report } from './fixtures.test-helper';
 
 describe('public report diagnostics', () => {
+  it('bounds the complete body including maximum attachment markup at the character boundary', () => {
+    const draft = oversizedReport(), assets = Array(2).fill('x'.repeat(REPORT_LIMITS.assetUrl));
+    expect(reportSchema.safeParse(draft).success).toBe(true);
+    expect(formatIssue(draft).length).toBeGreaterThan(REPORT_LIMITS.issueBody);
+    expect(fitsIssueBody(draft)).toBe(false);
+    const excess = formatIssue(draft, assets).length - REPORT_LIMITS.issueBody;
+    draft.description = draft.description.slice(0, draft.description.length - excess);
+    expect(reportSchema.safeParse(draft).success).toBe(true);
+    expect(formatIssue(draft, assets).length).toBe(REPORT_LIMITS.issueBody);
+    expect(fitsIssueBody(draft)).toBe(true);
+    draft.description += 'x';
+    expect(fitsIssueBody(draft)).toBe(false);
+  });
+  it('counts long Markdown fences and Unicode in the formatted body bound', () => {
+    const draft = oversizedReport();
+    draft.description = '`'.repeat(5000);
+    draft.diagnostics[0].message = '😀'.repeat(500);
+    draft.diagnostics[0].stack = '`'.repeat(2000);
+    expect(fitsIssueBody(draft)).toBe(false);
+    draft.diagnostics = [];
+    expect(fitsIssueBody(draft)).toBe(true);
+    expect(formatIssue(draft).length).toBeLessThan(REPORT_LIMITS.issueBody);
+  });
   it('compares issue repository names without casing while enforcing the URL boundary', () => {
     expect(isRepositoryIssueUrl('https://github.com/ZenZontle/Garage-Guardian/issues/12', 'zenzontle/garage-guardian')).toBe(true);
     for (const url of ['https://evil.test/zenzontle/garage-guardian/issues/12', 'https://github.com/zenzontle/other/issues/12', 'https://github.com/zenzontle/garage-guardian/issues/12/extra', 'https://github.com/zenzontle/garage-guardian/issues/12?token=x', 'https://token@github.com/zenzontle/garage-guardian/issues/12', 'not a URL']) {

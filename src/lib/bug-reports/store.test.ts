@@ -41,6 +41,23 @@ describe('shared rate limits', () => {
     expect(provider.calls.every((call) => !call.key.includes('private'))).toBe(true);
     expect(new Set(provider.calls.map((call) => call.duration))).toEqual(new Set(['10 m', '1 d']));
   });
+  it('bounds concurrent processing per user across instances independently of delivery limits', async () => {
+    const results = await Promise.allSettled(Array.from({ length: 4 }, (_, index) => reportStore(config).processing('processing-user', `ip-${index}`)));
+    expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(3);
+    expect(results.filter((result) => result.status === 'rejected')).toHaveLength(1);
+    expect(provider.calls.every((call) => call.prefix.includes(':processing-'))).toBe(true);
+    expect(provider.calls.every((call) => !call.key.includes('processing-user'))).toBe(true);
+    await expect(reportStore(config).limit('processing-user', 'ip-0')).resolves.toBeUndefined();
+  });
+  it('bounds processing per IP across users and fails closed on provider failures', async () => {
+    for (let index = 0; index < 10; index++) await reportStore(config).processing(`processing-${index}`, 'shared-ip');
+    await expect(reportStore(config).processing('processing-11', 'shared-ip')).rejects.toHaveProperty('status', 429);
+    await expect(reportStore({ ...config, prefix: 'test:production' }).processing('processing-11', 'shared-ip')).resolves.toBeUndefined();
+    provider.mode = 'timeout';
+    await expect(reportStore(config).processing('user', 'ip')).rejects.toHaveProperty('code', 'LIMITER_UNAVAILABLE');
+    provider.mode = 'throw';
+    await expect(reportStore(config).processing('user', 'ip')).rejects.toThrow('offline');
+  });
   it('enforces IP limits across distinct users and isolates deployments', async () => {
     for (let index = 0; index < 10; index++) await reportStore(config).limit(`user-${index}`, 'shared-ip');
     await expect(reportStore(config).limit('user-11', 'shared-ip')).rejects.toHaveProperty('status', 429);

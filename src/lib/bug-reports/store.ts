@@ -3,11 +3,11 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { ReportError, identifier, type ReportConfig } from './server-config';
-import { GITHUB_ASSET_URL, SUBMISSION_RETENTION_MS, isRepositoryIssueUrl } from './shared';
+import { GITHUB_ASSET_URL, REPORT_LIMITS, SUBMISSION_RETENTION_MS, isRepositoryIssueUrl } from './shared';
 
 const receiptSchema = z.strictObject({
   hash: z.string().min(1).max(128), state: z.enum(['uploading', 'creating', 'unknown', 'failed', 'succeeded']),
-  assets: z.array(z.string().regex(GITHUB_ASSET_URL)).max(2), issueUrl: z.string().regex(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+$/).optional(), createdAt: z.number().int().nonnegative(),
+  assets: z.array(z.string().max(REPORT_LIMITS.assetUrl).regex(GITHUB_ASSET_URL)).max(2), issueUrl: z.string().regex(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+$/).optional(), createdAt: z.number().int().nonnegative(),
 });
 export type Receipt = z.infer<typeof receiptSchema>;
 export const RECEIPT_TTL = SUBMISSION_RETENTION_MS / 1000;
@@ -20,6 +20,8 @@ export function reportStore(config: ReportConfig) {
   });
   const userShort = limiter('user-short', 3, '10 m'), userDaily = limiter('user-daily', 10, '1 d');
   const ipShort = limiter('ip-short', 10, '10 m'), ipDaily = limiter('ip-daily', 50, '1 d');
+  const processingUserShort = limiter('processing-user-short', 3, '10 m'), processingUserDaily = limiter('processing-user-daily', 10, '1 d');
+  const processingIpShort = limiter('processing-ip-short', 10, '10 m'), processingIpDaily = limiter('processing-ip-daily', 50, '1 d');
   const controls = limiter('controls', 30, '1 m');
   async function check(limits: { limiter: Ratelimit; key: string }[]) {
     const results = await Promise.all(limits.map(async ({ limiter: limit, key }) => {
@@ -33,6 +35,10 @@ export function reportStore(config: ReportConfig) {
   }
   const receiptKey = (userId: string, submissionId: string) => `${config.prefix}:receipt:${identifier(config, 'user', userId)}:${submissionId}`;
   return {
+    async processing(userId: string, ip: string) {
+      const user = identifier(config, 'user', userId), address = identifier(config, 'ip', ip);
+      await check([{ limiter: processingUserShort, key: user }, { limiter: processingUserDaily, key: user }, { limiter: processingIpShort, key: address }, { limiter: processingIpDaily, key: address }]);
+    },
     async limit(userId: string, ip: string) {
       const user = identifier(config, 'user', userId), address = identifier(config, 'ip', ip);
       await check([{ limiter: userShort, key: user }, { limiter: userDaily, key: user }, { limiter: ipShort, key: address }, { limiter: ipDaily, key: address }]);

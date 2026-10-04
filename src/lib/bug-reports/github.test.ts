@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { githubAdapter } from './github';
 import { config } from './fixtures.test-helper';
+import { REPORT_LIMITS } from './shared';
 
 describe('isolated GitHub adapter', () => {
   it('accepts canonical repository casing on creation and reconciliation', async () => {
@@ -19,7 +20,7 @@ describe('isolated GitHub adapter', () => {
     expect(url.origin).toBe('https://uploads.github.com'); expect(url.searchParams.get('repository_id')).toBe('123'); expect(url.searchParams.get('name')).toBe('screenshot-1.webp');
   });
   it('rejects unexpected asset hosts and never forwards credentials through redirects', async () => {
-    for (const url of ['https://evil.test/file', 'https://github.com/user-attachments/assets/x)@mention', 'https://github.com/user-attachments/assets/abc?secret=private']) {
+    for (const url of ['https://evil.test/file', 'https://github.com/user-attachments/assets/x)@mention', 'https://github.com/user-attachments/assets/abc?secret=private', `https://github.com/user-attachments/assets/${'a'.repeat(REPORT_LIMITS.assetUrl)}`]) {
       const fetch = vi.fn().mockResolvedValueOnce(Response.json({ id: 123, permissions: { push: true } })).mockResolvedValueOnce(Response.json({ url }));
       vi.stubGlobal('fetch', fetch);
       await expect(githubAdapter(config).upload(new Uint8Array([1]), 0)).rejects.toHaveProperty('status', 502);

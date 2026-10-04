@@ -324,6 +324,7 @@
     },
     "errors": {
       "INVALID_TEXT": "Enter a title of 5–120 characters and a description of 10–5,000 characters.",
+      "ISSUE_TOO_LARGE": "The public report is too long. Remove some diagnostics or shorten the description before publishing.",
       "INVALID_FILES": "Attach at most two valid, nonanimated PNG, JPEG or WebP screenshots, each up to 1.5 MiB and 20 million pixels.",
       "SUBMIT_FAILED": "Could not submit. Your draft has been kept.",
       "MISSING_RECEIPT": "The submission record is no longer available, so publication cannot be confirmed. Check GitHub before starting another report.",

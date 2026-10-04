@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BugReporter } from './bug-reporter';
 import { LocaleProvider } from './locale-provider';
-import { metadata } from '@/lib/bug-reports/fixtures.test-helper';
+import { metadata, oversizedReport } from '@/lib/bug-reports/fixtures.test-helper';
 import { recordDiagnostic } from '@/lib/bug-reports/diagnostics';
 
 vi.mock('@/lib/repository', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'verified-session-token' } } }) } } }));
@@ -29,6 +29,26 @@ async function review(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Review report' }));
 }
 describe('authenticated public bug reporter', () => {
+  it('keeps oversized reports reviewable and blocks publication until diagnostics are removed', async () => {
+    const user = await openReport(), large = oversizedReport();
+    large.diagnostics.forEach((entry) => { const cause = new Error(entry.message); cause.stack = entry.stack; recordDiagnostic(cause); });
+    await user.type(screen.getByLabelText('Title'), large.title);
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: large.description } });
+    await user.click(screen.getByRole('button', { name: 'Review report' }));
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    expect(screen.getByRole('alert').textContent).toContain('Remove some diagnostics');
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(0);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
+    expect(screen.getByRole('alert').textContent).toContain('Elimina algunos diagnósticos');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
+    await user.click(screen.getByRole('button', { name: 'Remove all diagnostics' }));
+    await user.click(screen.getByRole('checkbox'));
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` }, { status: 201 }));
+    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await screen.findByRole('link', { name: 'View GitHub issue' });
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report')).diagnostics).toEqual([]);
+  });
   it('does not fetch or display for guests and hides disabled deployments', async () => {
     const rendered = render(<BugReporter screen="dashboard" dialog="none" />);
     expect(fetchMock).not.toHaveBeenCalled(); expect(screen.queryByRole('button', { name: 'Report a bug' })).toBeNull();

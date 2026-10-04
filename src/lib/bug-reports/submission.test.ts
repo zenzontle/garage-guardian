@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { REPORT_LIMITS } from './shared';
 import { GitHubFailure } from './github';
-import { readReport, reconcileReceipt, submitReport } from './submission';
-import { memoryStore, metadata, report } from './fixtures.test-helper';
+import { decodeReport, readReport as parseReport, reconcileReceipt, submitReport } from './submission';
+import { memoryStore, metadata, oversizedReport, report } from './fixtures.test-helper';
+
+async function readReport(request: Request, metadata: Parameters<typeof parseReport>[1]) { return decodeReport(await parseReport(request, metadata)); }
 
 function request(value: unknown = report(), files: File[] = []) {
   const form = new FormData(); form.append('report', JSON.stringify(value)); files.forEach((file) => form.append('screenshots', file));
@@ -13,6 +15,10 @@ function request(value: unknown = report(), files: File[] = []) {
 function adapter() { return { upload: vi.fn(async (_bytes: Uint8Array, index: number) => `https://github.com/user-attachments/assets/${index}`), create: vi.fn(async () => 'https://github.com/zenzontle/garage-guardian/issues/1'), reconcile: vi.fn(async (): Promise<string | null> => null) }; }
 
 describe('submission validation', () => {
+  it('rejects an oversized formatted body before image decoding', async () => {
+    const corrupt = new File(['broken'], 'x.png', { type: 'image/png' });
+    await expect(readReport(request(oversizedReport(), [corrupt]), metadata)).rejects.toHaveProperty('code', 'ISSUE_TOO_LARGE');
+  });
   it('validates strict metadata, lengths, acknowledgment and diagnostics', async () => {
     for (const value of [{ ...report(), title: 'tiny' }, { ...report(), description: 'x'.repeat(5001) }, { ...report(), acknowledged: false }, { ...report(), extra: true }, { ...report(), metadata: { ...metadata, reporterId: `reporter-${'b'.repeat(24)}` } }, { ...report(), context: { ...report().context, viewport: { width: NaN, height: 10, pixelRatio: 1 } } }, { ...report(), diagnostics: [{ source: 'operation', message: 'token=secret', stack: '', timestamp: Date.now() }] }]) {
       await expect(readReport(request(value), metadata)).rejects.toHaveProperty('status');

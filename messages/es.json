@@ -324,6 +324,7 @@
     },
     "errors": {
       "INVALID_TEXT": "Escribe un título de 5 a 120 caracteres y una descripción de 10 a 5000 caracteres.",
+      "ISSUE_TOO_LARGE": "El reporte público es demasiado largo. Elimina algunos diagnósticos o acorta la descripción antes de publicarlo.",
       "INVALID_FILES": "Adjunta hasta dos capturas válidas y sin animación en formato PNG, JPEG o WebP, de hasta 1,5 MiB y 20 millones de píxeles cada una.",
       "SUBMIT_FAILED": "No se pudo enviar el reporte. Tu borrador se ha conservado.",
       "MISSING_RECEIPT": "El registro del envío ya no está disponible, por lo que no se puede confirmar la publicación. Revisa GitHub antes de iniciar otro reporte.",

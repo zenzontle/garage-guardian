@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const REPORT_LIMITS = { file: 1.5 * 1024 * 1024, body: 3.25 * 1024 * 1024, pixels: 20_000_000 };
+export const REPORT_LIMITS = { file: 1.5 * 1024 * 1024, body: 3.25 * 1024 * 1024, pixels: 20_000_000, issueBody: 65_536, assetUrl: 2048 };
 export const SUBMISSION_RETENTION_MS = 24 * 60 * 60_000;
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 export const GITHUB_ASSET_URL = /^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/;
@@ -65,4 +65,8 @@ export function formatIssue(report: BugReport, screenshots: string[] = []): stri
   const details = `Release: ${m.release}\nEnvironment: ${m.environment}\nReporter: ${m.reporterId}\nBrowser / OS: ${m.browserOS}\nRoute: ${c.pathname}\nScreen: ${c.screen}\nDialog: ${c.dialog}\nViewport: ${c.viewport.width} × ${c.viewport.height} (${c.viewport.pixelRatio}x)\nLocale: ${c.locale}\nOnline: ${c.online}`;
   const errors = report.diagnostics.map((entry) => `${new Date(entry.timestamp).toISOString()} [${entry.source}] ${entry.message}${entry.stack ? `\n${entry.stack}` : ''}`).join('\n\n');
   return `## Description\n${literal(report.description)}\n\n## App context\n${literal(details)}\n\n## Recent errors\n${literal(errors || 'No errors included.')}\n\n## Screenshots\n${screenshots.length ? screenshots.map((url, index) => url ? `![Screenshot ${index + 1}](${url})` : `Screenshot ${index + 1} (reviewed attachment)`).join('\n\n') : 'No screenshots included.'}\n\n<!-- garage-bug-report:${m.reporterId}:${report.submissionId} -->`;
+}
+export function fitsIssueBody(report: BugReport): boolean {
+  // Reserve two maximum-length asset URLs so the public preview and final body fit.
+  return formatIssue(report, Array(2).fill('x'.repeat(REPORT_LIMITS.assetUrl))).length <= REPORT_LIMITS.issueBody;
 }
