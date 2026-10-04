@@ -19,6 +19,7 @@ vi.mock('@upstash/ratelimit', () => ({ Ratelimit: class {
     provider.calls.push({ key, prefix: this.options.prefix, duration: this.options.limiter.duration });
     if (provider.mode === 'throw') throw new Error('offline');
     if (provider.mode === 'timeout') return { success: true, reason: 'timeout', pending: new Promise(() => {}), reset: Date.now() + 1000 };
+    if (provider.mode === 'pending-rejection') return { success: true, pending: Promise.reject(new Error('private provider details')), reset: Date.now() + 1000 };
     const name = `${this.options.prefix}:${key}`, next = (provider.counts.get(name) ?? 0) + 1;
     provider.counts.set(name, next);
     return { success: next <= this.options.limiter.count, reset: Date.now() + 600_000, pending: Promise.resolve() };
@@ -56,7 +57,7 @@ describe('shared rate limits', () => {
     provider.mode = 'timeout';
     await expect(reportStore(config).processing('user', 'ip')).rejects.toHaveProperty('code', 'LIMITER_UNAVAILABLE');
     provider.mode = 'throw';
-    await expect(reportStore(config).processing('user', 'ip')).rejects.toThrow('offline');
+    await expect(reportStore(config).processing('user', 'ip')).rejects.toHaveProperty('code', 'LIMITER_UNAVAILABLE');
   });
   it('enforces IP limits across distinct users and isolates deployments', async () => {
     for (let index = 0; index < 10; index++) await reportStore(config).limit(`user-${index}`, 'shared-ip');
@@ -78,10 +79,22 @@ describe('shared rate limits', () => {
     provider.mode = 'timeout';
     await expect(reportStore(config).limit('user', 'ip')).rejects.toHaveProperty('code', 'LIMITER_UNAVAILABLE');
     provider.mode = 'throw';
-    await expect(reportStore(config).limit('user', 'ip')).rejects.toThrow('offline');
+    await expect(reportStore(config).limit('user', 'ip')).rejects.toHaveProperty('code', 'LIMITER_UNAVAILABLE');
     const response = errorResponse(new ReportError(429, 'RATE_LIMITED', 'Wait', 60));
     expect(response.headers.get('retry-after')).toBe('60');
     expect(errorResponse(new Error('private provider details')).status).toBe(503);
+  });
+  it.each([
+    ['control', 'throw'], ['control', 'pending-rejection'],
+    ['processing', 'throw'], ['processing', 'pending-rejection'],
+    ['limit', 'throw'], ['limit', 'pending-rejection'],
+  ] as const)('maps %s limiter %s failures to retryable provider errors', async (method, mode) => {
+    provider.mode = mode;
+    const failure = await reportStore(config)[method]('user', 'ip').catch((cause: unknown) => cause);
+    expect(failure).toMatchObject({ status: 503, code: 'LIMITER_UNAVAILABLE' });
+    const response = errorResponse(failure);
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ code: 'LIMITER_UNAVAILABLE', error: 'Bug reporting is temporarily unavailable. Try again later.' });
   });
   it('claims atomically and isolates receipts by verified user', async () => {
     const first = reportStore(config), second = reportStore(config);

@@ -7,9 +7,11 @@ import { LocaleProvider } from './locale-provider';
 import { metadata, oversizedReport } from '@/lib/bug-reports/fixtures.test-helper';
 import { recordDiagnostic } from '@/lib/bug-reports/diagnostics';
 
-vi.mock('@/lib/repository', () => ({ supabase: { auth: { getSession: async () => ({ data: { session: { access_token: 'verified-session-token' } } }) } } }));
+const auth = vi.hoisted(() => ({ getSession: vi.fn() }));
+vi.mock('@/lib/repository', () => ({ supabase: { auth } }));
 let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
+  auth.getSession.mockReset().mockResolvedValue({ data: { session: { access_token: 'verified-session-token' } } });
   localStorage.clear();
   vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['en-US']);
   fetchMock = vi.fn().mockImplementation(async () => Response.json({ enabled: true, metadata }));
@@ -99,7 +101,42 @@ describe('authenticated public bug reporter', () => {
     expect(fetchMock.mock.calls.at(-1)![0]).toBe(`/api/bug-reports/${submission.submissionId}`);
     expect(screen.queryByRole('button', { name: 'Edit report' })).toBeNull();
   });
-  it.each(['AUTH_UNAVAILABLE', 'IP_UNAVAILABLE', 'NOT_CONFIGURED'])('allows the same reviewed draft to retry after a pre-write %s response', async (code) => {
+  it('unfreezes the reviewed draft when the initial publish has no local session before fetch', async () => {
+    const user = await openReport(); recordDiagnostic('Synthetic error'); await review(user); await user.click(screen.getByRole('checkbox'));
+    const preview = screen.getByText(/Release:/).textContent;
+    const callsBeforePublish = fetchMock.mock.calls.length;
+    auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await screen.findByRole('alert');
+    expect(fetchMock).toHaveBeenCalledTimes(callsBeforePublish);
+    expect(screen.queryByRole('button', { name: 'Edit report' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove all diagnostics' }).matches(':disabled')).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Check submission status' })).toBeNull();
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` }, { status: 201 }));
+    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await screen.findByRole('link', { name: 'View GitHub issue' });
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe('/api/bug-reports'); expect(init.method).toBe('POST');
+    const report = JSON.parse(init.body.get('report'));
+    expect(preview).toContain(report.submissionId); expect(report.diagnostics).toHaveLength(1);
+  });
+  it('keeps uncertain submissions frozen when a status check has no local session before fetch', async () => {
+    const user = await openReport(); await review(user); await user.click(screen.getByRole('checkbox'));
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
+    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    const callsBeforeCheck = fetchMock.mock.calls.length;
+    auth.getSession.mockResolvedValueOnce({ data: { session: null } });
+    await user.click(screen.getByRole('button', { name: 'Check submission status' }));
+    await screen.findByRole('alert');
+    expect(fetchMock).toHaveBeenCalledTimes(callsBeforeCheck);
+    expect(screen.queryByRole('button', { name: 'Edit report' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Publish report' })).toBeNull();
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
+    await user.click(screen.getByRole('button', { name: 'Check submission status' }));
+    expect(fetchMock.mock.calls.at(-1)![1].method).toBeUndefined();
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(1);
+  });
+  it.each(['AUTH_UNAVAILABLE', 'IP_UNAVAILABLE', 'NOT_CONFIGURED', 'LIMITER_UNAVAILABLE'])('allows the same reviewed draft to retry after a pre-write %s response', async (code) => {
     const user = await openReport(); recordDiagnostic('Synthetic error'); await review(user); await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ code }, { status: 503 }));
     await user.click(screen.getByRole('button', { name: 'Publish report' }));

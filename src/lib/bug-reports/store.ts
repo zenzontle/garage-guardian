@@ -29,7 +29,7 @@ export function reportStore(config: ReportConfig) {
       if (result.reason === 'timeout') throw new ReportError(503, 'LIMITER_UNAVAILABLE', 'Bug reporting is temporarily unavailable. Try again later.');
       await result.pending;
       return result;
-    }));
+    })).catch(() => { throw new ReportError(503, 'LIMITER_UNAVAILABLE', 'Bug reporting is temporarily unavailable. Try again later.'); });
     const denied = results.filter((result) => !result.success);
     if (denied.length) throw new ReportError(429, 'RATE_LIMITED', 'Too many reports. Please try again later.', Math.max(1, Math.ceil((Math.max(...denied.map((result) => result.reset)) - Date.now()) / 1000)));
   }

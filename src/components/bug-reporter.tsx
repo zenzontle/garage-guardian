@@ -114,12 +114,12 @@ export function BugReporter({ userId, screen, dialog: appDialog }: { userId?: st
     if (!draft || !acknowledged || busy) return;
     if (!check && !sent && !fitsIssueBody(draft)) { setError({ code: 'ISSUE_TOO_LARGE' }); return; }
     setBusy(true); setError(null);
+    const checking = check || sent;
     try {
       const data = new FormData();
       data.append('report', JSON.stringify(draft));
       screenshots.forEach((item) => data.append('screenshots', item.file));
       // Once a transport failure is possible, check the receipt before reposting.
-      const checking = check || sent;
       setSent(true);
       const response = await authenticatedFetch(checking ? `/api/bug-reports/${draft.submissionId}` : '/api/bug-reports', checking ? {} : { method: 'POST', body: data });
       const result = await response.json();
@@ -142,7 +142,11 @@ export function BugReporter({ userId, screen, dialog: appDialog }: { userId?: st
         setIssueUrl(result.issueUrl); setStatus('published');
       } else if (result.state === 'failed') { setSent(false); setStatus('failed'); }
       else setStatus('unknown');
-    } catch (cause) { setError(cause instanceof ReporterFailure ? { code: cause.code, retryAfter: cause.retryAfter } : { code: 'SUBMIT_FAILED' }); }
+    } catch (cause) {
+      // Authentication rejection cannot create an issue on the initial attempt.
+      if (!checking && cause instanceof ReporterFailure && cause.code === 'UNAUTHENTICATED') setSent(false);
+      setError(cause instanceof ReporterFailure ? { code: cause.code, retryAfter: cause.retryAfter } : { code: 'SUBMIT_FAILED' });
+    }
     finally { setBusy(false); }
   }
 
