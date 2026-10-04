@@ -37,9 +37,23 @@ export type BugReport = z.infer<typeof reportSchema>;
 export function redact(value: string): string {
   return value
     .replace(/https?:\/\/[^\s<>"']+/gi, (url) => {
-      try { const parsed = new URL(url); parsed.username = ''; parsed.password = ''; parsed.search = ''; parsed.hash = ''; return parsed.toString(); } catch { return '[URL]'; }
+      try {
+        const parsed = new URL(url);
+        // Replacing an IPv6 host with [IP] would create an invalid URL on re-cleaning.
+        if (parsed.hostname.startsWith('[')) return '[URL]';
+        parsed.username = ''; parsed.password = ''; parsed.search = ''; parsed.hash = ''; return parsed.toString();
+      } catch { return '[URL]'; }
     })
     .replace(/(?:\/|\.\.?\/)[^\s<>"']*[?#][^\s<>"']*/g, (path) => path.split(/[?#]/, 1)[0])
+    .replace(/(^|[^\w:])([\da-f:][\da-f:.]*:[\da-f:.]*(?:%[\w.~\-]+)?)(?![\w:%])/gi, (match, prefix: string, candidate: string) => {
+      const address = candidate.replace(/\.+$/, '');
+      try {
+        // WHATWG URL validates compressed and IPv4-mapped IPv6 in both runtimes.
+        // A scope identifies the interface; redact it along with the address.
+        new URL(`http://[${address.split('%', 1)[0]}]/`);
+        return `${prefix}[IP]${candidate.slice(address.length)}`;
+      } catch { return match; }
+    })
     .replace(/\b([A-Za-z][\w-]*\/)?((?:\d{1,3}\.){3}\d{1,3})\b/g, (match, prefix: string | undefined, address: string) => {
       if (prefix && /^(?:Chrome|Chromium|HeadlessChrome|CriOS|Firefox|FxiOS|Safari|Version|Edg|EdgA|EdgiOS|OPR|Opera)\/$/i.test(prefix)) return match;
       return address.split('.').every((part) => Number(part) <= 255) ? `${prefix ?? ''}[IP]` : match;

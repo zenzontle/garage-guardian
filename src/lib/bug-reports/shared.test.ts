@@ -5,6 +5,31 @@ import { oversizedReport, report } from './fixtures.test-helper';
 
 describe('public report diagnostics', () => {
   it.each([
+    ['client=2001:db8::1234', 'client=[IP]'],
+    ['remote/2001:0DB8:0000:0000:0000:0000:0000:1234', 'remote/[IP]'],
+    ['::1', '[IP]'],
+    ['::', '[IP]'],
+    ['fe80::abcd%eth0', '[IP]'],
+    ['::ffff:192.0.2.1', '[IP]'],
+    ['2001:db8:0:0:0:0:192.0.2.1', '[IP]'],
+    ['[2001:db8::1]:443', '[[IP]]:443'],
+    ['client=2001:db8::1234.', 'client=[IP].'],
+    ['https://[2001:db8::1]/request', '[URL]'],
+    ['https://user:pass@[::ffff:192.0.2.1]:8443/request?private=value#secret', '[URL]'],
+    ['https://example.test/connect/2001:db8::1234', 'https://example.test/connect/[IP]'],
+  ])('redacts IPv6 literals and remains stable when cleaned again: %s', (source, expected) => {
+    expect(redact(source)).toBe(expected);
+    expect(redact(expected)).toBe(expected);
+    const entry = { source: 'operation' as const, timestamp: Date.now(), message: source, stack: source };
+    const sanitized = cleanDiagnostic(entry);
+    expect(sanitized).toMatchObject({ message: expected, stack: expected });
+    expect(cleanDiagnostic(sanitized)).toEqual(sanitized);
+  });
+  it('preserves non-address colon sequences and malformed IPv6 candidates', () => {
+    const source = '12:34:56.789 src/app.ts:12:34 abc:def 2001:db8::xyz 12345::1 2001:db8::1::2 1:2:3:4:5:6:7:8:9';
+    expect(redact(source)).toBe(source);
+  });
+  it.each([
     'password="correct horse battery staple"',
     "secret='correct horse battery staple'",
     '{"access_token":"first second third"}',

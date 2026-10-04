@@ -15,7 +15,7 @@ function request(value: unknown = report(), files: File[] = []) {
 function adapter() { return { upload: vi.fn(async (_bytes: Uint8Array, index: number) => `https://github.com/user-attachments/assets/${index}`), create: vi.fn(async () => 'https://github.com/zenzontle/garage-guardian/issues/1'), reconcile: vi.fn(async (): Promise<string | null> => null) }; }
 
 describe('submission validation', () => {
-  it.each(['password="correct horse battery staple"', 'Authorization: Basic dXNlcjpwYXNz', 'remote/203.0.113.5 client/192.168.1.20'])('rejects raw sensitive diagnostics and accepts their complete redaction: %s', async (message) => {
+  it.each(['password="correct horse battery staple"', 'Authorization: Basic dXNlcjpwYXNz', 'remote/203.0.113.5 client/192.168.1.20', 'client=2001:db8::1234', 'https://[2001:db8::1]/request', '::ffff:192.0.2.1', 'fe80::abcd%eth0'])('rejects raw sensitive diagnostics and accepts their complete redaction: %s', async (message) => {
     const entry = { source: 'operation' as const, timestamp: Date.now(), message, stack: message };
     await expect(readReport(request({ ...report(), diagnostics: [entry] }), metadata)).rejects.toHaveProperty('code', 'UNSAFE_DIAGNOSTICS');
     const sanitized = cleanDiagnostic(entry);
