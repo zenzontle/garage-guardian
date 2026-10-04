@@ -9,7 +9,7 @@ const headers = { Authorization: `Bearer ${token}`, 'User-Agent': 'GarageGuardia
 const configResponse = await fetch(new URL('/api/bug-reports/config', url), { headers });
 const configuration = await configResponse.json();
 if (!configResponse.ok || !configuration.enabled) throw new Error('The preview reporter is not configured.');
-if (configuration.metadata.environment !== 'preview' || configuration.metadata.repository === 'zenzontle/garage-guardian') throw new Error('Use a preview deployment pointed at a separate TEST repository; this script refuses production and the real issue tracker.');
+if (configuration.metadata.environment !== 'preview' || configuration.metadata.repository.toLowerCase() === 'zenzontle/garage-guardian') throw new Error('Use a preview deployment pointed at a separate TEST repository; this script refuses production and the real issue tracker.');
 const bytes = await sharp({ create: { width: 160, height: 90, channels: 3, background: '#17804f' } }).png().toBuffer();
 const report = {
   submissionId: crypto.randomUUID(), title: 'Synthetic bug reporter smoke test',
