@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { REPORT_LIMITS, cleanDiagnostic } from './shared';
 import { GitHubFailure } from './github';
-import { decodeReport, readReport as parseReport, reconcileReceipt, submitReport } from './submission';
+import { decodeReport, readReport as parseReport, reconcileReceipt, replayReport, submitReport } from './submission';
 import { memoryStore, metadata, oversizedReport, report } from './fixtures.test-helper';
 
 async function readReport(request: Request, metadata: Parameters<typeof parseReport>[1]) { return decodeReport(await parseReport(request, metadata)); }
@@ -93,6 +93,70 @@ describe('GitHub delivery and retries', () => {
     github.reconcile.mockResolvedValueOnce('https://github.com/zenzontle/garage-guardian/issues/1');
     expect((await submitReport(store, github, 'user', 'ip', value)).status).toBe(201);
     expect(github.create).toHaveBeenCalledTimes(1);
+  });
+  it.each([
+    ['creating', 'status'], ['unknown', 'status'], ['creating', 'replay'], ['unknown', 'replay'],
+  ] as const)('preserves reconciliation success against a concurrent stale %s %s check', async (state, contender) => {
+    const store = memoryStore(), github = adapter(), value = input();
+    const receipt = { hash: value.hash, state, assets: [], createdAt: Date.now() };
+    await store.claim('user', value.report.submissionId, receipt);
+    let resolveFound!: (url: string) => void, resolveMissing!: (url: null) => void, started!: () => void;
+    const found = new Promise<string>((resolve) => { resolveFound = resolve; });
+    const missing = new Promise<null>((resolve) => { resolveMissing = resolve; });
+    const checking = new Promise<void>((resolve) => { started = resolve; });
+    github.reconcile.mockImplementationOnce(() => { started(); return found; }).mockImplementationOnce(() => missing);
+    const first = reconcileReceipt(store, github, 'user', value.report.submissionId, receipt, metadata.reporterId);
+    await checking;
+    const second = contender === 'status'
+      ? reconcileReceipt(store, github, 'user', value.report.submissionId, receipt, metadata.reporterId)
+      : replayReport(store, github, 'user', value.report, value.hash);
+    // Let the concurrent check start before GitHub confirms the first result.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const issueUrl = 'https://github.com/zenzontle/garage-guardian/issues/1';
+    resolveFound(issueUrl);
+    expect(await first).toMatchObject({ state: 'succeeded', issueUrl });
+    resolveMissing(null);
+    await second;
+    expect(await store.get('user', value.report.submissionId)).toMatchObject({ state: 'succeeded', issueUrl });
+    expect(await reconcileReceipt(store, github, 'user', value.report.submissionId, receipt, metadata.reporterId)).toMatchObject({ state: 'succeeded', issueUrl });
+    expect(github.reconcile).toHaveBeenCalledTimes(1);
+    expect(github.create).not.toHaveBeenCalled();
+  });
+  it('keeps status reconciliation out of an active issue creation lease', async () => {
+    const store = memoryStore(), github = adapter(), value = input();
+    let finish!: (url: string) => void, started!: () => void;
+    const creating = new Promise<string>((resolve) => { finish = resolve; });
+    const pending = new Promise<void>((resolve) => { started = resolve; });
+    github.create.mockImplementationOnce(() => { started(); return creating; });
+    const submission = submitReport(store, github, 'user', 'ip', value);
+    await pending;
+    const receipt = (await store.get('user', value.report.submissionId))!;
+    expect(await reconcileReceipt(store, github, 'user', value.report.submissionId, receipt, metadata.reporterId)).toEqual(receipt);
+    expect(github.reconcile).not.toHaveBeenCalled();
+    finish('https://github.com/zenzontle/garage-guardian/issues/1');
+    expect((await submission).status).toBe(201);
+  });
+  it('allows reconciliation to retry after a GitHub lookup failure', async () => {
+    const store = memoryStore(), github = adapter(), value = input();
+    const receipt = { hash: value.hash, state: 'unknown' as const, assets: [], createdAt: Date.now() };
+    await store.claim('user', value.report.submissionId, receipt);
+    github.reconcile.mockRejectedValueOnce(new GitHubFailure(true)).mockResolvedValueOnce('https://github.com/zenzontle/garage-guardian/issues/1');
+    await expect(reconcileReceipt(store, github, 'user', value.report.submissionId, receipt, metadata.reporterId)).rejects.toBeInstanceOf(GitHubFailure);
+    expect(await store.get('user', value.report.submissionId)).toEqual(receipt);
+    expect(await reconcileReceipt(store, github, 'user', value.report.submissionId, receipt, metadata.reporterId)).toMatchObject({ state: 'succeeded' });
+    expect(github.reconcile).toHaveBeenCalledTimes(2);
+  });
+  it('returns an uncertain receipt discovered after replay without re-entering its submission lease', async () => {
+    const store = memoryStore(), github = adapter(), value = input();
+    const receipt = { hash: value.hash, state: 'unknown' as const, assets: [], createdAt: Date.now() };
+    await store.claim('user', value.report.submissionId, receipt);
+    store.get = vi.fn(store.get).mockResolvedValueOnce(null);
+    const response = await submitReport(store, github, 'user', 'ip', value);
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({ state: 'unknown' });
+    expect(github.reconcile).not.toHaveBeenCalled(); expect(github.create).not.toHaveBeenCalled();
+    github.reconcile.mockResolvedValueOnce('https://github.com/zenzontle/garage-guardian/issues/1');
+    expect(await reconcileReceipt(store, github, 'user', value.report.submissionId, receipt, metadata.reporterId)).toMatchObject({ state: 'succeeded' });
   });
   it.each(['creating', 'unknown'] as const)('re-reads an uploading receipt under the lease before recovering a now-%s submission', async (state) => {
     const store = memoryStore(), github = adapter(), value = input();

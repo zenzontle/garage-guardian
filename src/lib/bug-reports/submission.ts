@@ -69,25 +69,24 @@ export function receiptResponse(receipt: Receipt): Response {
   return Response.json({ state: receipt.state, ...(receipt.issueUrl ? { issueUrl: receipt.issueUrl } : {}) }, { status: receipt.state === 'succeeded' ? 201 : 202, headers: { 'Cache-Control': 'no-store' } });
 }
 export async function reconcileReceipt(store: ReportStore, github: GitHubAdapter, userId: string, submissionId: string, receipt: Receipt, reporterId: string) {
-  if (receipt.state === 'uploading') {
-    const lease = await store.lock(userId, submissionId);
-    if (!lease) return receipt;
-    try {
-      // Re-read under the lease: the uploader may have advanced after the status read.
-      const current = await store.get(userId, submissionId);
-      if (!current) return receipt;
-      receipt = current;
-      if (receipt.state === 'uploading') {
-        receipt = { ...receipt, state: 'failed' };
-        await store.save(userId, submissionId, receipt);
-      }
-    } finally { await store.unlock(userId, submissionId, lease); }
-  }
-  if (receipt.state !== 'creating' && receipt.state !== 'unknown') return receipt;
-  const issueUrl = await github.reconcile(submissionId, reporterId);
-  const updated: Receipt = { ...receipt, state: issueUrl ? 'succeeded' : 'unknown', ...(issueUrl ? { issueUrl } : {}) };
-  await store.save(userId, submissionId, updated);
-  return updated;
+  if (!['uploading', 'creating', 'unknown'].includes(receipt.state)) return receipt;
+  const lease = await store.lock(userId, submissionId);
+  if (!lease) return await store.get(userId, submissionId) ?? receipt;
+  try {
+    // Serialize with submission and other checks, then discard the stale snapshot.
+    const current = await store.get(userId, submissionId);
+    if (!current) return receipt;
+    receipt = current;
+    if (receipt.state === 'uploading') {
+      receipt = { ...receipt, state: 'failed' };
+      await store.save(userId, submissionId, receipt);
+    }
+    if (receipt.state !== 'creating' && receipt.state !== 'unknown') return receipt;
+    const issueUrl = await github.reconcile(submissionId, reporterId);
+    const updated: Receipt = { ...receipt, state: issueUrl ? 'succeeded' : 'unknown', ...(issueUrl ? { issueUrl } : {}) };
+    await store.save(userId, submissionId, updated);
+    return updated;
+  } finally { await store.unlock(userId, submissionId, lease); }
 }
 export async function replayReport(store: ReportStore, github: GitHubAdapter, userId: string, report: BugReport, hash: string): Promise<Response | null> {
   const receipt = await store.get(userId, report.submissionId);
@@ -109,7 +108,7 @@ export async function submitReport(store: ReportStore, github: GitHubAdapter, us
     // Re-read under the lock; another worker may have finished between get and lock.
     let receipt = await store.get(userId, id);
     if (receipt && receipt.hash !== hash) throw new ReportError(409, 'DRAFT_CHANGED', 'The submission content changed.');
-    if (receipt && ['succeeded', 'creating', 'unknown'].includes(receipt.state)) return receiptResponse(await reconcileReceipt(store, github, userId, id, receipt, report.metadata.reporterId));
+    if (receipt && ['succeeded', 'creating', 'unknown'].includes(receipt.state)) return receiptResponse(receipt);
     await store.limit(userId, ip);
     if (!receipt) {
       receipt = { hash, state: 'uploading', assets: [], createdAt: Date.now() };

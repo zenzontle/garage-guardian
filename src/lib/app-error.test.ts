@@ -25,3 +25,14 @@ it('records caught errors for reports while keeping localized UI failures free o
     expect(recentDiagnostics()[0]).toMatchObject({ source: 'operation', message: 'Save failed Bearer [REDACTED] [EMAIL]' });
   } finally { stop(); }
 });
+it('records only the AppError code without private interpolation values or its stack', () => {
+  const stop = startDiagnostics();
+  try {
+    const cause = new AppError('photoMissing', { name: 'Jane-registration.webp' });
+    expect(cause.message).toContain('Jane-registration.webp');
+    expect(failureOf(cause)).toEqual({ code: 'photoMissing', values: { name: 'Jane-registration.webp' } });
+    expect(recentDiagnostics()).toHaveLength(1);
+    expect(recentDiagnostics()[0]).toMatchObject({ source: 'operation', message: 'photoMissing', stack: '' });
+    expect(JSON.stringify(recentDiagnostics())).not.toContain('Jane-registration.webp');
+  } finally { stop(); }
+});

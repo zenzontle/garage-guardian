@@ -13,7 +13,7 @@ export class AppError extends Error {
 }
 
 export function failureOf(cause: unknown, fallback: ErrorCode = 'generic'): AppFailure {
-  recordDiagnostic(cause);
+  recordDiagnostic(cause instanceof AppError ? cause.code : cause);
   if (cause instanceof AppError) return { code: cause.code, values: cause.values };
   const code = cause && typeof cause === 'object' && 'code' in cause ? cause.code : undefined;
   switch (code) {
