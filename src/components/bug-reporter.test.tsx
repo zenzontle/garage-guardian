@@ -79,6 +79,24 @@ describe('authenticated public bug reporter', () => {
     expect(fetchMock.mock.calls.at(-1)![0]).toBe(`/api/bug-reports/${submission.submissionId}`);
     expect(screen.queryByRole('button', { name: 'Edit report' })).toBeNull();
   });
+  it.each(['AUTH_UNAVAILABLE', 'IP_UNAVAILABLE', 'NOT_CONFIGURED'])('allows the same reviewed draft to retry after a pre-write %s response', async (code) => {
+    const user = await openReport(); recordDiagnostic('Synthetic error'); await review(user); await user.click(screen.getByRole('checkbox'));
+    fetchMock.mockResolvedValueOnce(Response.json({ code }, { status: 503 }));
+    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await screen.findByRole('alert');
+    const submission = JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report'));
+    expect(screen.getByRole('button', { name: 'Edit report' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Remove all diagnostics' }).matches(':disabled')).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Check submission status' })).toBeNull();
+
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` }, { status: 201 }));
+    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await screen.findByRole('link', { name: 'View GitHub issue' });
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe('/api/bug-reports'); expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body.get('report'))).toEqual(submission);
+    expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(2);
+  });
   it('never invites a new POST when a previously uncertain receipt disappears', async () => {
     const user = await openReport(); await review(user); await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
@@ -95,7 +113,7 @@ describe('authenticated public bug reporter', () => {
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
     await user.click(screen.getByRole('button', { name: 'Publish report' }));
     const submission = JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report'));
-    for (const [status, code] of [[429, 'RATE_LIMITED'], [503, 'LIMITER_UNAVAILABLE'], [502, 'GITHUB_FAILED'], [401, 'UNAUTHENTICATED'], [409, 'PREVIEW_CHANGED']] as const) {
+    for (const [status, code] of [[429, 'RATE_LIMITED'], [503, 'LIMITER_UNAVAILABLE'], [502, 'GITHUB_FAILED'], [401, 'UNAUTHENTICATED'], [409, 'PREVIEW_CHANGED'], [503, 'AUTH_UNAVAILABLE'], [503, 'IP_UNAVAILABLE'], [503, 'NOT_CONFIGURED']] as const) {
       fetchMock.mockResolvedValueOnce(Response.json({ code, error: 'Do not render provider details' }, { status }));
       await user.click(screen.getByRole('button', { name: 'Check submission status' }));
       expect(screen.getByRole('alert').textContent).not.toContain('Do not render provider details');

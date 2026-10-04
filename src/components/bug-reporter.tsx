@@ -127,7 +127,7 @@ export function BugReporter({ userId, screen, dialog: appDialog }: { userId?: st
           throw new ReporterFailure('MISSING_RECEIPT');
         }
         // A status failure says nothing about whether the original write succeeded.
-        if (!checking && ([401, 404, 413, 415, 422, 429].includes(response.status) || result.code === 'GITHUB_FAILED' || result.code === 'LIMITER_UNAVAILABLE')) setSent(false);
+        if (!checking && ([401, 404, 413, 415, 422, 429].includes(response.status) || ['GITHUB_FAILED', 'LIMITER_UNAVAILABLE', 'AUTH_UNAVAILABLE', 'IP_UNAVAILABLE', 'NOT_CONFIGURED'].includes(result.code))) setSent(false);
         if (!checking && result.code === 'PREVIEW_CHANGED') {
           const fresh = await authenticatedFetch('/api/bug-reports/config');
           const configuration = await fresh.json();
