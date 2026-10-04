@@ -39,6 +39,42 @@ async function screenshot() {
   return new File([bytes], 'synthetic.png', { type: 'image/png' });
 }
 describe('HTTP reporting boundary', () => {
+  it.each(['lookup', 'submission-lookup', 'lock', 'locked-lookup'] as const)('allows the same report to retry after a pre-write Redis %s failure', async (stage) => {
+    const request = await postRequest(), retry = request.clone();
+    const get = runtime.store.get;
+    if (stage === 'lock') runtime.store.lock = vi.fn(runtime.store.lock).mockRejectedValueOnce(new Error('private Redis details'));
+    else {
+      const lookup = vi.fn(get);
+      for (let index = 0; index < (stage === 'lookup' ? 0 : stage === 'submission-lookup' ? 1 : 2); index++) lookup.mockImplementationOnce(get);
+      lookup.mockRejectedValueOnce(new Error('private Redis details'));
+      runtime.store.get = lookup;
+    }
+    const response = await POST(request);
+    expect(response.status).toBe(503);
+    const result = await response.json();
+    expect(result.code).toBe('SUBMISSION_NOT_STARTED');
+    expect(JSON.stringify(result)).not.toContain('private Redis details');
+    expect(await get('verified-account', report().submissionId)).toBeNull();
+    expect(runtime.upload).not.toHaveBeenCalled(); expect(runtime.create).not.toHaveBeenCalled();
+    expect((await POST(retry)).status).toBe(201);
+    expect(runtime.create).toHaveBeenCalledTimes(1);
+  });
+  it('keeps Redis receipt-write failures ambiguous', async () => {
+    runtime.store.save = vi.fn().mockRejectedValue(new Error('Redis unavailable'));
+    const response = await POST(await postRequest());
+    expect(response.status).toBe(503); expect((await response.json()).code).toBe('UNAVAILABLE');
+    expect(await runtime.store.get('verified-account', report().submissionId)).toMatchObject({ state: 'uploading' });
+    expect(runtime.upload).not.toHaveBeenCalled(); expect(runtime.create).not.toHaveBeenCalled();
+  });
+  it('keeps a Redis reconciliation lock failure ambiguous for an existing receipt', async () => {
+    expect((await POST(await postRequest())).status).toBe(201);
+    const receipt = (await runtime.store.get('verified-account', report().submissionId))!;
+    await runtime.store.save('verified-account', report().submissionId, { ...receipt, state: 'unknown', issueUrl: undefined });
+    runtime.store.lock = vi.fn().mockRejectedValue(new Error('Redis unavailable'));
+    const response = await POST(await postRequest());
+    expect(response.status).toBe(503); expect((await response.json()).code).toBe('UNAVAILABLE');
+    expect(runtime.create).toHaveBeenCalledTimes(1);
+  });
   it('rejects an oversized public body before processing, decoding or GitHub writes', async () => {
     const draft = oversizedReport(), file = await screenshot();
     const request = await postRequest({ description: draft.description, diagnostics: draft.diagnostics }, [file]);

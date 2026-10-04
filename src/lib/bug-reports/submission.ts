@@ -68,6 +68,13 @@ export async function decodeReport(input: Awaited<ReturnType<typeof readReport>>
 export function receiptResponse(receipt: Receipt): Response {
   return Response.json({ state: receipt.state, ...(receipt.issueUrl ? { issueUrl: receipt.issueUrl } : {}) }, { status: receipt.state === 'succeeded' ? 201 : 202, headers: { 'Cache-Control': 'no-store' } });
 }
+async function beforeReceiptWrite<T>(operation: Promise<T>): Promise<T> {
+  try { return await operation; }
+  catch (cause) {
+    if (cause instanceof ReportError) throw cause;
+    throw new ReportError(503, 'SUBMISSION_NOT_STARTED', 'The report could not be started. Your draft has been kept. Try publishing again.');
+  }
+}
 export async function reconcileReceipt(store: ReportStore, github: GitHubAdapter, userId: string, submissionId: string, receipt: Receipt, reporterId: string) {
   if (!['uploading', 'creating', 'unknown'].includes(receipt.state)) return receipt;
   const lease = await store.lock(userId, submissionId);
@@ -89,7 +96,7 @@ export async function reconcileReceipt(store: ReportStore, github: GitHubAdapter
   } finally { await store.unlock(userId, submissionId, lease); }
 }
 export async function replayReport(store: ReportStore, github: GitHubAdapter, userId: string, report: BugReport, hash: string): Promise<Response | null> {
-  const receipt = await store.get(userId, report.submissionId);
+  const receipt = await beforeReceiptWrite(store.get(userId, report.submissionId));
   if (receipt) {
     if (receipt.hash !== hash) throw new ReportError(409, 'DRAFT_CHANGED', 'This submission was already sent with different content. Start a new reviewed report.');
     if (receipt.state === 'succeeded') return receiptResponse(receipt);
@@ -102,11 +109,11 @@ export async function submitReport(store: ReportStore, github: GitHubAdapter, us
   const id = report.submissionId;
   const replay = await replayReport(store, github, userId, report, hash);
   if (replay) return replay;
-  const lease = await store.lock(userId, id);
+  const lease = await beforeReceiptWrite(store.lock(userId, id));
   if (!lease) throw new ReportError(409, 'IN_PROGRESS', 'This report is already being submitted. Check its status.');
   try {
     // Re-read under the lock; another worker may have finished between get and lock.
-    let receipt = await store.get(userId, id);
+    let receipt = await beforeReceiptWrite(store.get(userId, id));
     if (receipt && receipt.hash !== hash) throw new ReportError(409, 'DRAFT_CHANGED', 'The submission content changed.');
     if (receipt && ['succeeded', 'creating', 'unknown'].includes(receipt.state)) return receiptResponse(receipt);
     await store.limit(userId, ip);

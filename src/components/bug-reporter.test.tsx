@@ -143,7 +143,7 @@ describe('authenticated public bug reporter', () => {
     expect(fetchMock.mock.calls.at(-1)![1].method).toBeUndefined();
     expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(1);
   });
-  it.each(['AUTH_UNAVAILABLE', 'IP_UNAVAILABLE', 'NOT_CONFIGURED', 'LIMITER_UNAVAILABLE'])('allows the same reviewed draft to retry after a pre-write %s response', async (code) => {
+  it.each(['AUTH_UNAVAILABLE', 'IP_UNAVAILABLE', 'NOT_CONFIGURED', 'LIMITER_UNAVAILABLE', 'SUBMISSION_NOT_STARTED'])('allows the same reviewed draft to retry after a pre-write %s response', async (code) => {
     const user = await openReport(); recordDiagnostic('Synthetic error'); await review(user); await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ code }, { status: 503 }));
     await user.click(screen.getByRole('button', { name: 'Publish report' }));
@@ -197,7 +197,7 @@ describe('authenticated public bug reporter', () => {
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
     await user.click(screen.getByRole('button', { name: 'Publish report' }));
     const submission = JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report'));
-    for (const [status, code] of [[429, 'RATE_LIMITED'], [503, 'LIMITER_UNAVAILABLE'], [502, 'GITHUB_FAILED'], [401, 'UNAUTHENTICATED'], [409, 'PREVIEW_CHANGED'], [503, 'AUTH_UNAVAILABLE'], [503, 'IP_UNAVAILABLE'], [503, 'NOT_CONFIGURED']] as const) {
+    for (const [status, code] of [[429, 'RATE_LIMITED'], [503, 'LIMITER_UNAVAILABLE'], [502, 'GITHUB_FAILED'], [401, 'UNAUTHENTICATED'], [409, 'PREVIEW_CHANGED'], [503, 'AUTH_UNAVAILABLE'], [503, 'IP_UNAVAILABLE'], [503, 'NOT_CONFIGURED'], [503, 'SUBMISSION_NOT_STARTED'], [503, 'UNAVAILABLE']] as const) {
       fetchMock.mockResolvedValueOnce(Response.json({ code, error: 'Do not render provider details' }, { status }));
       await user.click(screen.getByRole('button', { name: 'Check submission status' }));
       expect(screen.getByRole('alert').textContent).not.toContain('Do not render provider details');

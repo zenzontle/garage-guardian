@@ -333,6 +333,7 @@
       "NOT_CONFIGURED": "Bug reporting is unavailable.",
       "DISABLED": "Bug reporting is disabled.",
       "UNAVAILABLE": "Bug reporting is unavailable. Your draft has been kept.",
+      "SUBMISSION_NOT_STARTED": "The report could not be started. Your draft has been kept. Try publishing again.",
       "IP_UNAVAILABLE": "Could not verify the request address. Bug reporting is unavailable.",
       "LIMITER_UNAVAILABLE": "Bug reporting is temporarily unavailable. Try again later.",
       "RATE_LIMITED": "Too many reports. Please try again later.",

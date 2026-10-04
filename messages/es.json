@@ -333,6 +333,7 @@
       "NOT_CONFIGURED": "La función para reportar errores no está disponible.",
       "DISABLED": "La función para reportar errores está desactivada.",
       "UNAVAILABLE": "La función para reportar errores no está disponible. Tu borrador se ha conservado.",
+      "SUBMISSION_NOT_STARTED": "No se pudo iniciar el envío. Tu borrador se ha conservado. Vuelve a intentar publicarlo.",
       "IP_UNAVAILABLE": "No se pudo verificar la dirección de la solicitud. La función para reportar errores no está disponible.",
       "LIMITER_UNAVAILABLE": "La función para reportar errores no está disponible temporalmente. Vuelve a intentarlo más tarde.",
       "RATE_LIMITED": "Se han enviado demasiados reportes. Vuelve a intentarlo más tarde.",
