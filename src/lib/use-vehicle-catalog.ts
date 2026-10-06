@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { normalizeVehicleKey, vehicleCatalog, type CatalogEntry, type VehicleCatalogReader } from './vehicle-catalog';
+import { recordDiagnostic } from './bug-reports/diagnostics';
 
 type ListState = { entries: CatalogEntry[]; loading: boolean; failed: boolean };
 const empty: ListState = { entries: [], loading: false, failed: false };
@@ -18,7 +19,7 @@ export function useVehicleCatalog(enabled: boolean, make: string, reader: Vehicl
     setMakes({ ...empty, loading: true });
     void reader.makes().then(
       (entries) => { if (active) setMakes({ entries, loading: false, failed: false }); },
-      () => { if (active) setMakes({ ...empty, failed: true }); },
+      (cause) => { if (active) { recordDiagnostic(cause); setMakes({ ...empty, failed: true }); } },
     );
     return () => { active = false; };
   }, [enabled, reader, attempt]);
@@ -29,7 +30,7 @@ export function useVehicleCatalog(enabled: boolean, make: string, reader: Vehicl
     setModels({ ...empty, makeId, loading: true });
     void reader.models(makeId).then(
       (entries) => { if (active) setModels({ entries, makeId, loading: false, failed: false }); },
-      () => { if (active) setModels({ ...empty, makeId, failed: true }); },
+      (cause) => { if (active) { recordDiagnostic(cause); setModels({ ...empty, makeId, failed: true }); } },
     );
     return () => { active = false; };
   }, [enabled, reader, makeId, attempt]);

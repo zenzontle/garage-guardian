@@ -1,4 +1,5 @@
 import en from '../../messages/en.json';
+import { recordDiagnostic } from './bug-reports/diagnostics';
 
 export type ErrorCode = keyof typeof en.errors;
 export type AppFailure = { code: ErrorCode; values?: Record<string, string | number> };
@@ -12,6 +13,7 @@ export class AppError extends Error {
 }
 
 export function failureOf(cause: unknown, fallback: ErrorCode = 'generic'): AppFailure {
+  recordDiagnostic(cause instanceof AppError ? cause.code : cause);
   if (cause instanceof AppError) return { code: cause.code, values: cause.values };
   const code = cause && typeof cause === 'object' && 'code' in cause ? cause.code : undefined;
   switch (code) {

@@ -1,0 +1,55 @@
+# Public bug reporting
+
+Reporting is **off by default**, including production. Enabled deployments offer a floating **Report a bug** button to signed-in Supabase users, including while their garage is loading or recovering from a failure. Guests and Supabase anonymous users cannot submit. Reporters need no GitHub account.
+
+## Deployment setup
+
+Use `.env.example` as a reference; configure values separately in Vercel Preview and Production. All reporting settings are server-only, never `NEXT_PUBLIC_`.
+
+| Variable | Purpose |
+| --- | --- |
+| `BUG_REPORTS_ENABLED` | Exact string `true` opts the deployment in; otherwise disabled. |
+| `BUG_REPORT_GITHUB_REPOSITORY` | `owner/repository`; defaults to `zenzontle/garage-guardian`. Issues must be enabled. Use a separate public test repository for smoke testing. |
+| `BUG_REPORT_GITHUB_TOKEN` | Repository-scoped fine-grained PAT, from an account with repository write access. Issue creation needs Issues: write. Start with Issues: write and Contents: write for attachment upload, scoped only to the destination repository; verify with the smoke test. Never use a broad classic PAT. |
+| `BUG_REPORT_HMAC_SECRET` | At least 32 random characters. HMAC domain separation derives public reporter pseudonyms and private rate-limit keys. Keep stable across deployments that should share reporter IDs. |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Credentials for an Upstash Redis **Free** database. Do not upgrade it to a paid tier. |
+| `BUG_REPORT_ENVIRONMENT` | Optional override of `VERCEL_ENV`; falls back to `development`. Letters, numbers, dots, underscores, hyphens only. |
+| `BUG_REPORT_RELEASE` | Optional release override. Default is package version plus `VERCEL_GIT_COMMIT_SHA`. Enabled Vercel deployments require the commit variable or this override. |
+
+The existing `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` verify bearer access tokens with `auth.getUser(token)`. No service role key or database migration is needed. Deployed IP limiting trusts Vercel's `x-vercel-forwarded-for`, not arbitrary client headers. Non-Vercel production hosting fails closed until a trusted proxy implementation is supplied. Local development groups IP limits under loopback.
+
+GitHub's attachment upload follows the first-party [CLI implementation](https://github.com/cli/cli/blob/trunk/internal/attachments/client.go), using `uploads.github.com/user-attachments/assets` with the repository ID. This upload interface is isolated in an adapter because it is not part of the normal create-issue REST request. It requires a supported user token; GitHub App installation tokens are not a replacement. Do not enable production until actual upload permissions and rendering are verified.
+
+## What becomes public
+
+Users review the complete issue text and each screenshot, can remove diagnostic entries or all diagnostics, and must acknowledge the public-data warning before publication. Nothing is uploaded while editing/reviewing. After Submit, GitHub uploads are public immediately, even if subsequent issue creation fails; the app does not promise rollback of uploaded assets.
+
+The report includes the description, pseudonymous reporter ID, release/commit, environment, browser/OS user-agent string, pathname without queries/fragments, active screen/dialog, viewport/pixel ratio, locale and online status. It includes up to 20 recent errors from the last five minutes: console errors, browser errors, rejected promises, and caught garage/catalog operations. Collection starts only after reporting is confirmed enabled for the signed-in account. Records remain in memory and are cleared on account changes/sign-out; earlier startup errors and errors before enablement are not retroactively recovered.
+
+Diagnostic text is bounded and redacts recognizable tokens, credential assignments, emails, VINs and URL queries/fragments. Arbitrary logged objects and network request/response bodies are not serialized. Redaction cannot recognize every form of private data. Review remains necessary. Real Supabase user IDs, account emails, IP addresses, raw garage state, and authentication tokens are not automatic report fields. Users must remove personal data from their descriptions and screenshots themselves; there is no screenshot-content redaction.
+
+Descriptions and diagnostics render as literal text, preventing Markdown/HTML injection and accidental mentions. Attachment filenames are generic, and server image decoding/re-encoding removes image metadata.
+
+## Validation, limits and failures
+
+Titles: 5–120 characters. Descriptions: 10–5,000 characters. The complete formatted issue must fit a conservative 65,536-character cap, reserving markup for two attachment URLs of up to 2,048 characters each. Oversized reports remain reviewable so users can remove diagnostics or shorten their description; the server rejects them before decoding or uploading screenshots. Up to two PNG/JPEG/WebP files, each at most 1.5 MiB; total multipart body at most 3.25 MiB, enforced during streaming. Images must match their declared type, decode successfully, contain one frame, and have at most 20 million pixels. Re-encoded files must also fit the file limit. Unknown fields, unsafe diagnostic content, malformed contexts and invalid timestamps are rejected.
+
+Upstash sliding windows enforce 3 submissions per 10 minutes and 10/day per verified user, plus 10 per 10 minutes and 50/day per IP. Separate processing windows with the same limits run after bounded multipart validation/hashing and receipt lookup, before any Sharp decode/re-encode. All dimensions must pass. Configuration/status and submission attempts also have a 30/minute per-user control limit. Rejected/provider-failed attempts can consume limits. Matching completed or uncertain receipt replays skip image decoding and consume neither processing nor submission limits; the control limit still applies. Shared networks can hit the IP limit despite separate accounts. Rate-limit failures return `429` and `Retry-After`. Redis errors or SDK timeouts return `503`; there is no fail-open fallback. Redis rate-limit analytics are disabled.
+
+Redis stores HMAC identifiers, expiring counters, locks, and submission receipts containing only a payload hash, state, timestamps, GitHub asset references and final issue URL. Report content and image bytes remain outside Redis. Receipts last 24 hours; locks use a two-minute lease, exceeding the submission and status functions' 60-second execution limits. Keep those execution limits below the lease duration on other hosting platforms. Pseudonyms are stable references, not anonymous identities; public GitHub issues/attachments persist until handled in GitHub.
+
+One UUID identifies a reviewed draft across retries. Claims are atomic, and changed content under the same UUID is rejected. Successful attachments are reused after partial failures. Issue creation is preceded by a saved `creating` receipt. A timeout/5xx leaves an ambiguous receipt; status checks look for its unique marker in the latest 300 issue bodies, including closed issues, and never automatically create another issue. If no match is found, status remains unknown. After an interrupted uploader's lease expires, a status check acquires a new lease and re-reads the receipt. If it is still `uploading`, it becomes `failed`, allowing a retry with saved attachments; active uploads and ambiguous issue creation remain frozen. Retry safety is limited to the 24-hour receipt window.
+
+The UI preserves drafts when closed or on errors, but drafts are not written to browser storage and are cleared on sign-out, account changes or page reload. Unknown delivery states freeze edits and offer status checks. If a previously uncertain receipt disappears, or an unconfirmed attempt reaches the 24-hour retention window, the UI refuses to repost and asks the reporter to check GitHub. No background crash monitoring or session replay is included.
+
+## Preview smoke test and rollout
+
+1. Configure a Vercel **Preview** deployment with reporting enabled, an Upstash Free database, and a PAT scoped to a separate public **test** repository. Keep Production `BUG_REPORTS_ENABLED=false`.
+2. Sign in with a test Supabase account. Supply its current access token privately as `BUG_REPORT_SMOKE_ACCESS_TOKEN` and the preview origin as `BUG_REPORT_SMOKE_URL`. For previews with Vercel Deployment Protection, also set `BUG_REPORT_SMOKE_BYPASS_TOKEN` to the project's [automation bypass secret](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation). The script forwards it as `x-vercel-protection-bypass` on configuration, submission, and status requests. Keep both tokens private; do not place them in URLs, paste them into tickets, or commit them.
+3. Run `node scripts/smoke-bug-reports.mjs`. The script refuses the real tracker and non-preview reporting environments. It publishes synthetic text plus a generated green image and verifies the returned receipt URL. The bypass token is optional for unprotected previews.
+4. Open the resulting test issue and verify screenshot rendering and all context fields. Close the synthetic issue. Also exercise the real UI at desktop and narrow mobile widths: screenshot selection/removal, public preview, focus trap/return, layered dialogs and errors.
+5. Run `pnpm test`, `pnpm run typecheck`, and `pnpm run build`. Only enable production after the real smoke test passes.
+
+Upstash's [Free tier](https://upstash.com/pricing/redis) currently includes 500,000 commands/month and 256 MB. Several Redis operations are used per report/control request; command count is not report count. Free quotas/provider failures can make reporting unavailable without affecting garage saves. Check usage in the Upstash dashboard. Do not add a credit card/upgrade automatically.
+
+To disable, set `BUG_REPORTS_ENABLED=false` in the target environment and redeploy/restart. Existing open browsers may retain their button, but server submission/status endpoints immediately reject requests on the new deployment. Rotate the PAT/Redis token through environment settings and redeploy. Changing the HMAC secret changes public pseudonyms and Redis keys; coordinate rotation with the retry window to avoid losing receipt access. Diagnose provider failures without logging tokens, request bodies, raw user IDs or IPs.

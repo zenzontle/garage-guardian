@@ -67,6 +67,12 @@ Use the actual received/import and retrieval dates as the final two arguments; o
 
 Deployment order: migration, seed, database permission check, then UI. Smoke-test add/edit in configured guest and authenticated environments and in an unconfigured prototype; check desktop/narrow-screen dropdown scrolling, touch selection, focus return, and screen-reader active-option announcements. Keyboard/ARIA behavior is covered by component tests; an actual screen-reader pass remains part of release verification.
 
+## Optional public bug reporting
+
+Enable an authenticated **Report a bug** button per deployment with `BUG_REPORTS_ENABLED=true`. Users review their description, diagnostic context, recent errors, and optional screenshots before acknowledging that the report will be public and publishing it to GitHub Issues. Guests cannot submit. Upstash Redis provides shared user/IP limits and retry receipts; no Supabase migration is needed.
+
+See [bug reporting setup and verification](docs/bug-reporting.md) and `.env.example` for server-only credentials, validation limits, public-data handling, and the synthetic preview smoke test. Reporting defaults to disabled; keep production disabled until the preview smoke test passes.
+
 ## Web analytics
 
 Vercel Web Analytics is included in the root layout to track page views. Enable **Web Analytics** for the project in the Vercel dashboard, then deploy the app to start collecting data. No additional environment variables are required. See the [Vercel setup guide](https://vercel.com/docs/analytics/quickstart).

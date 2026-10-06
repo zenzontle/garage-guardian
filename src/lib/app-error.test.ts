@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { AppError, failureOf } from './app-error';
+import { recentDiagnostics, startDiagnostics } from './bug-reports/diagnostics';
 
 it('keeps app error codes and interpolation values independent of presentation', () => {
   expect(failureOf(new AppError('photoMissing', { name: 'receipt.webp' }))).toEqual({ code: 'photoMissing', values: { name: 'receipt.webp' } });
@@ -15,4 +16,23 @@ it.each([
 it('does not render unknown provider details or secrets', () => {
   expect(failureOf(new Error('Bearer secret'), 'save')).toEqual({ code: 'save' });
   expect(failureOf({ code: 'unknown', message: 'secret' })).toEqual({ code: 'generic' });
+});
+it('records caught errors for reports while keeping localized UI failures free of diagnostics', () => {
+  const stop = startDiagnostics();
+  try {
+    expect(failureOf(new Error('Save failed Bearer private-token owner@example.org'), 'save')).toEqual({ code: 'save' });
+    expect(recentDiagnostics()).toHaveLength(1);
+    expect(recentDiagnostics()[0]).toMatchObject({ source: 'operation', message: 'Save failed Bearer [REDACTED] [EMAIL]' });
+  } finally { stop(); }
+});
+it('records only the AppError code without private interpolation values or its stack', () => {
+  const stop = startDiagnostics();
+  try {
+    const cause = new AppError('photoMissing', { name: 'Jane-registration.webp' });
+    expect(cause.message).toContain('Jane-registration.webp');
+    expect(failureOf(cause)).toEqual({ code: 'photoMissing', values: { name: 'Jane-registration.webp' } });
+    expect(recentDiagnostics()).toHaveLength(1);
+    expect(recentDiagnostics()[0]).toMatchObject({ source: 'operation', message: 'photoMissing', stack: '' });
+    expect(JSON.stringify(recentDiagnostics())).not.toContain('Jane-registration.webp');
+  } finally { stop(); }
 });
