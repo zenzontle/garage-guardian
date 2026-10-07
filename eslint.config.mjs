@@ -17,6 +17,11 @@ const config = [
   js.configs.recommended,
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
   {
+    rules: {
+      'react/no-multi-comp': 'error',
+    },
+  },
+  {
     files: ['*.mjs', 'scripts/**/*.mjs'],
     languageOptions: { globals: globals.node },
   },
