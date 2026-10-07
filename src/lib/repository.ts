@@ -3,7 +3,17 @@
 import { del, get, set, update } from 'idb-keyval';
 import { AppError } from './app-error';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { EMPTY_SNAPSHOT, normalizeCar, normalizePlate, normalizeSnapshot, type Car, type Photo, type ScheduleItem, type Snapshot, type Visit } from './model';
+import {
+  EMPTY_SNAPSHOT,
+  normalizeCar,
+  normalizePlate,
+  normalizeSnapshot,
+  type Car,
+  type Photo,
+  type ScheduleItem,
+  type Snapshot,
+  type Visit,
+} from './model';
 
 export type Repository = {
   load(): Promise<Snapshot>;
@@ -82,24 +92,36 @@ export class LocalRepository implements Repository {
   }
   async readPhoto(photo: Photo): Promise<Blob> {
     const file = await get<Blob>(`photo:${photo.path}`);
-    if (!file) throw new AppError("photoMissing", { name: photo.name });
+    if (!file) throw new AppError('photoMissing', { name: photo.name });
     return file;
   }
   async clearTransferred(transferred: Snapshot) {
     transferred = normalizeSnapshot(transferred);
     // Preserve anything edited in another tab or after signing out during a transfer.
     await this.write((current) => {
-      const changed = <T extends { id: string }>(item: T, originals: T[]) => !originals.some((original) => original.id === item.id && sameRecord(item, original));
+      const changed = <T extends { id: string }>(item: T, originals: T[]) =>
+        !originals.some((original) => original.id === item.id && sameRecord(item, original));
       current.visits = current.visits.filter((item) => changed(item, transferred.visits));
-      const neededSchedules = new Set(current.visits.flatMap((visit) => visit.items.map((item) => item.scheduleItemId)));
-      current.schedules = current.schedules.filter((item) => changed(item, transferred.schedules) || neededSchedules.has(item.id));
-      const neededCars = new Set([...current.schedules, ...current.visits].map((item) => item.carId));
-      current.cars = current.cars.filter((item) => changed(item, transferred.cars) || neededCars.has(item.id));
+      const neededSchedules = new Set(
+        current.visits.flatMap((visit) => visit.items.map((item) => item.scheduleItemId)),
+      );
+      current.schedules = current.schedules.filter(
+        (item) => changed(item, transferred.schedules) || neededSchedules.has(item.id),
+      );
+      const neededCars = new Set(
+        [...current.schedules, ...current.visits].map((item) => item.carId),
+      );
+      current.cars = current.cars.filter(
+        (item) => changed(item, transferred.cars) || neededCars.has(item.id),
+      );
     });
     const current = await this.load();
-    const retainedPaths = new Set(current.visits.flatMap((visit) => visit.photos.map((photo) => photo.path)));
+    const retainedPaths = new Set(
+      current.visits.flatMap((visit) => visit.photos.map((photo) => photo.path)),
+    );
     for (const visit of transferred.visits) {
-      for (const photo of visit.photos) if (!retainedPaths.has(photo.path)) await this.removePhoto(photo);
+      for (const photo of visit.photos)
+        if (!retainedPaths.has(photo.path)) await this.removePhoto(photo);
     }
   }
   async removePhoto(photo: Photo) {
@@ -118,11 +140,17 @@ async function mutateLocalSnapshot(mutate: (snapshot: Snapshot) => void) {
 export function sameRecord(left: unknown, right: unknown): boolean {
   const canonical = (value: unknown): unknown => {
     if (Array.isArray(value)) return value.map(canonical);
-    if (value && typeof value === 'object') return Object.fromEntries(
-      Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => [
-        key, key === 'createdAt' && typeof entry === 'string' ? new Date(entry).toISOString() : canonical(entry),
-      ]),
-    );
+    if (value && typeof value === 'object')
+      return Object.fromEntries(
+        Object.entries(value)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([key, entry]) => [
+            key,
+            key === 'createdAt' && typeof entry === 'string'
+              ? new Date(entry).toISOString()
+              : canonical(entry),
+          ]),
+      );
     return value;
   };
   return JSON.stringify(canonical(left)) === JSON.stringify(canonical(right));
@@ -184,24 +212,30 @@ export class SupabaseRepository implements Repository {
     const [cars, schedules, visits] = await Promise.all([
       this.client.from('cars').select('*').eq('user_id', this.userId).order('created_at'),
       this.client.from('schedule_items').select('*').eq('user_id', this.userId).order('created_at'),
-      this.client.from('visits').select('*').eq('user_id', this.userId).order('service_date', { ascending: false }),
+      this.client
+        .from('visits')
+        .select('*')
+        .eq('user_id', this.userId)
+        .order('service_date', { ascending: false }),
     ]);
     for (const result of [cars, schedules, visits]) if (result.error) throw result.error;
     return {
-      cars: (cars.data ?? []).map((row) => normalizeCar({
-        id: row.id,
-        name: row.name,
-        year: row.year,
-        make: row.make,
-        model: row.model,
-        vin: row.vin,
-        plate: row.plate,
-        distanceUnit: row.distance_unit,
-        odometer: row.odometer,
-        reminderDays: row.reminder_days,
-        reminderMiles: row.reminder_miles,
-        createdAt: row.created_at,
-      })),
+      cars: (cars.data ?? []).map((row) =>
+        normalizeCar({
+          id: row.id,
+          name: row.name,
+          year: row.year,
+          make: row.make,
+          model: row.model,
+          vin: row.vin,
+          plate: row.plate,
+          distanceUnit: row.distance_unit,
+          odometer: row.odometer,
+          reminderDays: row.reminder_days,
+          reminderMiles: row.reminder_miles,
+          createdAt: row.created_at,
+        }),
+      ),
       schedules: (schedules.data ?? []).map((row) => ({
         id: row.id,
         carId: row.car_id,
@@ -235,19 +269,35 @@ export class SupabaseRepository implements Repository {
     if (error) throw error;
   }
   async deleteCar(id: string) {
-    const { data: visits, error: lookupError } = await this.client.from('visits').select('photos').eq('user_id', this.userId).eq('car_id', id);
+    const { data: visits, error: lookupError } = await this.client
+      .from('visits')
+      .select('photos')
+      .eq('user_id', this.userId)
+      .eq('car_id', id);
     if (lookupError) throw lookupError;
-    const { error } = await this.client.from('cars').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await this.client
+      .from('cars')
+      .delete()
+      .eq('user_id', this.userId)
+      .eq('id', id);
     if (error) throw error;
-    const paths = (visits ?? []).flatMap((visit) => (visit.photos as Photo[]).map((photo) => photo.path));
+    const paths = (visits ?? []).flatMap((visit) =>
+      (visit.photos as Photo[]).map((photo) => photo.path),
+    );
     if (paths.length) await this.client.storage.from('visit-photos').remove(paths);
   }
   async saveSchedule(item: ScheduleItem) {
-    const { error } = await this.client.from('schedule_items').upsert(scheduleToRow(item, this.userId));
+    const { error } = await this.client
+      .from('schedule_items')
+      .upsert(scheduleToRow(item, this.userId));
     if (error) throw error;
   }
   async deleteSchedule(id: string) {
-    const { error } = await this.client.from('schedule_items').delete().eq('user_id', this.userId).eq('id', id);
+    const { error } = await this.client
+      .from('schedule_items')
+      .delete()
+      .eq('user_id', this.userId)
+      .eq('id', id);
     if (error) throw error;
   }
   async saveVisit(visit: Visit) {
@@ -265,10 +315,16 @@ export class SupabaseRepository implements Repository {
     }
   }
   async deleteVisit(visit: Visit) {
-    const { error } = await this.client.from('visits').delete().eq('user_id', this.userId).eq('id', visit.id);
+    const { error } = await this.client
+      .from('visits')
+      .delete()
+      .eq('user_id', this.userId)
+      .eq('id', visit.id);
     if (error) throw error;
     if (visit.photos.length)
-      await this.client.storage.from('visit-photos').remove(visit.photos.map((photo) => photo.path));
+      await this.client.storage
+        .from('visit-photos')
+        .remove(visit.photos.map((photo) => photo.path));
   }
   async uploadPhoto(visitId: string, file: File): Promise<Photo> {
     const id = crypto.randomUUID();
@@ -280,7 +336,9 @@ export class SupabaseRepository implements Repository {
     return { id, path, name: file.name, contentType: file.type };
   }
   async photoUrl(photo: Photo): Promise<string> {
-    const { data, error } = await this.client.storage.from('visit-photos').createSignedUrl(photo.path, 60);
+    const { data, error } = await this.client.storage
+      .from('visit-photos')
+      .createSignedUrl(photo.path, 60);
     if (error) throw error;
     return data.signedUrl;
   }
@@ -294,7 +352,10 @@ export const isCloudConfigured = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
 );
 export const supabase = isCloudConfigured
-  ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!)
+  ? createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+    )
   : null;
 
 export function createRepository(userId?: string): Repository {

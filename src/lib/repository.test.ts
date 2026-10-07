@@ -7,52 +7,81 @@ import type { Car } from './model';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 
-beforeEach(async () => { await clear(); vi.resetModules(); });
+beforeEach(async () => {
+  await clear();
+  vi.resetModules();
+});
 
 describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
   async function setup() {
     const { LocalRepository, SupabaseRepository } = await import('./repository');
-    const cloud = fakeSupabase(); cloud.emit(account());
-    return { cloud, repository: mode === 'local' ? new LocalRepository() : new SupabaseRepository(cloud.client, account().id) };
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    return {
+      cloud,
+      repository:
+        mode === 'local'
+          ? new LocalRepository()
+          : new SupabaseRepository(cloud.client, account().id),
+    };
   }
 
-  it.each([undefined, null, '', 'AbC  - 123'])('loads legacy or saved plate %s without losing other records', async (plate) => {
-    const { repository, cloud } = await setup();
-    await repository.saveCar(car);
-    await repository.saveSchedule(schedule);
-    await repository.saveVisit(visit);
-    if (mode === 'local') {
-      const legacy = { ...car, plate };
-      if (plate === undefined) delete (legacy as Partial<typeof legacy>).plate;
-      await set('garage-guardian:local:v1', { cars: [legacy], schedules: [schedule], visits: [visit] });
-    } else {
-      const row = cloud.tables.get('cars')!.get(car.id)!;
-      row.plate = plate;
-      if (plate === undefined) delete row.plate;
-    }
-    expect(await repository.load()).toEqual({ cars: [{ ...car, plate: plate ?? '' }], schedules: [schedule], visits: [visit] });
-  });
+  it.each([undefined, null, '', 'AbC  - 123'])(
+    'loads legacy or saved plate %s without losing other records',
+    async (plate) => {
+      const { repository, cloud } = await setup();
+      await repository.saveCar(car);
+      await repository.saveSchedule(schedule);
+      await repository.saveVisit(visit);
+      if (mode === 'local') {
+        const legacy = { ...car, plate };
+        if (plate === undefined) delete (legacy as Partial<typeof legacy>).plate;
+        await set('garage-guardian:local:v1', {
+          cars: [legacy],
+          schedules: [schedule],
+          visits: [visit],
+        });
+      } else {
+        const row = cloud.tables.get('cars')!.get(car.id)!;
+        row.plate = plate;
+        if (plate === undefined) delete row.plate;
+      }
+      expect(await repository.load()).toEqual({
+        cars: [{ ...car, plate: plate ?? '' }],
+        schedules: [schedule],
+        visits: [visit],
+      });
+    },
+  );
 
-  it.each([undefined, null, '', '   ', '  AbC  - 123  ', 'x'.repeat(20), '🚗'.repeat(20)])('normalizes and round-trips plate %s on save', async (plate) => {
-    const { repository, cloud } = await setup();
-    const input = { ...car, plate } as unknown as Car;
-    await repository.saveCar(input);
-    const expected = (plate ?? '').trim();
-    expect((await repository.load()).cars).toEqual([{ ...car, plate: expected }]);
-    expect(input.plate).toBe(plate);
-    if (mode === 'cloud') expect(cloud.tables.get('cars')!.get(car.id)!.plate).toBe(expected);
-    await repository.saveCar({ ...car, plate: '' });
-    expect((await repository.load()).cars[0].plate).toBe('');
-  });
+  it.each([undefined, null, '', '   ', '  AbC  - 123  ', 'x'.repeat(20), '🚗'.repeat(20)])(
+    'normalizes and round-trips plate %s on save',
+    async (plate) => {
+      const { repository, cloud } = await setup();
+      const input = { ...car, plate } as unknown as Car;
+      await repository.saveCar(input);
+      const expected = (plate ?? '').trim();
+      expect((await repository.load()).cars).toEqual([{ ...car, plate: expected }]);
+      expect(input.plate).toBe(plate);
+      if (mode === 'cloud') expect(cloud.tables.get('cars')!.get(car.id)!.plate).toBe(expected);
+      await repository.saveCar({ ...car, plate: '' });
+      expect((await repository.load()).cars[0].plate).toBe('');
+    },
+  );
 
-  it.each(['x'.repeat(21), '🚗'.repeat(21)])('rejects overlength plates without overwriting the saved car', async (plate) => {
-    const { repository, cloud } = await setup();
-    await repository.saveCar({ ...car, plate: 'Original' });
-    cloud.from.mockClear();
-    await expect(repository.saveCar({ ...car, plate: ` ${plate} ` })).rejects.toThrow('License plate must be 20 characters or fewer.');
-    expect(cloud.from).not.toHaveBeenCalled();
-    expect((await repository.load()).cars[0]).toEqual({ ...car, plate: 'Original' });
-  });
+  it.each(['x'.repeat(21), '🚗'.repeat(21)])(
+    'rejects overlength plates without overwriting the saved car',
+    async (plate) => {
+      const { repository, cloud } = await setup();
+      await repository.saveCar({ ...car, plate: 'Original' });
+      cloud.from.mockClear();
+      await expect(repository.saveCar({ ...car, plate: ` ${plate} ` })).rejects.toThrow(
+        'License plate must be 20 characters or fewer.',
+      );
+      expect(cloud.from).not.toHaveBeenCalled();
+      expect((await repository.load()).cars[0]).toEqual({ ...car, plate: 'Original' });
+    },
+  );
 });
 
 describe.each([
@@ -62,7 +91,9 @@ describe.each([
 ] as const)('%s storage workflow', (_name, configured, authenticated) => {
   it('persists cars, schedules, visits and photos exclusively in the selected store', async () => {
     const cloud = fakeSupabase();
-    vi.mocked(createClient).mockReturnValue(cloud.client as unknown as ReturnType<typeof createClient>);
+    vi.mocked(createClient).mockReturnValue(
+      cloud.client as unknown as ReturnType<typeof createClient>,
+    );
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', configured ? 'https://garage.supabase.co' : '');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', configured ? 'test-key' : '');
     if (authenticated) cloud.emit(account());
@@ -71,12 +102,23 @@ describe.each([
     const repository = createRepository(authenticated ? account().id : undefined);
     await repository.saveCar(car);
     await repository.saveSchedule(schedule);
-    const photo = await repository.uploadPhoto(visit.id, new File(['photo bytes'], 'receipt.webp', { type: 'image/webp' }));
+    const photo = await repository.uploadPhoto(
+      visit.id,
+      new File(['photo bytes'], 'receipt.webp', { type: 'image/webp' }),
+    );
     await repository.saveVisit({ ...visit, photos: [photo] });
     const reloaded = createRepository(authenticated ? account().id : undefined);
-    expect(await reloaded.load()).toEqual({ cars: [car], schedules: [schedule], visits: [{ ...visit, photos: [photo] }] });
+    expect(await reloaded.load()).toEqual({
+      cars: [car],
+      schedules: [schedule],
+      visits: [{ ...visit, photos: [photo] }],
+    });
     await reloaded.saveCar({ ...car, distanceUnit: 'kilometers', reminderMiles: 1000 });
-    expect((await reloaded.load()).cars[0]).toEqual({ ...car, distanceUnit: 'kilometers', reminderMiles: 1000 });
+    expect((await reloaded.load()).cars[0]).toEqual({
+      ...car,
+      distanceUnit: 'kilometers',
+      reminderMiles: 1000,
+    });
     await reloaded.saveCar({ ...car, name: 'Updated driver' });
     await reloaded.saveSchedule({ ...schedule, intervalMiles: 6000 });
     await reloaded.saveVisit({ ...visit, notes: 'Updated notes', photos: [photo] });
@@ -106,16 +148,29 @@ describe.each([
 
 it('loads legacy guest records as Miles without rewriting readings or custom windows', async () => {
   const { distanceUnit: _unit, ...legacy } = car;
-  await set('garage-guardian:local:v1', { cars: [{ ...legacy, reminderMiles: 123 }], schedules: [schedule], visits: [visit] });
+  await set('garage-guardian:local:v1', {
+    cars: [{ ...legacy, reminderMiles: 123 }],
+    schedules: [schedule],
+    visits: [visit],
+  });
   const { LocalRepository } = await import('./repository');
   const local = new LocalRepository();
-  expect(await local.load()).toEqual({ cars: [{ ...car, reminderMiles: 123 }], schedules: [schedule], visits: [visit] });
+  expect(await local.load()).toEqual({
+    cars: [{ ...car, reminderMiles: 123 }],
+    schedules: [schedule],
+    visits: [visit],
+  });
   await local.saveCar({ ...(await local.load()).cars[0], name: 'Edited legacy' });
-  expect((await get<{ cars: typeof car[] }>('garage-guardian:local:v1'))?.cars[0]).toMatchObject({ distanceUnit: 'miles', odometer: car.odometer, reminderMiles: 123 });
+  expect((await get<{ cars: (typeof car)[] }>('garage-guardian:local:v1'))?.cars[0]).toMatchObject({
+    distanceUnit: 'miles',
+    odometer: car.odometer,
+    reminderMiles: 123,
+  });
 });
 
 it('normalizes legacy cloud records and preserves zero kilometer reminder windows', async () => {
-  const cloud = fakeSupabase(); cloud.emit(account());
+  const cloud = fakeSupabase();
+  cloud.emit(account());
   const { SupabaseRepository } = await import('./repository');
   const repository = new SupabaseRepository(cloud.client, account().id);
   await repository.saveCar(car);
@@ -123,8 +178,12 @@ it('normalizes legacy cloud records and preserves zero kilometer reminder window
   delete row.distance_unit;
   expect((await repository.load()).cars[0]).toEqual(car);
   await repository.saveCar({ ...car, distanceUnit: 'kilometers', reminderMiles: 0 });
-  expect((await repository.load()).cars[0]).toMatchObject({ distanceUnit: 'kilometers', reminderMiles: 0 });
-  row.distance_unit = 'kilometers'; row.reminder_miles = null;
+  expect((await repository.load()).cars[0]).toMatchObject({
+    distanceUnit: 'kilometers',
+    reminderMiles: 0,
+  });
+  row.distance_unit = 'kilometers';
+  row.reminder_miles = null;
   cloud.tables.get('cars')!.set(car.id, row);
   expect((await repository.load()).cars[0].reminderMiles).toBe(1000);
 });
@@ -143,7 +202,9 @@ it('does not fall back to local storage after a cloud write failure', async () =
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
   const cloud = fakeSupabase();
   cloud.emit(account());
-  vi.mocked(createClient).mockReturnValue(cloud.client as unknown as ReturnType<typeof createClient>);
+  vi.mocked(createClient).mockReturnValue(
+    cloud.client as unknown as ReturnType<typeof createClient>,
+  );
   const { createRepository } = await import('./repository');
   cloud.execute.mockResolvedValueOnce({ data: null, error: new Error('Cloud unavailable') });
   await expect(createRepository(account().id).saveCar(car)).rejects.toThrow('Cloud unavailable');

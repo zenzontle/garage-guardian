@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
   const emailKey = process.env.BREVO_API_KEY;
   const sender = process.env.BREVO_SENDER_EMAIL;
   const recipient = process.env.REMINDER_TO_EMAIL;
-  if (!url || !key || !emailKey || !sender || !recipient) return NextResponse.json({ status: 'email_disabled' });
+  if (!url || !key || !emailKey || !sender || !recipient)
+    return NextResponse.json({ status: 'email_disabled' });
 
   // One weekly digest for the single owner of this private prototype.
   const now = new Date();
@@ -25,7 +26,8 @@ export async function GET(request: NextRequest) {
   const { data: auth, error: authError } = await db.auth.admin.listUsers({ page: 1, perPage: 2 });
   if (authError) return NextResponse.json({ error: 'Could not load owner' }, { status: 500 });
   const owner = auth.users.find((user) => user.email?.toLowerCase() === recipient.toLowerCase());
-  if (!owner) return NextResponse.json({ error: 'Reminder recipient has no account' }, { status: 400 });
+  if (!owner)
+    return NextResponse.json({ error: 'Reminder recipient has no account' }, { status: 400 });
   const [carResult, scheduleResult, visitResult] = await Promise.all([
     db.from('cars').select('*').eq('user_id', owner.id),
     db.from('schedule_items').select('*').eq('user_id', owner.id),
@@ -34,20 +36,22 @@ export async function GET(request: NextRequest) {
   if (carResult.error || scheduleResult.error || visitResult.error)
     return NextResponse.json({ error: 'Could not load maintenance' }, { status: 500 });
   if (now.getUTCDay() !== 1) return NextResponse.json({ status: 'not_digest_day' });
-  const cars: Car[] = (carResult.data ?? []).map((row) => normalizeCar({
-    id: row.id,
-    name: row.name,
-    year: row.year,
-    make: row.make,
-    model: row.model,
-    vin: row.vin,
-    plate: row.plate,
-    distanceUnit: row.distance_unit,
-    odometer: row.odometer,
-    reminderDays: row.reminder_days,
-    reminderMiles: row.reminder_miles,
-    createdAt: row.created_at,
-  }));
+  const cars: Car[] = (carResult.data ?? []).map((row) =>
+    normalizeCar({
+      id: row.id,
+      name: row.name,
+      year: row.year,
+      make: row.make,
+      model: row.model,
+      vin: row.vin,
+      plate: row.plate,
+      distanceUnit: row.distance_unit,
+      odometer: row.odometer,
+      reminderDays: row.reminder_days,
+      reminderMiles: row.reminder_miles,
+      createdAt: row.created_at,
+    }),
+  );
   const schedules: ScheduleItem[] = (scheduleResult.data ?? []).map((row) => ({
     id: row.id,
     carId: row.car_id,
@@ -76,7 +80,9 @@ export async function GET(request: NextRequest) {
     (item) => item.status === 'due' || item.status === 'upcoming',
   );
   if (!relevant.length) return NextResponse.json({ status: 'nothing_due' });
-  const { error: claimError } = await db.from('reminder_deliveries').insert({ user_id: owner.id, week_start: today });
+  const { error: claimError } = await db
+    .from('reminder_deliveries')
+    .insert({ user_id: owner.id, week_start: today });
   if (claimError) {
     if (claimError.code === '23505') return NextResponse.json({ status: 'already_sent' });
     return NextResponse.json({ error: 'Could not claim digest' }, { status: 500 });
@@ -109,6 +115,7 @@ export async function GET(request: NextRequest) {
 function escapeHtml(input: string): string {
   return input.replace(
     /[&<>"']/g,
-    (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!,
+    (character) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!,
   );
 }

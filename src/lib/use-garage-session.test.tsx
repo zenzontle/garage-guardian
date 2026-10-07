@@ -17,7 +17,9 @@ beforeEach(async () => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', project);
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
   cloud = fakeSupabase();
-  vi.mocked(createClient).mockReturnValue(cloud.client as unknown as ReturnType<typeof createClient>);
+  vi.mocked(createClient).mockReturnValue(
+    cloud.client as unknown as ReturnType<typeof createClient>,
+  );
 });
 
 async function openGarage() {
@@ -33,14 +35,22 @@ it('opens configured guests locally and restores guest data after ordinary sign-
   const hook = await openGarage();
   expect(hook.result.current.snapshot.cars).toEqual([car]);
   expect(cloud.from).not.toHaveBeenCalled();
-  await act(async () => { await hook.result.current.signIn('owner@example.com', 'password'); });
+  await act(async () => {
+    await hook.result.current.signIn('owner@example.com', 'password');
+  });
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.user?.id).toBe(account().id);
   expect(hook.result.current.snapshot.cars).toEqual([]);
   expect((await new LocalRepository().load()).cars).toEqual([car]);
-  await act(async () => { await hook.result.current.run(() => hook.result.current.repository!.saveCar({ ...car, id: 'cloud-car' })); });
+  await act(async () => {
+    await hook.result.current.run(() =>
+      hook.result.current.repository!.saveCar({ ...car, id: 'cloud-car' }),
+    );
+  });
   expect((await new LocalRepository().load()).cars).toEqual([car]);
-  await act(async () => { await hook.result.current.signOut(); });
+  await act(async () => {
+    await hook.result.current.signOut();
+  });
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.snapshot.cars).toEqual([car]);
 });
@@ -48,16 +58,26 @@ it('opens configured guests locally and restores guest data after ordinary sign-
 it('moves guest data after immediate signup, then uses only cloud storage and logs out to a fresh garage', async () => {
   const { LocalRepository } = await import('./repository');
   const local = new LocalRepository();
-  await local.saveCar(car); await local.saveSchedule(schedule); await local.saveVisit(visit);
+  await local.saveCar(car);
+  await local.saveSchedule(schedule);
+  await local.saveVisit(visit);
   const hook = await openGarage();
-  await act(async () => { expect(await hook.result.current.signUp('new@example.com', 'password')).toBe(false); });
+  await act(async () => {
+    expect(await hook.result.current.signUp('new@example.com', 'password')).toBe(false);
+  });
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.snapshot.cars).toEqual([car]);
   expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
-  await act(async () => { await hook.result.current.run(() => hook.result.current.repository!.saveCar({ ...car, name: 'Cloud change' })); });
+  await act(async () => {
+    await hook.result.current.run(() =>
+      hook.result.current.repository!.saveCar({ ...car, name: 'Cloud change' }),
+    );
+  });
   expect((await local.load()).cars).toEqual([]);
   expect(cloud.tables.get('cars')?.get(car.id)?.name).toBe('Cloud change');
-  await act(async () => { await hook.result.current.signOut(); });
+  await act(async () => {
+    await hook.result.current.signOut();
+  });
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.snapshot.cars).toEqual([]);
 });
@@ -65,16 +85,23 @@ it('moves guest data after immediate signup, then uses only cloud storage and lo
 it('keeps confirmation-pending signup local across reload and transfers after the matching account signs in', async () => {
   cloud.requireConfirmation();
   const { LocalRepository } = await import('./repository');
-  const local = new LocalRepository(); await local.saveCar(car);
+  const local = new LocalRepository();
+  await local.saveCar(car);
   const hook = await openGarage();
-  await act(async () => { expect(await hook.result.current.signUp('new@example.com', 'password')).toBe(true); });
-  await act(async () => { await hook.result.current.run(() => hook.result.current.repository!.saveSchedule(schedule)); });
+  await act(async () => {
+    expect(await hook.result.current.signUp('new@example.com', 'password')).toBe(true);
+  });
+  await act(async () => {
+    await hook.result.current.run(() => hook.result.current.repository!.saveSchedule(schedule));
+  });
   expect(cloud.from).not.toHaveBeenCalled();
   hook.unmount();
   const reopened = await openGarage();
   expect(reopened.result.current.user).toBeNull();
   expect(reopened.result.current.snapshot.schedules).toEqual([schedule]);
-  await act(async () => { await reopened.result.current.signIn('new@example.com', 'password'); });
+  await act(async () => {
+    await reopened.result.current.signIn('new@example.com', 'password');
+  });
   await waitFor(() => expect(reopened.result.current.repository).not.toBeNull());
   expect(reopened.result.current.snapshot.schedules).toEqual([schedule]);
   expect((await local.load()).cars).toEqual([]);
@@ -83,15 +110,24 @@ it('keeps confirmation-pending signup local across reload and transfers after th
 it('never transfers guest data for an existing-account signup response or a failed signup', async () => {
   const { LocalRepository } = await import('./repository');
   const { pendingTransfer } = await import('./signup-transfer');
-  const local = new LocalRepository(); await local.saveCar(car);
+  const local = new LocalRepository();
+  await local.saveCar(car);
   const hook = await openGarage();
   cloud.auth.signUp.mockRejectedValueOnce(new Error('Signup disabled'));
-  await act(async () => { await expect(hook.result.current.signUp('new@example.com', 'password')).rejects.toThrow('Signup disabled'); });
+  await act(async () => {
+    await expect(hook.result.current.signUp('new@example.com', 'password')).rejects.toThrow(
+      'Signup disabled',
+    );
+  });
   expect(await pendingTransfer(project)).toBeUndefined();
   cloud.existingSignup();
-  await act(async () => { expect(await hook.result.current.signUp('existing@example.com', 'password')).toBe(true); });
+  await act(async () => {
+    expect(await hook.result.current.signUp('existing@example.com', 'password')).toBe(true);
+  });
   expect(await pendingTransfer(project)).toBeUndefined();
-  await act(async () => { await hook.result.current.signIn('existing@example.com', 'password'); });
+  await act(async () => {
+    await hook.result.current.signIn('existing@example.com', 'password');
+  });
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.snapshot.cars).toEqual([]);
   expect((await local.load()).cars).toEqual([car]);
@@ -99,12 +135,18 @@ it('never transfers guest data for an existing-account signup response or a fail
 
 it('leaves failed transfers blocked for retry and resumes after reload', async () => {
   const { LocalRepository } = await import('./repository');
-  const local = new LocalRepository(); await local.saveCar(car);
-  const photo = await local.uploadPhoto(visit.id, new File(['receipt'], 'receipt.webp', { type: 'image/webp' }));
+  const local = new LocalRepository();
+  await local.saveCar(car);
+  const photo = await local.uploadPhoto(
+    visit.id,
+    new File(['receipt'], 'receipt.webp', { type: 'image/webp' }),
+  );
   await local.saveVisit({ ...visit, photos: [photo] });
   const hook = await openGarage();
   cloud.bucket.upload.mockResolvedValueOnce({ error: new Error('Network unavailable') });
-  await act(async () => { await hook.result.current.signUp('new@example.com', 'password'); });
+  await act(async () => {
+    await hook.result.current.signUp('new@example.com', 'password');
+  });
   await waitFor(() => expect(hook.result.current.error).toEqual({ code: 'transfer' }));
   expect(hook.result.current.repository).toBeNull();
   expect(hook.result.current.user?.id).toBe(account().id);
@@ -120,7 +162,10 @@ it('does not reload or reimport data on duplicate sign-in and token refresh even
   cloud.emit(account());
   const hook = await openGarage();
   const calls = cloud.from.mock.calls.length;
-  act(() => { cloud.emit(account()); cloud.emit(account(), 'TOKEN_REFRESHED'); });
+  act(() => {
+    cloud.emit(account());
+    cloud.emit(account(), 'TOKEN_REFRESHED');
+  });
   expect(hook.result.current.loading).toBe(false);
   expect(cloud.from.mock.calls.length).toBe(calls);
 });
@@ -129,9 +174,12 @@ it('does not write or transfer for a different account while signup confirmation
   cloud.requireConfirmation();
   const { LocalRepository } = await import('./repository');
   const { pendingTransfer } = await import('./signup-transfer');
-  const local = new LocalRepository(); await local.saveCar(car);
+  const local = new LocalRepository();
+  await local.saveCar(car);
   const hook = await openGarage();
-  await act(async () => { await hook.result.current.signUp('new@example.com', 'password'); });
+  await act(async () => {
+    await hook.result.current.signUp('new@example.com', 'password');
+  });
   act(() => cloud.emit(account('different')));
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.snapshot.cars).toEqual([]);
@@ -142,18 +190,34 @@ it('does not write or transfer for a different account while signup confirmation
 
 it('cancels an in-flight transfer after logout and leaves guest data usable', async () => {
   const { LocalRepository } = await import('./repository');
-  const local = new LocalRepository(); await local.saveCar(car);
-  const photo = await local.uploadPhoto(visit.id, new File(['receipt'], 'receipt.webp', { type: 'image/webp' }));
+  const local = new LocalRepository();
+  await local.saveCar(car);
+  const photo = await local.uploadPhoto(
+    visit.id,
+    new File(['receipt'], 'receipt.webp', { type: 'image/webp' }),
+  );
   await local.saveVisit({ ...visit, photos: [photo] });
   const hook = await openGarage();
   let release!: () => void;
-  const delayed = new Promise<void>((resolve) => { release = resolve; });
-  cloud.bucket.upload.mockImplementationOnce(async () => { await delayed; return { error: null }; });
-  await act(async () => { await hook.result.current.signUp('new@example.com', 'password'); });
+  const delayed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  cloud.bucket.upload.mockImplementationOnce(async () => {
+    await delayed;
+    return { error: null };
+  });
+  await act(async () => {
+    await hook.result.current.signUp('new@example.com', 'password');
+  });
   await waitFor(() => expect(cloud.bucket.upload).toHaveBeenCalled());
-  await act(async () => { await hook.result.current.signOut(); });
+  await act(async () => {
+    await hook.result.current.signOut();
+  });
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
-  await act(async () => { release(); await delayed; });
+  await act(async () => {
+    release();
+    await delayed;
+  });
   expect(hook.result.current.user).toBeNull();
   expect(hook.result.current.snapshot.cars).toEqual([car]);
   expect(cloud.bucket.download).not.toHaveBeenCalled();
@@ -165,14 +229,22 @@ it('ignores a stale cloud load after logout', async () => {
   await new LocalRepository().saveCar(car);
   cloud.emit(account());
   let release!: () => void;
-  const delayed = new Promise<void>((resolve) => { release = resolve; });
-  cloud.execute.mockImplementationOnce(async () => { await delayed; return { data: [], error: null }; });
+  const delayed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  cloud.execute.mockImplementationOnce(async () => {
+    await delayed;
+    return { data: [], error: null };
+  });
   const { useGarageSession } = await import('./use-garage-session');
   const hook = renderHook(() => useGarageSession());
   await waitFor(() => expect(cloud.execute).toHaveBeenCalled());
   act(() => cloud.emit(null));
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
-  await act(async () => { release(); await delayed; });
+  await act(async () => {
+    release();
+    await delayed;
+  });
   expect(hook.result.current.user).toBeNull();
   expect(hook.result.current.snapshot.cars).toEqual([car]);
 });
@@ -194,18 +266,29 @@ it('waits for an in-flight guest write before taking the signup transfer snapsho
   const { registerSignup } = await import('./signup-transfer');
   const hook = await openGarage();
   let release!: () => void;
-  const delayed = new Promise<void>((resolve) => { release = resolve; });
+  const delayed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   const original = LocalRepository.prototype.saveCar;
-  vi.spyOn(LocalRepository.prototype, 'saveCar').mockImplementationOnce(async function (this: InstanceType<typeof LocalRepository>, value) {
-    await delayed; return original.call(this, value);
+  vi.spyOn(LocalRepository.prototype, 'saveCar').mockImplementationOnce(async function (
+    this: InstanceType<typeof LocalRepository>,
+    value,
+  ) {
+    await delayed;
+    return original.call(this, value);
   });
   let write!: Promise<void>;
-  act(() => { write = hook.result.current.run(() => hook.result.current.repository!.saveCar(car)); });
+  act(() => {
+    write = hook.result.current.run(() => hook.result.current.repository!.saveCar(car));
+  });
   // Attach rejection handling before switching; the old UI result is deliberately canceled.
   const canceled = expect(write).rejects.toThrow('session changed');
   await registerSignup(project, account(), true);
   act(() => cloud.emit(account()));
-  await act(async () => { release(); await canceled; });
+  await act(async () => {
+    release();
+    await canceled;
+  });
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.snapshot.cars).toEqual([car]);
   expect((await new LocalRepository().load()).cars).toEqual([]);
@@ -229,9 +312,13 @@ it('restores and transfers safely when React Strict Mode mounts effects twice', 
   await registerSignup(project, account(), true);
   cloud.emit(account());
   const { useGarageSession } = await import('./use-garage-session');
-  const hook = renderHook(() => useGarageSession(), { wrapper: ({ children }) => <React.StrictMode>{children}</React.StrictMode> });
+  const hook = renderHook(() => useGarageSession(), {
+    wrapper: ({ children }) => <React.StrictMode>{children}</React.StrictMode>,
+  });
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.snapshot.cars).toEqual([car]);
   expect((await new LocalRepository().load()).cars).toEqual([]);
-  expect(cloud.execute.mock.calls.filter(([, operation]) => operation === 'upsert')).toHaveLength(1);
+  expect(cloud.execute.mock.calls.filter(([, operation]) => operation === 'upsert')).toHaveLength(
+    1,
+  );
 });

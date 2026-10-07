@@ -19,8 +19,10 @@ export function mergeMessages(defaults: Messages, overrides: Messages): Messages
   const result = { ...defaults };
   for (const [key, value] of Object.entries(overrides)) {
     const fallback = defaults[key];
-    result[key] = typeof value === 'object' && typeof fallback === 'object'
-      ? mergeMessages(fallback, value) : value;
+    result[key] =
+      typeof value === 'object' && typeof fallback === 'object'
+        ? mergeMessages(fallback, value)
+        : value;
   }
   return result;
 }

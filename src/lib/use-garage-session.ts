@@ -82,7 +82,8 @@ export function useGarageSession() {
             setRepository(guarded);
             setTransferring(false);
           } catch (cause) {
-            if (active && generation.current === version) setError(failureOf(cause, failureContext));
+            if (active && generation.current === version)
+              setError(failureOf(cause, failureContext));
           } finally {
             if (active && generation.current === version) setLoading(false);
           }
@@ -94,7 +95,9 @@ export function useGarageSession() {
     if (!supabase) receive(null);
     else {
       const client = supabase;
-      const { data: listener } = client.auth.onAuthStateChange((_event, session) => receive(session?.user ?? null));
+      const { data: listener } = client.auth.onAuthStateChange((_event, session) =>
+        receive(session?.user ?? null),
+      );
       const initialize = async () => {
         try {
           const { data, error } = await client.auth.getSession();
@@ -102,35 +105,56 @@ export function useGarageSession() {
           if (error) throw error;
           receive(data.session?.user ?? null);
         } catch (cause) {
-          if (active && identity === undefined) { setError(failureOf(cause, 'load')); setLoading(false); }
+          if (active && identity === undefined) {
+            setError(failureOf(cause, 'load'));
+            setLoading(false);
+          }
         }
       };
-      retry.current = () => { if (identity === undefined) void initialize(); else receive(currentUser.current, true); };
+      retry.current = () => {
+        if (identity === undefined) void initialize();
+        else receive(currentUser.current, true);
+      };
       void initialize();
-      return () => { active = false; ++generation.current; listener.subscription.unsubscribe(); };
+      return () => {
+        active = false;
+        ++generation.current;
+        listener.subscription.unsubscribe();
+      };
     }
-    return () => { active = false; ++generation.current; };
+    return () => {
+      active = false;
+      ++generation.current;
+    };
   }, [project]);
 
-  const run = useCallback(async (action: () => Promise<void>) => {
-    if (!repository || mutationBusy.current) throw new AppError('operationBusy');
-    mutationBusy.current = true;
-    const version = generation.current;
-    setError(null);
-    const work = (async () => {
+  const run = useCallback(
+    async (action: () => Promise<void>) => {
+      if (!repository || mutationBusy.current) throw new AppError('operationBusy');
+      mutationBusy.current = true;
+      const version = generation.current;
+      setError(null);
+      const work = (async () => {
+        try {
+          await action();
+          const data = await repository.load();
+          if (generation.current === version) setSnapshot(data);
+        } catch (cause) {
+          if (generation.current === version) setError(failureOf(cause, 'save'));
+          throw cause;
+        } finally {
+          mutationBusy.current = false;
+        }
+      })();
+      operations.current.add(work);
       try {
-        await action();
-        const data = await repository.load();
-        if (generation.current === version) setSnapshot(data);
-      } catch (cause) {
-        if (generation.current === version) setError(failureOf(cause, 'save'));
-        throw cause;
-      } finally { mutationBusy.current = false; }
-    })();
-    operations.current.add(work);
-    try { await work; }
-    finally { operations.current.delete(work); }
-  }, [repository]);
+        await work;
+      } finally {
+        operations.current.delete(work);
+      }
+    },
+    [repository],
+  );
 
   async function signUp(email: string, password: string): Promise<boolean> {
     if (!supabase) throw new AppError('cloudNotConfigured');
@@ -139,15 +163,22 @@ export function useGarageSession() {
     const work = (async () => {
       const pending = await pendingTransfer(project);
       if (pending) throw new AppError('previousTransfer');
-      const { data, error } = await client.auth.signUp({ email, password, options: { emailRedirectTo: window.location.origin } });
+      const { data, error } = await client.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: window.location.origin },
+      });
       if (error) throw error;
       if (data.user) await registerSignup(project, data.user, Boolean(data.session));
       if (data.session) transition.current(data.session.user, true);
       return !data.session;
     })();
     signupWork.current = work;
-    try { return await work; }
-    finally { signupWork.current = null; }
+    try {
+      return await work;
+    } finally {
+      signupWork.current = null;
+    }
   }
 
   async function signIn(email: string, password: string) {
@@ -164,5 +195,18 @@ export function useGarageSession() {
     else transition.current(null);
   }
 
-  return { repository, snapshot, user, loading, transferring, error, setError, run, signUp, signIn, signOut, retry: () => retry.current() };
+  return {
+    repository,
+    snapshot,
+    user,
+    loading,
+    transferring,
+    error,
+    setError,
+    run,
+    signUp,
+    signIn,
+    signOut,
+    retry: () => retry.current(),
+  };
 }
