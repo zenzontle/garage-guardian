@@ -1,0 +1,12 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# Generated files
+next-env.d.ts
+pnpm-lock.yaml
+supabase/seeds/vehicle-catalog.sql
+supabase/seeds/vehicle-catalog.provenance.json

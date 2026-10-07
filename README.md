@@ -37,11 +37,11 @@ Open `http://localhost:3000`. Without environment variables the app runs in **lo
 
 Set Supabase Auth's **Site URL** to your app URL and allow your deployed URL and `http://localhost:3000` as confirmation redirect URLs. The app supports email confirmation being enabled or disabled. If confirmation is required, users can continue locally until they confirm their email and authenticate in the browser containing their guest data.
 
-| Configuration | Account | Application data |
-| --- | --- | --- |
-| No Supabase variables | No account required | Local prototype mode, browser IndexedDB |
-| Supabase configured | Signed out | Guest mode, browser IndexedDB |
-| Supabase configured | Signed in | Supabase database and private photo bucket |
+| Configuration         | Account             | Application data                           |
+| --------------------- | ------------------- | ------------------------------------------ |
+| No Supabase variables | No account required | Local prototype mode, browser IndexedDB    |
+| Supabase configured   | Signed out          | Guest mode, browser IndexedDB              |
+| Supabase configured   | Signed in           | Supabase database and private photo bucket |
 
 Guests can use all garage features without signing in. **Create account** automatically transfers their records and photos after the new account authenticates. Transfers preserve record relationships and can resume after a reload or failed upload. Editing pauses during transfer or while awaiting retry; errors offer **Retry** or **Sign out**. Browser records and photos are only cleared after the cloud copy is verified. After a successful transfer, signing out opens a fresh guest garage. Edits made in another tab or after signing out during an interrupted transfer are retained locally.
 
@@ -84,6 +84,15 @@ In-app due reminders always work. To try a weekly Monday email digest, configure
 No paid plan or automatic upgrade is required. Free service quotas and Supabase inactivity pausing can delay an email or make the prototype temporarily unavailable. Check provider usage and export records regularly. The free photo bucket is limited to 1 GB; each visit accepts up to three resized photos of at most 2 MB each.
 
 ## Checks
+
+Prettier is installed locally with a pinned version. Run `pnpm format` to format supported
+project files, or `pnpm format:check` to check formatting without changing files. The
+configuration uses single quotes, semicolons, trailing commas, two-space indentation,
+a 100-character print width, and CRLF line endings. Generated files and build output are
+excluded through `.prettierignore`; Prettier also respects `.gitignore`.
+
+To format only files changed during a task, run `pnpm exec prettier --write path/to/file.ts`
+with the relevant file paths.
 
 ```powershell
 pnpm test
