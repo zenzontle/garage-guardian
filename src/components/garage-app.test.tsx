@@ -490,7 +490,7 @@ it('localizes a recognized auth failure and confirmation notice while preserving
   expect(cloud.auth.signUp).toHaveBeenCalledOnce();
 });
 
-it('switches languages during a transfer and its recovery without restarting work, then retains the choice on logout', async () => {
+it('hides language selection during a transfer, allows changes in recovery, and retains the choice on logout', async () => {
   const project = 'https://garage.supabase.co';
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', project);
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
@@ -506,18 +506,14 @@ it('switches languages during a transfer and its recovery without restarting wor
   const user = userEvent.setup(); render(<GarageApp />);
   await screen.findByRole('heading', { name: 'Moving your garage to Supabase' });
   await waitFor(() => expect(cloud.execute).toHaveBeenCalledOnce());
-  const runningCalls = cloud.execute.mock.calls.length;
-  await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
-  expect(screen.getByRole('heading', { name: 'Transfiriendo tu garaje a Supabase' })).toBeDefined();
-  expect(cloud.execute.mock.calls.length).toBe(runningCalls);
+  expect(screen.queryByRole('combobox', { name: 'Language' })).toBeNull();
   release();
-  expect((await screen.findByRole('alert')).textContent).toContain('Se conserva la copia del navegador');
+  expect((await screen.findByRole('alert')).textContent).toContain('Your browser copy has been kept');
   const failedCalls = cloud.execute.mock.calls.length;
-  await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
-  expect(screen.getByRole('alert').textContent).toContain('Your browser copy has been kept');
+  await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
+  expect(screen.getByRole('alert').textContent).toContain('Se conserva la copia del navegador');
   expect(cloud.execute.mock.calls.length).toBe(failedCalls);
   expect(await local.load()).toMatchObject({ cars: [car], visits: [visit] });
-  await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
   await user.click(screen.getByRole('button', { name: 'Reintentar' }));
   await screen.findByRole('heading', { name: 'Tu garaje de un vistazo' });
   expect((await createRepository(account().id).load()).cars).toEqual([car]);
