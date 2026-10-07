@@ -34,6 +34,7 @@ const text = (max: number) =>
     .string()
     .max(max)
     .refine(
+      // eslint-disable-next-line no-control-regex -- Reject non-printable input while allowing tabs and line breaks.
       (value) => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value),
       'Invalid control characters',
     );
@@ -99,7 +100,7 @@ export function redact(value: string): string {
       })
       .replace(/(?:\/|\.\.?\/)[^\s<>"']*[?#][^\s<>"']*/g, (path) => path.split(/[?#]/, 1)[0])
       .replace(
-        /(^|[^\w:])([\da-f:][\da-f:.]*:[\da-f:.]*(?:%[\w.~\-]+)?)(?![\w:%])/gi,
+        /(^|[^\w:])([\da-f:][\da-f:.]*:[\da-f:.]*(?:%[\w.~-]+)?)(?![\w:%])/gi,
         (match, prefix: string, candidate: string) => {
           const address = candidate.replace(/\.+$/, '');
           try {
@@ -139,6 +140,7 @@ export function redact(value: string): string {
       .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[EMAIL]')
       .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '[ID]')
       .replace(/\b[A-HJ-NPR-Z0-9]{17}\b/gi, '[VIN]')
+      // eslint-disable-next-line no-control-regex -- Remove non-printable characters from public diagnostics.
       .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
   );
 }
