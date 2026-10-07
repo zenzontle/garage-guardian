@@ -1,4 +1,4 @@
-name: Prettier
+name: Code Quality
 
 on:
   pull_request:
@@ -7,8 +7,8 @@ permissions:
   contents: read
 
 jobs:
-  prettier:
-    name: Check formatting
+  code-quality:
+    name: Check formatting and lint rules
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
