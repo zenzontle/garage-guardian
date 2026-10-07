@@ -97,9 +97,11 @@ export function VisitModal({
     }
     const cleanItems = items
       .filter((entry) => entry.name.trim())
-      .map(({ key: _key, costInput: _costInput, ...entry }) => ({
-        ...entry,
-        name: entry.name.trim(),
+      .map(({ id, name, scheduleItemId, costCents }): VisitItem => ({
+        id,
+        name: name.trim(),
+        scheduleItemId,
+        costCents,
       }));
     if (!cleanItems.length) {
       setFormError({ code: 'serviceItem' });

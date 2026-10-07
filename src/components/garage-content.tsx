@@ -199,7 +199,6 @@ export function GarageContent() {
             {page === 'cars' && (
               <CarsPage
                 cars={snapshot.cars}
-                schedules={snapshot.schedules}
                 visits={visits}
                 allDue={allDue}
                 selectedCar={selectedCar}

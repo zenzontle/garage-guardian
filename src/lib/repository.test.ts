@@ -147,7 +147,8 @@ describe.each([
 });
 
 it('loads legacy guest records as Miles without rewriting readings or custom windows', async () => {
-  const { distanceUnit: _unit, ...legacy } = car;
+  const legacy: Partial<typeof car> = { ...car };
+  delete legacy.distanceUnit;
   await set('garage-guardian:local:v1', {
     cars: [{ ...legacy, reminderMiles: 123 }],
     schedules: [schedule],

@@ -30,7 +30,9 @@ describe('signup transfer', () => {
   it.each(['pending', 'uploading', 'uploaded'])(
     'resumes a legacy %s transfer and cleans up equivalent guest records',
     async (status) => {
-      const { distanceUnit: _unit, plate: _plate, ...legacyCar } = car;
+      const legacyCar: Partial<typeof car> = { ...car };
+      delete legacyCar.distanceUnit;
+      delete legacyCar.plate;
       const snapshot = { cars: [legacyCar], schedules: [schedule], visits: [visit] };
       await set('garage-guardian:local:v1', snapshot);
       await set(`garage-guardian:signup-transfer:v1:${project}`, {
@@ -76,7 +78,8 @@ describe('signup transfer', () => {
   });
 
   it('keeps a legacy pending snapshot frozen and preserves a concurrent guest plate edit', async () => {
-    const { plate: _plate, ...legacyCar } = car;
+    const legacyCar: Partial<typeof car> = { ...car };
+    delete legacyCar.plate;
     const snapshot = { cars: [legacyCar], schedules: [], visits: [] };
     await set('garage-guardian:local:v1', snapshot);
     await set(`garage-guardian:signup-transfer:v1:${project}`, {
