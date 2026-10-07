@@ -4,7 +4,8 @@ import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { useTranslations } from 'next-intl';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { LocaleProvider, LocaleSelector } from './locale-provider';
+import { LocaleProvider } from './locale-provider';
+import { LocaleSelector } from './locale-selector';
 import { LOCALE_KEY } from '@/i18n/config';
 
 beforeEach(() => {

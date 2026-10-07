@@ -83,6 +83,15 @@ In-app due reminders always work. To try a weekly Monday email digest, configure
 
 No paid plan or automatic upgrade is required. Free service quotas and Supabase inactivity pausing can delay an email or make the prototype temporarily unavailable. Check provider usage and export records regularly. The free photo bucket is limited to 1 GB; each visit accepts up to three resized photos of at most 2 MB each.
 
+## Component organization
+
+UI components live in `src/components`, with each component in its own kebab-case file.
+`GarageApp` supplies the locale provider, while `GarageContent` coordinates the garage
+session, navigation, and dialogs. Pages, account forms, car/task/visit dialogs, navigation
+controls, and bug-report sections import shared UI components directly from their files.
+The locale provider and selector share `src/i18n/locale-context.ts`; date and photo
+preparation helpers live in `src/lib`.
+
 ## Checks
 
 Prettier is installed locally with a pinned version. Run `pnpm format` to format supported
