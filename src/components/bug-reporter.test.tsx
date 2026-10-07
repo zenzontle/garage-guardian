@@ -35,6 +35,20 @@ function failSessionLookup(failure: 'missing' | 'rejected') {
   else auth.getSession.mockResolvedValueOnce({ data: { session: null } });
 }
 describe('authenticated public bug reporter', () => {
+  it('hides language selection while loading and restores it in recovery without losing the draft', async () => {
+    const user = userEvent.setup();
+    const rendered = render(<BugReporter userId="account" screen="loading" dialog="none" />);
+    await user.click(await screen.findByRole('button', { name: 'Report a bug' }));
+    expect(screen.queryByRole('combobox', { name: 'Language' })).toBeNull();
+    await user.type(screen.getByLabelText('Title'), 'Slow garage transfer');
+    rendered.rerender(<BugReporter userId="account" screen="recovery" dialog="none" />);
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
+    expect(screen.getByDisplayValue('Slow garage transfer')).toBeDefined();
+    rendered.rerender(<BugReporter userId="account" screen="loading" dialog="none" />);
+    expect(screen.queryByRole('combobox', { name: 'Idioma' })).toBeNull();
+    expect(screen.getByDisplayValue('Slow garage transfer')).toBeDefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it('keeps oversized reports reviewable and blocks publication until diagnostics are removed', async () => {
     const user = await openReport(), large = oversizedReport();
     large.diagnostics.forEach((entry) => { const cause = new Error(entry.message); cause.stack = entry.stack; recordDiagnostic(cause); });

@@ -159,7 +159,7 @@ export function BugReporter({ userId, screen, dialog: appDialog }: { userId?: st
     {launcherTarget ? createPortal(launcher, launcherTarget) : launcher}
     {open && createPortal(<div ref={portalRef} className="modal-backdrop bug-report-backdrop" onKeyDown={keyboard}>
       <div ref={dialogRef} tabIndex={-1} className="modal bug-report-modal" role="dialog" aria-modal="true" aria-labelledby="bug-report-title">
-        <div className="modal-header"><div><h2 id="bug-report-title">{draft ? t('reviewTitle') : t('launch')}</h2><p>{t('repository', { repository: metadata.repository })}</p></div><LocaleSelector /><button className="icon-button" aria-label={t('close')} disabled={busy} onClick={close}><X size={20} /></button></div>
+        <div className="modal-header"><div><h2 id="bug-report-title">{draft ? t('reviewTitle') : t('launch')}</h2><p>{t('repository', { repository: metadata.repository })}</p></div>{screen !== 'loading' && <LocaleSelector />}<button className="icon-button" aria-label={t('close')} disabled={busy} onClick={close}><X size={20} /></button></div>
         <div className="modal-body form-stack">
           <p className="info-callout">{t('publicWarning')}</p>
           {!draft ? <>
