@@ -88,7 +88,7 @@ No paid plan or automatic upgrade is required. Free service quotas and Supabase 
 Prettier is installed locally with a pinned version. Run `pnpm format` to format supported
 project files, or `pnpm format:check` to check formatting without changing files. The
 configuration uses single quotes, semicolons, trailing commas, two-space indentation,
-a 100-character print width, and CRLF line endings. Generated files and build output are
+a 100-character print width, and LF line endings enforced by `.gitattributes`. Generated files and build output are
 excluded through `.prettierignore`; Prettier also respects `.gitignore`.
 
 To format only files changed during a task, run `pnpm exec prettier --write path/to/file.ts`
