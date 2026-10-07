@@ -29,3 +29,6 @@ jobs:
 
       - name: Check formatting
         run: pnpm exec prettier --check .
+
+      - name: Check lint rules
+        run: pnpm exec eslint . --max-warnings 0
