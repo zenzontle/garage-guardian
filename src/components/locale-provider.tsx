@@ -1,13 +1,9 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { NextIntlClientProvider, useTranslations } from 'next-intl';
-import { isLocale, LOCALE_KEY, messages, resolveLocale, type Locale } from '@/i18n/config';
-
-const LocaleContext = createContext<{
-  locale: Locale;
-  selectLocale: (locale: Locale) => void;
-} | null>(null);
+import { useEffect, useState, type ReactNode } from 'react';
+import { NextIntlClientProvider } from 'next-intl';
+import { LOCALE_KEY, messages, resolveLocale, type Locale } from '@/i18n/config';
+import { LocaleContext } from '@/i18n/locale-context';
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocale] = useState<Locale>('en');
@@ -44,29 +40,5 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
         {children}
       </NextIntlClientProvider>
     </LocaleContext.Provider>
-  );
-}
-
-export function LocaleSelector() {
-  const context = useContext(LocaleContext);
-  const t = useTranslations('shared');
-  if (!context) throw new Error('LocaleSelector requires LocaleProvider');
-  return (
-    <label className="locale-selector">
-      <span className="sr-only">{t('language')}</span>
-      <select
-        value={context.locale}
-        onChange={(event) => {
-          if (isLocale(event.target.value)) context.selectLocale(event.target.value);
-        }}
-      >
-        <option value="en" lang="en">
-          English
-        </option>
-        <option value="es" lang="es">
-          Español
-        </option>
-      </select>
-    </label>
   );
 }

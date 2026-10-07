@@ -5,7 +5,10 @@ import { createPortal } from 'react-dom';
 import { Bug, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import en from '../../messages/en.json';
-import { LocaleSelector } from './locale-provider';
+import { LocaleSelector } from './locale-selector';
+import { BugReportFields } from './bug-report-fields';
+import { BugReportPreview } from './bug-report-preview';
+import { BugReportScreenshots, type Screenshot } from './bug-report-screenshots';
 import { supabase } from '@/lib/repository';
 import {
   clearDiagnostics,
@@ -16,9 +19,7 @@ import {
   IMAGE_TYPES,
   REPORT_LIMITS,
   fitsIssueBody,
-  formatIssue,
   isRepositoryIssueUrl,
-  issueTitle,
   publicMetadataSchema,
   reportSchema,
   type BugReport,
@@ -51,7 +52,6 @@ async function authenticatedFetch(url: string, init: RequestInit = {}) {
     headers: { ...init.headers, Authorization: `Bearer ${data.session.access_token}` },
   });
 }
-type Screenshot = { file: File; url: string };
 function trapFocus(event: KeyboardEvent, root: Element | null) {
   if (event.key !== 'Tab') return;
   const controls = root?.querySelectorAll<HTMLElement>(
@@ -364,124 +364,35 @@ export function BugReporter({
               <div className="modal-body form-stack">
                 <p className="info-callout">{t('publicWarning')}</p>
                 {!draft ? (
-                  <>
-                    <label>
-                      {t('title')}
-                      <input
-                        value={title}
-                        minLength={5}
-                        maxLength={120}
-                        onChange={(event) => setTitle(event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      {t('description')}
-                      <textarea
-                        rows={7}
-                        value={description}
-                        minLength={10}
-                        maxLength={5000}
-                        onChange={(event) => setDescription(event.target.value)}
-                        placeholder={t('descriptionPrompt')}
-                      />
-                    </label>
-                    <label htmlFor="bug-report-screenshots">{t('screenshots')}</label>
-                    <input
-                      id="bug-report-screenshots"
-                      aria-describedby="bug-report-file-help"
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      multiple
-                      onChange={(event) => {
-                        chooseFiles(event.target.files);
-                        event.target.value = '';
-                      }}
-                    />
-                    <p id="bug-report-file-help" className="field-help">
-                      {t('fileHelp')}
-                    </p>
-                  </>
+                  <BugReportFields
+                    title={title}
+                    description={description}
+                    onTitleChange={setTitle}
+                    onDescriptionChange={setDescription}
+                    onChooseFiles={chooseFiles}
+                  />
                 ) : (
-                  <>
-                    <h3>{issueTitle(draft.title)}</h3>
-                    <details open>
-                      <summary>{t('completePreview')}</summary>
-                      <pre className="bug-report-preview">
-                        {formatIssue(
-                          draft,
-                          screenshots.map(() => ''),
-                        )}
-                      </pre>
-                    </details>
-                    <fieldset className="bug-report-diagnostics" disabled={sent || busy}>
-                      <legend>{t('diagnostics')}</legend>
-                      <p className="field-help">{t('redactionHelp')}</p>
-                      {draft.diagnostics.map((entry, index) => (
-                        <div className="bug-report-diagnostic" key={`${entry.timestamp}-${index}`}>
-                          <pre>
-                            {entry.message}
-                            {entry.stack ? `\n${entry.stack}` : ''}
-                          </pre>
-                          <button
-                            className="button secondary"
-                            onClick={() => {
-                              setDraft({
-                                ...draft,
-                                submissionId: crypto.randomUUID(),
-                                diagnostics: draft.diagnostics.filter(
-                                  (_, position) => position !== index,
-                                ),
-                              });
-                              setAcknowledged(false);
-                            }}
-                          >
-                            {t('removeError', { count: index + 1 })}
-                          </button>
-                        </div>
-                      ))}
-                      <button
-                        className="text-link"
-                        disabled={!draft.diagnostics.length}
-                        onClick={() => {
-                          setDraft({
-                            ...draft,
-                            submissionId: crypto.randomUUID(),
-                            diagnostics: [],
-                          });
-                          setAcknowledged(false);
-                        }}
-                      >
-                        {t('removeAllErrors')}
-                      </button>
-                    </fieldset>
-                  </>
+                  <BugReportPreview
+                    draft={draft}
+                    screenshotCount={screenshots.length}
+                    disabled={sent || busy}
+                    onDraftChange={(next) => {
+                      setDraft(next);
+                      setAcknowledged(false);
+                    }}
+                  />
                 )}
-                <div className="bug-report-screenshots">
-                  {screenshots.map((item, index) => (
-                    <figure key={item.url}>
-                      <img src={item.url} alt={t('screenshotAlt', { count: index + 1 })} />
-                      <figcaption>
-                        {t('screenshotCaption', { count: index + 1 })}
-                        {!sent && (
-                          <button
-                            className="text-link"
-                            disabled={busy}
-                            onClick={() => {
-                              URL.revokeObjectURL(item.url);
-                              setScreenshots(
-                                screenshots.filter((_, position) => position !== index),
-                              );
-                              if (draft) setDraft({ ...draft, submissionId: crypto.randomUUID() });
-                              setAcknowledged(false);
-                            }}
-                          >
-                            {t('removeScreenshot', { count: index + 1 })}
-                          </button>
-                        )}
-                      </figcaption>
-                    </figure>
-                  ))}
-                </div>
+                <BugReportScreenshots
+                  screenshots={screenshots}
+                  sent={sent}
+                  busy={busy}
+                  onRemove={(index) => {
+                    URL.revokeObjectURL(screenshots[index].url);
+                    setScreenshots(screenshots.filter((_, position) => position !== index));
+                    if (draft) setDraft({ ...draft, submissionId: crypto.randomUUID() });
+                    setAcknowledged(false);
+                  }}
+                />
                 {draft && (
                   <label className="checkbox-line">
                     <input
