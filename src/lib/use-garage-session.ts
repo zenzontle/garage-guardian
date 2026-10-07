@@ -24,6 +24,7 @@ export function useGarageSession() {
   const project = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 
   useEffect(() => {
+    const sessionGeneration = generation;
     let active = true;
     let identity: string | null | undefined;
     const receive = (nextUser: User | null, force = false) => {
@@ -31,9 +32,9 @@ export function useGarageSession() {
       if (!active || (!force && identity === nextIdentity)) return;
       identity = nextIdentity;
       currentUser.current = nextUser;
-      const version = ++generation.current;
+      const version = ++sessionGeneration.current;
       const assertActive = () => {
-        if (!active || generation.current !== version) throw new AppError('sessionChanged');
+        if (!active || sessionGeneration.current !== version) throw new AppError('sessionChanged');
       };
       setUser(nextUser);
       setRepository(null);
@@ -82,10 +83,10 @@ export function useGarageSession() {
             setRepository(guarded);
             setTransferring(false);
           } catch (cause) {
-            if (active && generation.current === version)
+            if (active && sessionGeneration.current === version)
               setError(failureOf(cause, failureContext));
           } finally {
-            if (active && generation.current === version) setLoading(false);
+            if (active && sessionGeneration.current === version) setLoading(false);
           }
         })();
       }, 0);
@@ -118,13 +119,13 @@ export function useGarageSession() {
       void initialize();
       return () => {
         active = false;
-        ++generation.current;
+        ++sessionGeneration.current;
         listener.subscription.unsubscribe();
       };
     }
     return () => {
       active = false;
-      ++generation.current;
+      ++sessionGeneration.current;
     };
   }, [project]);
 

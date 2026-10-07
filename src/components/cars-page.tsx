@@ -10,7 +10,6 @@ import { EmptyPanel } from './empty-panel';
 
 export function CarsPage({
   cars,
-  schedules,
   visits,
   allDue,
   selectedCar,
@@ -24,7 +23,6 @@ export function CarsPage({
   onDeleteSchedule,
 }: {
   cars: Car[];
-  schedules: ScheduleItem[];
   visits: Visit[];
   allDue: DueItem[];
   selectedCar: Car | null;
