@@ -5,10 +5,12 @@ import es from '../../messages/es.json';
 import { mergeMessages, resolveLocale } from './config';
 
 function flatten(messages: AbstractIntlMessages, prefix = ''): Record<string, string> {
-  return Object.fromEntries(Object.entries(messages).flatMap(([key, value]) => {
-    const path = prefix ? `${prefix}.${key}` : key;
-    return typeof value === 'string' ? [[path, value]] : Object.entries(flatten(value, path));
-  }));
+  return Object.fromEntries(
+    Object.entries(messages).flatMap(([key, value]) => {
+      const path = prefix ? `${prefix}.${key}` : key;
+      return typeof value === 'string' ? [[path, value]] : Object.entries(flatten(value, path));
+    }),
+  );
 }
 function placeholders(message: string) {
   return [...new Set([...message.matchAll(/\{(\w+)(?:,|\})/g)].map((match) => match[1]))].sort();
@@ -16,14 +18,30 @@ function placeholders(message: string) {
 
 describe('translation contracts', () => {
   it('has matching recursive keys and ICU placeholders and formats every message without errors', () => {
-    const english = flatten(en), spanish = flatten(es);
+    const english = flatten(en),
+      spanish = flatten(es);
     expect(Object.keys(spanish).sort()).toEqual(Object.keys(english).sort());
-    for (const [key, message] of Object.entries(english)) expect(placeholders(spanish[key]), key).toEqual(placeholders(message));
-    for (const [locale, messages] of [['en', en], ['es', es]] as const) {
+    for (const [key, message] of Object.entries(english))
+      expect(placeholders(spanish[key]), key).toEqual(placeholders(message));
+    for (const [locale, messages] of [
+      ['en', en],
+      ['es', es],
+    ] as const) {
       for (const [key, message] of Object.entries(flatten(messages))) {
-        const t = createTranslator({ locale, messages: { entry: { value: message } }, onError: (error) => { throw error; } });
+        const t = createTranslator({
+          locale,
+          messages: { entry: { value: message } },
+          onError: (error) => {
+            throw error;
+          },
+        });
         for (const count of [0, 1, 2]) {
-          const values = Object.fromEntries(placeholders(message).map((name) => [name, ['count', 'total'].includes(name) ? count : 'example']));
+          const values = Object.fromEntries(
+            placeholders(message).map((name) => [
+              name,
+              ['count', 'total'].includes(name) ? count : 'example',
+            ]),
+          );
           expect(t('entry.value', values), `${locale}.${key}`).not.toBe('entry.value');
         }
       }
@@ -50,10 +68,14 @@ describe('translation contracts', () => {
 });
 
 it.each([
-  ['en', ['es-MX'], 'en'], ['es', ['en-US'], 'es'],
-  [null, ['fr-FR', 'es-MX', 'en-US'], 'es'], [null, ['en-GB', 'es'], 'en'],
-  ['invalid', ['ES-ar'], 'es'], ['es-MX', ['en-US'], 'en'],
-  [null, ['fr', 'ja'], 'en'], [null, [], 'en'],
+  ['en', ['es-MX'], 'en'],
+  ['es', ['en-US'], 'es'],
+  [null, ['fr-FR', 'es-MX', 'en-US'], 'es'],
+  [null, ['en-GB', 'es'], 'en'],
+  ['invalid', ['ES-ar'], 'es'],
+  ['es-MX', ['en-US'], 'en'],
+  [null, ['fr', 'ja'], 'en'],
+  [null, [], 'en'],
 ])('resolves saved %s over browser %j to %s', (saved, languages, expected) => {
   expect(resolveLocale(saved, languages as string[])).toBe(expected);
 });

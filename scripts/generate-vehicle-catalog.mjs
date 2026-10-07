@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 
 const clean = (value) => value.trim().replace(/\s+/gu, ' ');
 const key = (value) => clean(value).toLowerCase();
-const compare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+const compare = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const sqlString = (value) => `'${value.replaceAll("'", "''")}'`;
 const stableId = (value) => {
   const hex = createHash('sha256').update(value).digest('hex');
@@ -15,22 +15,32 @@ const stableId = (value) => {
 // RFC 4180 fields, including quoted commas, escaped quotes, and embedded newlines.
 export function parseCsv(source) {
   const rows = [];
-  let row = [], field = '', quoted = false, closed = false;
+  let row = [],
+    field = '',
+    quoted = false,
+    closed = false;
   source = source.replace(/^\uFEFF/u, '');
   for (let i = 0; i < source.length; i++) {
     const char = source[i];
     if (quoted) {
-      if (char === '"' && source[i + 1] === '"') { field += '"'; i++; }
-      else if (char === '"') { quoted = false; closed = true; }
-      else field += char;
+      if (char === '"' && source[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else if (char === '"') {
+        quoted = false;
+        closed = true;
+      } else field += char;
     } else if (char === '"') {
       if (field || closed) throw new Error(`Unexpected quote in record ${rows.length + 1}`);
       quoted = true;
     } else if (char === ',' || char === '\n' || char === '\r') {
-      row.push(field); field = ''; closed = false;
+      row.push(field);
+      field = '';
+      closed = false;
       if (char !== ',') {
         if (char === '\r' && source[i + 1] === '\n') i++;
-        rows.push(row); row = [];
+        rows.push(row);
+        row = [];
       }
     } else {
       if (closed) throw new Error(`Unexpected text after quote in record ${rows.length + 1}`);
@@ -43,13 +53,29 @@ export function parseCsv(source) {
 }
 
 export function generateCatalog(source) {
-  const errors = [], conflicts = [], makes = new Map(), models = new Map();
+  const errors = [],
+    conflicts = [],
+    makes = new Map(),
+    models = new Map();
   let rows;
-  try { rows = parseCsv(source); }
-  catch (cause) { return { sql: null, errors: [cause.message], conflicts, makeCount: 0, modelCount: 0 }; }
+  try {
+    rows = parseCsv(source);
+  } catch (cause) {
+    return { sql: null, errors: [cause.message], conflicts, makeCount: 0, modelCount: 0 };
+  }
   const header = rows.shift()?.map(key) ?? [];
-  if (!header.includes('make') || !header.includes('model') || new Set(header).size !== header.length) {
-    return { sql: null, errors: ['Expected unique headers including make and model'], conflicts, makeCount: 0, modelCount: 0 };
+  if (
+    !header.includes('make') ||
+    !header.includes('model') ||
+    new Set(header).size !== header.length
+  ) {
+    return {
+      sql: null,
+      errors: ['Expected unique headers including make and model'],
+      conflicts,
+      makeCount: 0,
+      modelCount: 0,
+    };
   }
   const recordName = (names, lookup, display) => {
     if (!names.has(lookup)) names.set(lookup, new Set());
@@ -58,12 +84,24 @@ export function generateCatalog(source) {
   rows.forEach((row, index) => {
     if (row.length === 1 && row[0] === '') return;
     const record = index + 2;
-    if (row.length !== header.length) { errors.push(`Record ${record}: expected ${header.length} fields, got ${row.length}`); return; }
+    if (row.length !== header.length) {
+      errors.push(`Record ${record}: expected ${header.length} fields, got ${row.length}`);
+      return;
+    }
     const make = clean(row[header.indexOf('make')]);
     const base = header.includes('basemodel') ? clean(row[header.indexOf('basemodel')]) : '';
     const model = base || clean(row[header.indexOf('model')]);
-    if (!make || !model || make.length > 50 || model.length > 50 || /[\p{Cc}]/u.test(make + model)) {
-      errors.push(`Record ${record}: empty, overlength, or invalid name: ${JSON.stringify({ make, model })}`); return;
+    if (
+      !make ||
+      !model ||
+      make.length > 50 ||
+      model.length > 50 ||
+      /[\p{Cc}]/u.test(make + model)
+    ) {
+      errors.push(
+        `Record ${record}: empty, overlength, or invalid name: ${JSON.stringify({ make, model })}`,
+      );
+      return;
     }
     recordName(makes, key(make), make);
     recordName(models, JSON.stringify([key(make), key(model)]), model);
@@ -73,41 +111,75 @@ export function generateCatalog(source) {
     if (variants.length > 1) conflicts.push({ key: lookup, names: variants, chosen: variants[0] });
     return variants[0];
   };
-  const makeValues = [...makes.keys()].sort(compare).map((lookup) => `(${sqlString(stableId(`make:${lookup}`))}, ${sqlString(lookup)}, ${sqlString(display(makes, lookup))})`);
+  const makeValues = [...makes.keys()]
+    .sort(compare)
+    .map(
+      (lookup) =>
+        `(${sqlString(stableId(`make:${lookup}`))}, ${sqlString(lookup)}, ${sqlString(display(makes, lookup))})`,
+    );
   const modelValues = [...models.keys()].sort(compare).map((lookup) => {
     const [makeKey, modelKey] = JSON.parse(lookup);
     return `(${sqlString(stableId(`model:${lookup}`))}, ${sqlString(makeKey)}, ${sqlString(modelKey)}, ${sqlString(display(models, lookup))})`;
   });
-  let sql = '-- Generated by scripts/generate-vehicle-catalog.mjs. See vehicle-catalog.provenance.json.\nbegin;\n';
-  if (makeValues.length) sql += `insert into public.vehicle_makes (id, lookup_key, display_name) values\n${makeValues.join(',\n')}\non conflict (lookup_key) do update set display_name = excluded.display_name;\n\n`;
-  if (modelValues.length) sql += `insert into public.vehicle_models (id, make_id, lookup_key, display_name)\nselect source.id::uuid, makes.id, source.lookup_key, source.display_name\nfrom (values\n${modelValues.join(',\n')}\n) as source(id, make_key, lookup_key, display_name)\njoin public.vehicle_makes as makes on makes.lookup_key = source.make_key\non conflict (make_id, lookup_key) do update set display_name = excluded.display_name;\n`;
+  let sql =
+    '-- Generated by scripts/generate-vehicle-catalog.mjs. See vehicle-catalog.provenance.json.\nbegin;\n';
+  if (makeValues.length)
+    sql += `insert into public.vehicle_makes (id, lookup_key, display_name) values\n${makeValues.join(',\n')}\non conflict (lookup_key) do update set display_name = excluded.display_name;\n\n`;
+  if (modelValues.length)
+    sql += `insert into public.vehicle_models (id, make_id, lookup_key, display_name)\nselect source.id::uuid, makes.id, source.lookup_key, source.display_name\nfrom (values\n${modelValues.join(',\n')}\n) as source(id, make_key, lookup_key, display_name)\njoin public.vehicle_makes as makes on makes.lookup_key = source.make_key\non conflict (make_id, lookup_key) do update set display_name = excluded.display_name;\n`;
   sql += 'commit;\n';
-  return { sql: errors.length ? null : sql, errors, conflicts, makeCount: makes.size, modelCount: models.size, sourceRecords: rows.length };
+  return {
+    sql: errors.length ? null : sql,
+    errors,
+    conflicts,
+    makeCount: makes.size,
+    modelCount: models.size,
+    sourceRecords: rows.length,
+  };
 }
 
 async function main() {
-  const [input, output = 'supabase/seeds/vehicle-catalog.sql', receivedDate, retrievalDate = 'unknown'] = process.argv.slice(2);
-  if (!input || !/^\d{4}-\d{2}-\d{2}$/u.test(receivedDate ?? '')) throw new Error('Usage: node scripts/generate-vehicle-catalog.mjs <vehicles.csv> <seed.sql> <received-date YYYY-MM-DD> [retrieval-date YYYY-MM-DD]');
-  if (retrievalDate !== 'unknown' && !/^\d{4}-\d{2}-\d{2}$/u.test(retrievalDate)) throw new Error('Invalid retrieval date');
+  const [
+    input,
+    output = 'supabase/seeds/vehicle-catalog.sql',
+    receivedDate,
+    retrievalDate = 'unknown',
+  ] = process.argv.slice(2);
+  if (!input || !/^\d{4}-\d{2}-\d{2}$/u.test(receivedDate ?? ''))
+    throw new Error(
+      'Usage: node scripts/generate-vehicle-catalog.mjs <vehicles.csv> <seed.sql> <received-date YYYY-MM-DD> [retrieval-date YYYY-MM-DD]',
+    );
+  if (retrievalDate !== 'unknown' && !/^\d{4}-\d{2}-\d{2}$/u.test(retrievalDate))
+    throw new Error('Invalid retrieval date');
   const bytes = await readFile(input);
   const { sql, ...report } = generateCatalog(bytes.toString('utf8'));
   const provenance = {
     sourceUrl: 'https://www.fueleconomy.gov/feg/download.shtml',
     fieldDocumentation: 'https://www.fueleconomy.gov/feg/ws/index.shtml',
-    sourceFile: 'vehicles.csv', receivedDate, retrievalDate,
+    sourceFile: 'vehicles.csv',
+    receivedDate,
+    retrievalDate,
     sha256: createHash('sha256').update(bytes).digest('hex'),
-    coverage: 'Consolidated EPA US passenger-car and light-truck data from 1984 onward. Not exhaustive: historical gaps, heavy vehicles, imports, and new models may be missing. Years are discarded. No vehicle verification.',
-    normalization: 'Trim, collapse whitespace, lowercase lookup keys; preserve punctuation. Prefer baseModel (case-insensitive header), fallback to model. Conflicting display names choose the first in code-point order; all variants reported for review.',
+    coverage:
+      'Consolidated EPA US passenger-car and light-truck data from 1984 onward. Not exhaustive: historical gaps, heavy vehicles, imports, and new models may be missing. Years are discarded. No vehicle verification.',
+    normalization:
+      'Trim, collapse whitespace, lowercase lookup keys; preserve punctuation. Prefer baseModel (case-insensitive header), fallback to model. Conflicting display names choose the first in code-point order; all variants reported for review.',
     ...report,
   };
   await mkdir(dirname(resolve(output)), { recursive: true });
   const reportPath = output.replace(/\.sql$/u, '') + '.provenance.json';
   await writeFile(reportPath, JSON.stringify(provenance, null, 2) + '\n');
-  if (!sql) throw new Error(`Catalog rejected. Review ${reportPath}; previous seed was not overwritten.`);
+  if (!sql)
+    throw new Error(`Catalog rejected. Review ${reportPath}; previous seed was not overwritten.`);
   await writeFile(output, sql);
-  console.log(`Generated ${report.makeCount} makes and ${report.modelCount} models; ${report.conflicts.length} display conflicts. Review ${reportPath}.`);
+  console.log(
+    `Generated ${report.makeCount} makes and ${report.modelCount} models; ${report.conflicts.length} display conflicts. Review ${reportPath}.`,
+  );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main().catch((cause) => { console.error(cause.message); process.exitCode = 1; });
+  main().catch((cause) => {
+    console.error(cause.message);
+    process.exitCode = 1;
+  });
 }

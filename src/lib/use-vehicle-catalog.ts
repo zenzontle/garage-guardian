@@ -1,27 +1,50 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { normalizeVehicleKey, vehicleCatalog, type CatalogEntry, type VehicleCatalogReader } from './vehicle-catalog';
+import {
+  normalizeVehicleKey,
+  vehicleCatalog,
+  type CatalogEntry,
+  type VehicleCatalogReader,
+} from './vehicle-catalog';
 import { recordDiagnostic } from './bug-reports/diagnostics';
 
 type ListState = { entries: CatalogEntry[]; loading: boolean; failed: boolean };
 const empty: ListState = { entries: [], loading: false, failed: false };
 
-export function useVehicleCatalog(enabled: boolean, make: string, reader: VehicleCatalogReader | null = vehicleCatalog) {
+export function useVehicleCatalog(
+  enabled: boolean,
+  make: string,
+  reader: VehicleCatalogReader | null = vehicleCatalog,
+) {
   const [makes, setMakes] = useState<ListState>(empty);
-  const [models, setModels] = useState<ListState & { makeId: string | null }>({ ...empty, makeId: null });
+  const [models, setModels] = useState<ListState & { makeId: string | null }>({
+    ...empty,
+    makeId: null,
+  });
   const [attempt, setAttempt] = useState(0);
-  const makeId = enabled ? makes.entries.find((entry) => entry.lookup_key === normalizeVehicleKey(make))?.id ?? null : null;
+  const makeId = enabled
+    ? (makes.entries.find((entry) => entry.lookup_key === normalizeVehicleKey(make))?.id ?? null)
+    : null;
 
   useEffect(() => {
     if (!enabled || !reader) return;
     let active = true;
     setMakes({ ...empty, loading: true });
     void reader.makes().then(
-      (entries) => { if (active) setMakes({ entries, loading: false, failed: false }); },
-      (cause) => { if (active) { recordDiagnostic(cause); setMakes({ ...empty, failed: true }); } },
+      (entries) => {
+        if (active) setMakes({ entries, loading: false, failed: false });
+      },
+      (cause) => {
+        if (active) {
+          recordDiagnostic(cause);
+          setMakes({ ...empty, failed: true });
+        }
+      },
     );
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [enabled, reader, attempt]);
 
   useEffect(() => {
@@ -29,10 +52,19 @@ export function useVehicleCatalog(enabled: boolean, make: string, reader: Vehicl
     let active = true;
     setModels({ ...empty, makeId, loading: true });
     void reader.models(makeId).then(
-      (entries) => { if (active) setModels({ entries, makeId, loading: false, failed: false }); },
-      (cause) => { if (active) { recordDiagnostic(cause); setModels({ ...empty, makeId, failed: true }); } },
+      (entries) => {
+        if (active) setModels({ entries, makeId, loading: false, failed: false });
+      },
+      (cause) => {
+        if (active) {
+          recordDiagnostic(cause);
+          setModels({ ...empty, makeId, failed: true });
+        }
+      },
     );
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [enabled, reader, makeId, attempt]);
 
   return {

@@ -29,7 +29,12 @@ export async function registerSignup(project: string, user: User, hasSession: bo
 // Also serializes duplicate requests from React Strict Mode in this tab.
 const transfers = new Map<string, Promise<void>>();
 
-export async function transferSignupData(client: SupabaseClient, project: string, userId: string, assertActive: () => void = () => {}) {
+export async function transferSignupData(
+  client: SupabaseClient,
+  project: string,
+  userId: string,
+  assertActive: () => void = () => {},
+) {
   const key = transferKey(project);
   const previous = transfers.get(key);
   if (previous) {
@@ -43,11 +48,19 @@ export async function transferSignupData(client: SupabaseClient, project: string
     } else await runTransfer(client, project, userId, assertActive);
   })();
   transfers.set(key, work);
-  try { await work; }
-  finally { if (transfers.get(key) === work) transfers.delete(key); }
+  try {
+    await work;
+  } finally {
+    if (transfers.get(key) === work) transfers.delete(key);
+  }
 }
 
-async function runTransfer(client: SupabaseClient, project: string, userId: string, assertActive: () => void) {
+async function runTransfer(
+  client: SupabaseClient,
+  project: string,
+  userId: string,
+  assertActive: () => void,
+) {
   let transfer = await pendingTransfer(project);
   assertActive();
   if (!transfer || transfer.userId !== userId) return;
@@ -67,21 +80,34 @@ async function runTransfer(client: SupabaseClient, project: string, userId: stri
     // Normalize old pending snapshots for verification; keep the cleanup original frozen.
     const expected = normalizeSnapshot(structuredClone(snapshot));
     // Each await is a cancellation boundary: never continue under another session.
-    for (const car of expected.cars) { assertActive(); await cloud.saveCar(car); }
-    for (const item of expected.schedules) { assertActive(); await cloud.saveSchedule(item); }
+    for (const car of expected.cars) {
+      assertActive();
+      await cloud.saveCar(car);
+    }
+    for (const item of expected.schedules) {
+      assertActive();
+      await cloud.saveSchedule(item);
+    }
     for (const visit of expected.visits) {
       for (const photo of visit.photos) {
         assertActive();
         const file = await local.readPhoto(photo);
         const path = `${userId}/${visit.id}/${photo.id}.webp`;
         assertActive();
-        const { error } = await client.storage.from('visit-photos').upload(path, file, { contentType: photo.contentType, upsert: true });
+        const { error } = await client.storage
+          .from('visit-photos')
+          .upload(path, file, { contentType: photo.contentType, upsert: true });
         if (error) throw error;
         assertActive();
-        const { data: uploaded, error: readError } = await client.storage.from('visit-photos').download(path);
+        const { data: uploaded, error: readError } = await client.storage
+          .from('visit-photos')
+          .download(path);
         if (readError) throw readError;
         if (!uploaded || uploaded.size !== file.size) throw new AppError('photoVerification');
-        const [originalBytes, uploadedBytes] = await Promise.all([file.arrayBuffer(), uploaded.arrayBuffer()]);
+        const [originalBytes, uploadedBytes] = await Promise.all([
+          file.arrayBuffer(),
+          uploaded.arrayBuffer(),
+        ]);
         const verifiedBytes = new Uint8Array(uploadedBytes);
         if (!new Uint8Array(originalBytes).every((byte, index) => byte === verifiedBytes[index])) {
           throw new AppError('photoVerification');
@@ -95,7 +121,12 @@ async function runTransfer(client: SupabaseClient, project: string, userId: stri
     const saved = await cloud.load();
     for (const key of ['cars', 'schedules', 'visits'] as const) {
       for (const item of expected[key]) {
-        if (!sameRecord(item, saved[key].find((entry) => entry.id === item.id))) {
+        if (
+          !sameRecord(
+            item,
+            saved[key].find((entry) => entry.id === item.id),
+          )
+        ) {
           throw new AppError('transferVerification');
         }
       }

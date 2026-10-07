@@ -12,21 +12,33 @@ let cloud: ReturnType<typeof fakeSupabase>;
 beforeEach(async () => {
   localStorage.clear();
   vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['en-US']);
-  await clear(); vi.resetModules(); vi.doMock('react', () => React);
+  await clear();
+  vi.resetModules();
+  vi.doMock('react', () => React);
   cloud = fakeSupabase();
-  cloud.tables.set('vehicle_makes', new Map([
-    ['toyota', { id: 'toyota', lookup_key: 'toyota', display_name: 'Toyota' }],
-    ['honda', { id: 'honda', lookup_key: 'honda', display_name: 'Honda' }],
-  ]));
-  cloud.tables.set('vehicle_models', new Map([
-    ['rav4', { id: 'rav4', make_id: 'toyota', lookup_key: 'rav4', display_name: 'RAV4' }],
-    ['civic', { id: 'civic', make_id: 'honda', lookup_key: 'civic', display_name: 'Civic' }],
-  ]));
-  vi.mocked(createClient).mockReturnValue(cloud.client as unknown as ReturnType<typeof createClient>);
+  cloud.tables.set(
+    'vehicle_makes',
+    new Map([
+      ['toyota', { id: 'toyota', lookup_key: 'toyota', display_name: 'Toyota' }],
+      ['honda', { id: 'honda', lookup_key: 'honda', display_name: 'Honda' }],
+    ]),
+  );
+  cloud.tables.set(
+    'vehicle_models',
+    new Map([
+      ['rav4', { id: 'rav4', make_id: 'toyota', lookup_key: 'rav4', display_name: 'RAV4' }],
+      ['civic', { id: 'civic', make_id: 'honda', lookup_key: 'civic', display_name: 'Civic' }],
+    ]),
+  );
+  vi.mocked(createClient).mockReturnValue(
+    cloud.client as unknown as ReturnType<typeof createClient>,
+  );
 });
 
 describe.each([
-  ['prototype', false, false], ['guest', true, false], ['cloud', true, true],
+  ['prototype', false, false],
+  ['guest', true, false],
+  ['cloud', true, true],
 ] as const)('%s Spanish workflows', (_mode, configured, authenticated) => {
   it('saves canonical car/task/visit values, preserves drafts and errors, and keeps exports and calculations unchanged', async () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', configured ? 'https://garage.supabase.co' : '');
@@ -41,9 +53,11 @@ describe.each([
     const saveCar = vi.spyOn(backend.constructor.prototype, 'saveCar');
     const saveSchedule = vi.spyOn(backend.constructor.prototype, 'saveSchedule');
     const saveVisit = vi.spyOn(backend.constructor.prototype, 'saveVisit');
-    const app = render(<GarageApp />), user = userEvent.setup();
+    const app = render(<GarageApp />),
+      user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Añadir un auto' }));
-    const dialogElement = screen.getByRole('dialog'), dialog = within(dialogElement);
+    const dialogElement = screen.getByRole('dialog'),
+      dialog = within(dialogElement);
     await user.type(dialog.getByLabelText('Nombre del auto'), 'Mi auto / My car');
     await user.type(dialog.getByLabelText('Marca'), 'Toyota');
     await user.type(dialog.getByLabelText('Modelo'), 'RAV4');
@@ -51,57 +65,111 @@ describe.each([
     await user.type(dialog.getByLabelText('Odómetro actual (kilómetros)'), '48250');
     fireEvent.change(dialog.getByLabelText(/Matrícula/), { target: { value: 'A'.repeat(21) } });
     await user.click(dialog.getByRole('button', { name: 'Añadir auto' }));
-    expect((await dialog.findByRole('alert')).textContent).toBe('La matrícula debe tener 20 caracteres o menos.');
+    expect((await dialog.findByRole('alert')).textContent).toBe(
+      'La matrícula debe tener 20 caracteres o menos.',
+    );
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Idioma' }), 'en');
     expect(screen.getByRole('dialog')).toBe(dialogElement);
-    expect(dialog.getByRole('alert').textContent).toBe('License plate must be 20 characters or fewer.');
+    expect(dialog.getByRole('alert').textContent).toBe(
+      'License plate must be 20 characters or fewer.',
+    );
     expect((dialog.getByLabelText('Nickname') as HTMLInputElement).value).toBe('Mi auto / My car');
-    expect((dialog.getByLabelText('Current odometer (kilometers)') as HTMLInputElement).value).toBe('48250');
+    expect((dialog.getByLabelText('Current odometer (kilometers)') as HTMLInputElement).value).toBe(
+      '48250',
+    );
     expect(saveCar).not.toHaveBeenCalled();
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Language' }), 'es');
     fireEvent.change(dialog.getByLabelText(/Matrícula/), { target: { value: ' AbC-123 ' } });
     await user.click(dialog.getByRole('button', { name: 'Añadir auto' }));
     await screen.findByRole('tab', { name: 'Mi auto / My car' });
     const created = await backend.load();
-    expect(created.cars[0]).toMatchObject({ name: 'Mi auto / My car', odometer: 48250, distanceUnit: 'kilometers', reminderMiles: 1000, plate: 'AbC-123' });
+    expect(created.cars[0]).toMatchObject({
+      name: 'Mi auto / My car',
+      odometer: 48250,
+      distanceUnit: 'kilometers',
+      reminderMiles: 1000,
+      plate: 'AbC-123',
+    });
     expect(created.schedules.map((task) => task.name)).toContain('Cambio de aceite');
     await user.click(screen.getByRole('button', { name: 'Añadir tarea' }));
     const task = within(screen.getByRole('dialog'));
     await user.type(task.getByLabelText('Nombre de la tarea'), 'User-owned task');
-    fireEvent.change(task.getByLabelText(/Primer vencimiento en el odómetro/), { target: { value: '49000' } });
-    fireEvent.change(task.getByLabelText(/Fecha del primer vencimiento/), { target: { value: '2026-12-31' } });
+    fireEvent.change(task.getByLabelText(/Primer vencimiento en el odómetro/), {
+      target: { value: '49000' },
+    });
+    fireEvent.change(task.getByLabelText(/Fecha del primer vencimiento/), {
+      target: { value: '2026-12-31' },
+    });
     await user.click(task.getByRole('button', { name: 'Guardar tarea' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await user.click(screen.getByRole('button', { name: 'Registrar servicio' }));
-    const visitElement = screen.getByRole('dialog'), visitDialog = within(visitElement);
+    const visitElement = screen.getByRole('dialog'),
+      visitDialog = within(visitElement);
     fireEvent.change(visitDialog.getByLabelText('Fecha'), { target: { value: '2026-09-25' } });
-    fireEvent.change(visitDialog.getByLabelText('Odómetro (kilómetros)'), { target: { value: '48500' } });
-    fireEvent.change(visitDialog.getByRole('spinbutton', { name: 'Costo total (USD)' }), { target: { value: '1234.56' } });
-    fireEvent.change(visitDialog.getByRole('textbox', { name: 'Nombre de la tarea de servicio' }), { target: { value: 'Unallocated' } });
-    fireEvent.change(visitDialog.getByRole('spinbutton', { name: 'Costo de la tarea en dólares' }), { target: { value: '100.25' } });
+    fireEvent.change(visitDialog.getByLabelText('Odómetro (kilómetros)'), {
+      target: { value: '48500' },
+    });
+    fireEvent.change(visitDialog.getByRole('spinbutton', { name: 'Costo total (USD)' }), {
+      target: { value: '1234.56' },
+    });
+    fireEvent.change(visitDialog.getByRole('textbox', { name: 'Nombre de la tarea de servicio' }), {
+      target: { value: 'Unallocated' },
+    });
+    fireEvent.change(
+      visitDialog.getByRole('spinbutton', { name: 'Costo de la tarea en dólares' }),
+      { target: { value: '100.25' } },
+    );
     await user.selectOptions(visitDialog.getByRole('combobox', { name: 'Idioma' }), 'en');
     expect(screen.getByRole('dialog')).toBe(visitElement);
-    expect((visitDialog.getByRole('spinbutton', { name: 'Total cost (USD)' }) as HTMLInputElement).value).toBe('1234.56');
+    expect(
+      (visitDialog.getByRole('spinbutton', { name: 'Total cost (USD)' }) as HTMLInputElement).value,
+    ).toBe('1234.56');
     await user.selectOptions(visitDialog.getByRole('combobox', { name: 'Language' }), 'es');
     await user.click(visitDialog.getByRole('button', { name: 'Guardar visita' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     const saved = await backend.load();
-    expect(saved.visits[0]).toMatchObject({ date: '2026-09-25', odometer: 48500, totalCostCents: 123456, items: [{ name: 'Unallocated', costCents: 10025 }] });
-    const csv = visitsToCsv(saved.visits, saved.cars), totals = reportTotals(saved.visits, saved.cars);
+    expect(saved.visits[0]).toMatchObject({
+      date: '2026-09-25',
+      odometer: 48500,
+      totalCostCents: 123456,
+      items: [{ name: 'Unallocated', costCents: 10025 }],
+    });
+    const csv = visitsToCsv(saved.visits, saved.cars),
+      totals = reportTotals(saved.visits, saved.cars);
     const due = getAllDue(saved.cars, saved.schedules, saved.visits, '2026-10-03');
-    const counts = [saveCar.mock.calls.length, saveSchedule.mock.calls.length, saveVisit.mock.calls.length, cloud.execute.mock.calls.length];
-    await user.click(within(screen.getByRole('navigation', { name: 'Navegación principal' })).getByRole('button', { name: 'Informes' }));
+    const counts = [
+      saveCar.mock.calls.length,
+      saveSchedule.mock.calls.length,
+      saveVisit.mock.calls.length,
+      cloud.execute.mock.calls.length,
+    ];
+    await user.click(
+      within(screen.getByRole('navigation', { name: 'Navegación principal' })).getByRole('button', {
+        name: 'Informes',
+      }),
+    );
     expect(screen.getByText('Sin asignar')).toBeDefined();
     expect(screen.getByText('Unallocated')).toBeDefined();
-    expect(screen.getAllByText(new Intl.NumberFormat('es', { style: 'currency', currency: 'USD' }).format(1234.56), { normalizer: (value) => value }).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(
+        new Intl.NumberFormat('es', { style: 'currency', currency: 'USD' }).format(1234.56),
+        { normalizer: (value) => value },
+      ).length,
+    ).toBeGreaterThan(0);
     await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
     expect(screen.getByRole('heading', { name: 'Reports' })).toBeDefined();
-    expect([saveCar.mock.calls.length, saveSchedule.mock.calls.length, saveVisit.mock.calls.length, cloud.execute.mock.calls.length]).toEqual(counts);
+    expect([
+      saveCar.mock.calls.length,
+      saveSchedule.mock.calls.length,
+      saveVisit.mock.calls.length,
+      cloud.execute.mock.calls.length,
+    ]).toEqual(counts);
     expect(await backend.load()).toEqual(saved);
     expect(visitsToCsv(saved.visits, saved.cars)).toBe(csv);
     expect(reportTotals(saved.visits, saved.cars)).toEqual(totals);
     expect(getAllDue(saved.cars, saved.schedules, saved.visits, '2026-10-03')).toEqual(due);
-    app.unmount(); render(<GarageApp />);
+    app.unmount();
+    render(<GarageApp />);
     await screen.findByRole('heading', { name: 'Your garage at a glance' });
     expect(document.documentElement.lang).toBe('en');
   }, 20000);
@@ -124,7 +192,9 @@ describe.each([
     const dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
     expect(dialog.queryAllByRole('combobox')).toHaveLength(configured ? 4 : 2); // Includes language and distance-unit selects.
     expect((dialog.getByLabelText('Distance unit') as HTMLSelectElement).value).toBe('miles');
-    expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe('500');
+    expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe(
+      '500',
+    );
     await user.type(dialog.getByLabelText('Nickname'), 'Daily driver');
     await user.type(dialog.getByLabelText('Make'), 'Toyota');
     if (configured) await user.click(await dialog.findByRole('option', { name: 'Toyota' }));
@@ -153,7 +223,8 @@ describe.each([
     } else {
       expect(local.cars[0].name).toBe('Updated driver');
       expect(local.schedules).toHaveLength(6);
-      if (configured) expect(cloud.from.mock.calls.every(([table]) => table.startsWith('vehicle_'))).toBe(true);
+      if (configured)
+        expect(cloud.from.mock.calls.every(([table]) => table.startsWith('vehicle_'))).toBe(true);
       else expect(cloud.from).not.toHaveBeenCalled();
       if (configured) expect(screen.getByText('Guest — stored in this browser')).toBeDefined();
       else expect(screen.getByText('Local prototype')).toBeDefined();
@@ -203,7 +274,10 @@ it('preserves free text in add/edit, scopes models after make changes, and dismi
   await user.type(screen.getByLabelText('Model'), ' RAV4 '); // Deliberately arbitrary Honda/model pair.
   await user.click(screen.getByRole('button', { name: 'Add car' }));
   await screen.findByRole('tab', { name: 'Unlisted' });
-  expect((await new LocalRepository().load()).cars[0]).toMatchObject({ make: 'Honda', model: 'RAV4' });
+  expect((await new LocalRepository().load()).cars[0]).toMatchObject({
+    make: 'Honda',
+    model: 'RAV4',
+  });
   await user.click(screen.getByRole('button', { name: 'Edit car' }));
   expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('RAV4');
   await user.clear(screen.getByLabelText('Make'));
@@ -211,7 +285,10 @@ it('preserves free text in add/edit, scopes models after make changes, and dismi
   expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('RAV4');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  expect((await new LocalRepository().load()).cars[0]).toMatchObject({ make: 'Unknown maker', model: 'RAV4' });
+  expect((await new LocalRepository().load()).cars[0]).toMatchObject({
+    make: 'Unknown maker',
+    model: 'RAV4',
+  });
   await user.click(screen.getByRole('button', { name: 'Edit car' }));
   await user.click(screen.getByLabelText('Make'));
   expect(screen.queryByRole('listbox')).toBeNull();
@@ -229,25 +306,40 @@ it('a catalog outage allows guest save and a later retry without altering saved 
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: 'Add a car' }));
   await screen.findByText('Suggestions unavailable. You can still type any value.');
-  for (const [label, value] of [['Nickname', 'Free text'], ['Make', 'unknown'], ['Model', 'existing custom'], ['Current odometer (miles)', '1']]) {
+  for (const [label, value] of [
+    ['Nickname', 'Free text'],
+    ['Make', 'unknown'],
+    ['Model', 'existing custom'],
+    ['Current odometer (miles)', '1'],
+  ]) {
     fireEvent.change(screen.getByLabelText(label), { target: { value } });
   }
   await user.click(screen.getByRole('button', { name: 'Add car' }));
   await screen.findByRole('tab', { name: 'Free text' });
-  expect((await new LocalRepository().load()).cars[0]).toMatchObject({ make: 'unknown', model: 'existing custom' });
+  expect((await new LocalRepository().load()).cars[0]).toMatchObject({
+    make: 'unknown',
+    model: 'existing custom',
+  });
   cloud.execute.mockRejectedValueOnce(new Error('catalog still offline'));
   await user.click(screen.getByRole('button', { name: 'Edit car' }));
   await screen.findByText('Suggestions unavailable. You can still type any value.');
   await user.click(screen.getByRole('button', { name: 'Retry make suggestions' }));
-  await waitFor(() => expect(screen.queryByText('Suggestions unavailable. You can still type any value.')).toBeNull());
-  await waitFor(() => expect(screen.queryByText('Loading suggestions. You can still type.')).toBeNull());
+  await waitFor(() =>
+    expect(screen.queryByText('Suggestions unavailable. You can still type any value.')).toBeNull(),
+  );
+  await waitFor(() =>
+    expect(screen.queryByText('Loading suggestions. You can still type.')).toBeNull(),
+  );
   expect((screen.getByLabelText('Make') as HTMLInputElement).value).toBe('unknown');
   expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('existing custom');
   await user.click(screen.getByRole('button', { name: 'Save changes' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 });
 
-describe.each([['guest', false], ['authenticated cloud', true]] as const)('%s plate workflow', (_mode, authenticated) => {
+describe.each([
+  ['guest', false],
+  ['authenticated cloud', true],
+] as const)('%s plate workflow', (_mode, authenticated) => {
   it('creates, edits, clears, and reloads a plate while preserving unrelated fields', async () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://garage.supabase.co');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
@@ -259,7 +351,14 @@ describe.each([['guest', false], ['authenticated cloud', true]] as const)('%s pl
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Add a car' }));
     let dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
-    for (const [label, value] of [['Nickname', 'Plate driver'], ['Make', 'Toyota'], ['Model', 'RAV4'], ['Current odometer (miles)', '100'], ['Coming up: days before due', '15'], ['Coming up: miles before due', '123']]) {
+    for (const [label, value] of [
+      ['Nickname', 'Plate driver'],
+      ['Make', 'Toyota'],
+      ['Model', 'RAV4'],
+      ['Current odometer (miles)', '100'],
+      ['Coming up: days before due', '15'],
+      ['Coming up: miles before due', '123'],
+    ]) {
       fireEvent.change(dialog.getByLabelText(label), { target: { value } });
     }
     const vin = dialog.getByLabelText(/VIN/);
@@ -272,21 +371,32 @@ describe.each([['guest', false], ['authenticated cloud', true]] as const)('%s pl
     await screen.findByRole('tab', { name: 'Plate driver' });
     expect(screen.getByText('Plate: AbC - 123').textContent).toBe('Plate: AbC  - 123');
     const created = (await repository.load()).cars[0];
-    expect(created).toMatchObject({ plate: 'AbC  - 123', vin: '12345678901234567', reminderDays: 15, reminderMiles: 123 });
+    expect(created).toMatchObject({
+      plate: 'AbC  - 123',
+      vin: '12345678901234567',
+      reminderDays: 15,
+      reminderMiles: 123,
+    });
 
     await user.click(screen.getByRole('button', { name: 'Edit car' }));
     dialog = within(screen.getByRole('dialog', { name: 'Edit car' }));
     expect((dialog.getByLabelText(/License plate/) as HTMLInputElement).value).toBe(created.plate);
     fireEvent.change(dialog.getByLabelText(/License plate/), { target: { value: 'W'.repeat(21) } });
     await user.click(dialog.getByRole('button', { name: 'Save changes' }));
-    expect(await dialog.findByRole('alert')).toHaveProperty('textContent', 'License plate must be 20 characters or fewer.');
+    expect(await dialog.findByRole('alert')).toHaveProperty(
+      'textContent',
+      'License plate must be 20 characters or fewer.',
+    );
     expect((await repository.load()).cars[0]).toEqual(created);
-    fireEvent.change(dialog.getByLabelText(/License plate/), { target: { value: `  ${'W'.repeat(20)}  ` } });
+    fireEvent.change(dialog.getByLabelText(/License plate/), {
+      target: { value: `  ${'W'.repeat(20)}  ` },
+    });
     await user.click(dialog.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect((await repository.load()).cars[0]).toEqual({ ...created, plate: 'W'.repeat(20) });
 
-    app.unmount(); app = render(<GarageApp />);
+    app.unmount();
+    app = render(<GarageApp />);
     await screen.findByText('Plate driver');
     await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
     expect(screen.getByText(`Plate: ${'W'.repeat(20)}`)).toBeDefined();
@@ -298,7 +408,8 @@ describe.each([['guest', false], ['authenticated cloud', true]] as const)('%s pl
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(screen.queryByText(/^Plate:/)).toBeNull();
     expect((await repository.load()).cars[0]).toEqual({ ...created, plate: '' });
-    app.unmount(); render(<GarageApp />);
+    app.unmount();
+    render(<GarageApp />);
     await screen.findByText('Plate driver');
     await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
     expect(screen.queryByText(/^Plate:/)).toBeNull();
@@ -315,21 +426,40 @@ it('switches creation defaults while preserving typed odometer readings and cust
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: 'Add a car' }));
   const dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
-  fireEvent.change(dialog.getByLabelText('Current odometer (miles)'), { target: { value: '12345' } });
+  fireEvent.change(dialog.getByLabelText('Current odometer (miles)'), {
+    target: { value: '12345' },
+  });
   await user.selectOptions(dialog.getByLabelText('Distance unit'), 'kilometers');
-  expect((dialog.getByLabelText('Coming up: kilometers before due') as HTMLInputElement).value).toBe('1000');
-  expect((dialog.getByLabelText('Current odometer (kilometers)') as HTMLInputElement).value).toBe('12345');
+  expect(
+    (dialog.getByLabelText('Coming up: kilometers before due') as HTMLInputElement).value,
+  ).toBe('1000');
+  expect((dialog.getByLabelText('Current odometer (kilometers)') as HTMLInputElement).value).toBe(
+    '12345',
+  );
   await user.selectOptions(dialog.getByLabelText('Distance unit'), 'miles');
-  expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe('500');
-  fireEvent.change(dialog.getByLabelText('Coming up: miles before due'), { target: { value: '0' } });
+  expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe(
+    '500',
+  );
+  fireEvent.change(dialog.getByLabelText('Coming up: miles before due'), {
+    target: { value: '0' },
+  });
   await user.selectOptions(dialog.getByLabelText('Distance unit'), 'kilometers');
-  expect((dialog.getByLabelText('Coming up: kilometers before due') as HTMLInputElement).value).toBe('0');
-  fireEvent.change(dialog.getByLabelText('Coming up: kilometers before due'), { target: { value: '750' } });
+  expect(
+    (dialog.getByLabelText('Coming up: kilometers before due') as HTMLInputElement).value,
+  ).toBe('0');
+  fireEvent.change(dialog.getByLabelText('Coming up: kilometers before due'), {
+    target: { value: '750' },
+  });
   await user.selectOptions(dialog.getByLabelText('Distance unit'), 'miles');
-  expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe('750');
+  expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe(
+    '750',
+  );
 });
 
-describe.each([['guest', false], ['cloud', true]] as const)('%s kilometer workflow', (_mode, authenticated) => {
+describe.each([
+  ['guest', false],
+  ['cloud', true],
+] as const)('%s kilometer workflow', (_mode, authenticated) => {
   it('persists the unit, cascades it to tasks and visits, and keeps it read-only after reload', async () => {
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', authenticated ? 'https://garage.supabase.co' : '');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', authenticated ? 'test-key' : '');
@@ -339,7 +469,12 @@ describe.each([['guest', false], ['cloud', true]] as const)('%s kilometer workfl
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Add a car' }));
     let dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
-    for (const [label, value] of [['Nickname', 'Metric driver'], ['Make', 'Toyota'], ['Model', 'RAV4'], ['Current odometer (miles)', '100']]) {
+    for (const [label, value] of [
+      ['Nickname', 'Metric driver'],
+      ['Make', 'Toyota'],
+      ['Model', 'RAV4'],
+      ['Current odometer (miles)', '100'],
+    ]) {
       fireEvent.change(dialog.getByLabelText(label), { target: { value } });
     }
     await user.selectOptions(dialog.getByLabelText('Distance unit'), 'kilometers');
@@ -349,8 +484,12 @@ describe.each([['guest', false], ['cloud', true]] as const)('%s kilometer workfl
     await user.click(screen.getByRole('button', { name: 'Add task' }));
     dialog = within(screen.getByRole('dialog', { name: 'Add maintenance task' }));
     fireEvent.change(dialog.getByLabelText('Task name'), { target: { value: 'Brake check' } });
-    fireEvent.change(dialog.getByLabelText(/First due at odometer \(kilometers\)/), { target: { value: '1100' } });
-    fireEvent.change(dialog.getByLabelText(/Repeat every kilometers/), { target: { value: '5000' } });
+    fireEvent.change(dialog.getByLabelText(/First due at odometer \(kilometers\)/), {
+      target: { value: '1100' },
+    });
+    fireEvent.change(dialog.getByLabelText(/Repeat every kilometers/), {
+      target: { value: '5000' },
+    });
     await user.click(dialog.getByRole('button', { name: 'Save task' }));
     await screen.findByText('at 1,100 km');
     expect(screen.getByText('Soon')).toBeDefined();
@@ -367,8 +506,15 @@ describe.each([['guest', false], ['cloud', true]] as const)('%s kilometer workfl
     expect(screen.getByText(/1,200 km current odometer/)).toBeDefined();
     const { createRepository } = await import('../lib/repository');
     const saved = await createRepository(authenticated ? account().id : undefined).load();
-    expect(saved.cars[0]).toMatchObject({ distanceUnit: 'kilometers', reminderMiles: 1000, odometer: 100 });
-    expect(saved.schedules.find((item) => item.name === 'Brake check')).toMatchObject({ intervalMiles: 5000, firstDueMiles: 1100 });
+    expect(saved.cars[0]).toMatchObject({
+      distanceUnit: 'kilometers',
+      reminderMiles: 1000,
+      odometer: 100,
+    });
+    expect(saved.schedules.find((item) => item.name === 'Brake check')).toMatchObject({
+      intervalMiles: 5000,
+      firstDueMiles: 1100,
+    });
     expect(saved.visits[0].odometer).toBe(1200);
     app.unmount();
     render(<GarageApp />);
@@ -377,12 +523,19 @@ describe.each([['guest', false], ['cloud', true]] as const)('%s kilometer workfl
     await user.click(screen.getByRole('button', { name: 'Edit car' }));
     dialog = within(screen.getByRole('dialog', { name: 'Edit car' }));
     const unit = dialog.getByLabelText('Distance unit') as HTMLInputElement;
-    expect(unit.value).toBe('Kilometers'); expect(unit.readOnly).toBe(true);
-    expect((dialog.getByLabelText('Coming up: kilometers before due') as HTMLInputElement).value).toBe('1000');
-    fireEvent.change(dialog.getByLabelText('Coming up: kilometers before due'), { target: { value: '250' } });
+    expect(unit.value).toBe('Kilometers');
+    expect(unit.readOnly).toBe(true);
+    expect(
+      (dialog.getByLabelText('Coming up: kilometers before due') as HTMLInputElement).value,
+    ).toBe('1000');
+    fireEvent.change(dialog.getByLabelText('Coming up: kilometers before due'), {
+      target: { value: '250' },
+    });
     await user.click(dialog.getByRole('button', { name: 'Save changes' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect((await createRepository(authenticated ? account().id : undefined).load()).cars[0]).toMatchObject({ distanceUnit: 'kilometers', reminderMiles: 250 });
+    expect(
+      (await createRepository(authenticated ? account().id : undefined).load()).cars[0],
+    ).toMatchObject({ distanceUnit: 'kilometers', reminderMiles: 250 });
   });
 });
 
@@ -392,7 +545,13 @@ it('sorts mixed-unit history by equivalent distance and refreshes a new visit re
   const { LocalRepository } = await import('../lib/repository');
   const local = new LocalRepository();
   await local.saveCar(car);
-  await local.saveCar({ ...car, id: 'metric', name: 'Metric driver', distanceUnit: 'kilometers', reminderMiles: 1000 });
+  await local.saveCar({
+    ...car,
+    id: 'metric',
+    name: 'Metric driver',
+    distanceUnit: 'kilometers',
+    reminderMiles: 1000,
+  });
   await local.saveVisit({ ...visit, odometer: 1000 });
   await local.saveVisit({ ...visit, id: 'metric-visit', carId: 'metric', odometer: 1600 });
   const { GarageApp } = await import('./garage-app');
@@ -451,32 +610,53 @@ it('updates an existing missing-photo error when the language changes', async ()
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
   localStorage.setItem('garage-guardian:locale', 'es');
   const { LocalRepository } = await import('../lib/repository');
-  const local = new LocalRepository(); await local.saveCar(car);
-  await local.saveVisit({ ...visit, photos: [{ id: 'missing', name: 'receipt.webp', path: 'missing', contentType: 'image/webp' }] });
+  const local = new LocalRepository();
+  await local.saveCar(car);
+  await local.saveVisit({
+    ...visit,
+    photos: [{ id: 'missing', name: 'receipt.webp', path: 'missing', contentType: 'image/webp' }],
+  });
   const { GarageApp } = await import('./garage-app');
-  render(<GarageApp />); const user = userEvent.setup();
+  render(<GarageApp />);
+  const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: 'Historial de servicio' }));
   await user.click(screen.getByRole('button', { name: 'Oil change' }));
   await user.click(screen.getByRole('button', { name: 'receipt.webp' }));
-  await screen.findByText('La foto receipt.webp ya no está disponible. Tus registros locales se conservan.');
+  await screen.findByText(
+    'La foto receipt.webp ya no está disponible. Tus registros locales se conservan.',
+  );
   await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
-  expect(screen.getByText('Photo receipt.webp is no longer available. Your local records have been kept.')).toBeDefined();
-  expect(screen.getByRole('button', { name: 'Oil change' }).getAttribute('aria-expanded')).toBe('true');
+  expect(
+    screen.getByText(
+      'Photo receipt.webp is no longer available. Your local records have been kept.',
+    ),
+  ).toBeDefined();
+  expect(screen.getByRole('button', { name: 'Oil change' }).getAttribute('aria-expanded')).toBe(
+    'true',
+  );
 });
 
 it('localizes a recognized auth failure and confirmation notice while preserving account drafts', async () => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://garage.supabase.co');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
-  cloud.auth.signInWithPassword.mockRejectedValueOnce({ code: 'invalid_credentials', message: 'Private diagnostic' });
+  cloud.auth.signInWithPassword.mockRejectedValueOnce({
+    code: 'invalid_credentials',
+    message: 'Private diagnostic',
+  });
   const { GarageApp } = await import('./garage-app');
-  render(<GarageApp />); const user = userEvent.setup();
+  render(<GarageApp />);
+  const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: 'Sign in' }));
   await user.type(screen.getByLabelText('Email'), 'new@example.com');
   await user.type(screen.getByLabelText('Password'), 'password');
   await user.click(screen.getByRole('button', { name: 'Sign in' }));
-  expect((await screen.findByRole('alert')).textContent).toContain('The email or password is incorrect');
+  expect((await screen.findByRole('alert')).textContent).toContain(
+    'The email or password is incorrect',
+  );
   await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
-  expect(screen.getByRole('alert').textContent).toContain('El correo o la contraseña son incorrectos');
+  expect(screen.getByRole('alert').textContent).toContain(
+    'El correo o la contraseña son incorrectos',
+  );
   expect(screen.getByLabelText('Correo electrónico')).toHaveProperty('value', 'new@example.com');
   expect(screen.getByLabelText('Contraseña')).toHaveProperty('value', 'password');
   expect(cloud.auth.signInWithPassword).toHaveBeenCalledOnce();
@@ -496,14 +676,22 @@ it('hides language selection during a transfer, allows it in recovery, and retai
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
   const { LocalRepository, createRepository } = await import('../lib/repository');
   const { registerSignup } = await import('../lib/signup-transfer');
-  const local = new LocalRepository(); await local.saveCar(car); await local.saveVisit(visit);
+  const local = new LocalRepository();
+  await local.saveCar(car);
+  await local.saveVisit(visit);
   await registerSignup(project, account(), true);
   cloud.emit(account());
   let release!: () => void;
-  const gate = new Promise<void>((resolve) => { release = resolve; });
-  cloud.execute.mockImplementationOnce(async () => { await gate; return { data: null, error: new Error('Private provider details') }; });
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  cloud.execute.mockImplementationOnce(async () => {
+    await gate;
+    return { data: null, error: new Error('Private provider details') };
+  });
   const { GarageApp } = await import('./garage-app');
-  const user = userEvent.setup(); render(<GarageApp />);
+  const user = userEvent.setup();
+  render(<GarageApp />);
   expect(screen.getByRole('heading', { name: 'Opening your garage' })).toBeDefined();
   expect(screen.queryByRole('combobox', { name: 'Language' })).toBeNull();
   await screen.findByRole('heading', { name: 'Moving your garage to Supabase' });
@@ -512,7 +700,9 @@ it('hides language selection during a transfer, allows it in recovery, and retai
   expect(screen.queryByRole('combobox', { name: 'Language' })).toBeNull();
   expect(cloud.execute.mock.calls.length).toBe(runningCalls);
   release();
-  expect((await screen.findByRole('alert')).textContent).toContain('Your browser copy has been kept');
+  expect((await screen.findByRole('alert')).textContent).toContain(
+    'Your browser copy has been kept',
+  );
   const failedCalls = cloud.execute.mock.calls.length;
   await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
   expect(screen.getByRole('alert').textContent).toContain('Se conserva la copia del navegador');
