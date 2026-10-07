@@ -94,6 +94,12 @@ preparation helpers live in `src/lib`.
 
 ## Checks
 
+ESLint checks JavaScript, TypeScript, and TSX files with the recommended Next.js Core Web
+Vitals and TypeScript rules. Run `pnpm lint` to check the project or `pnpm lint:fix` to
+apply automatic fixes. Configuration lives in `eslint.config.mjs`; generated Next.js
+types, build output, and coverage are excluded. Prettier handles formatting separately,
+with `eslint-config-prettier` preventing conflicting lint rules.
+
 Prettier is installed locally with a pinned version. Run `pnpm format` to format supported
 project files, or `pnpm format:check` to check formatting without changing files. The
 configuration uses single quotes, semicolons, trailing commas, two-space indentation,
@@ -104,6 +110,7 @@ To format only files changed during a task, run `pnpm exec prettier --write path
 with the relevant file paths.
 
 ```powershell
+pnpm lint
 pnpm test
 pnpm run typecheck
 pnpm run build

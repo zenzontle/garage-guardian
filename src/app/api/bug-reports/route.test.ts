@@ -28,8 +28,8 @@ vi.mock('@/lib/bug-reports/github', async (original) => ({
   }),
 }));
 vi.mock('sharp', async (original) => {
-  const module = await original<typeof import('sharp')>();
-  return { ...module, default: vi.fn(module.default) };
+  const sharpModule = await original<typeof import('sharp')>();
+  return { ...sharpModule, default: vi.fn(sharpModule.default) };
 });
 const headers = {
   authorization: 'Bearer verified-token',
