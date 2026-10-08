@@ -199,6 +199,38 @@ it('retains a vehicle after failed edit/delete, and replaces the URL only after 
   expect(testRouter.entries).toEqual(['/cars']);
 });
 
+it.each([false, true])(
+  'retains the vehicle URL after a committed delete fails to refresh (only car=%s)',
+  async (onlyCar) => {
+    const { local, LocalRepository } = await seed();
+    if (onlyCar) await local.deleteCar('second');
+    testRouter.reset(carPath(car.id));
+    const App = await loadGarageTestApp();
+    render(<App />);
+    await screen.findByRole('heading', { name: car.name });
+    const load = vi.spyOn(LocalRepository.prototype, 'load');
+    const original = LocalRepository.prototype.deleteCar;
+    const remove = vi
+      .spyOn(LocalRepository.prototype, 'deleteCar')
+      .mockImplementationOnce(async function (this: InstanceType<typeof LocalRepository>, id) {
+        await original.call(this, id);
+        load.mockRejectedValueOnce(new Error('Refresh failed'));
+      });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Delete car and records' }));
+    await screen.findByRole('alert');
+    expect(testRouter.url).toBe(carPath(car.id));
+    expect(testRouter.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole('heading', { name: car.name })).toBeDefined();
+    expect((await local.load()).cars.map((entry) => entry.id)).toEqual(onlyCar ? [] : ['second']);
+    await user.click(screen.getByRole('button', { name: 'Retry refresh' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(remove).toHaveBeenCalledOnce();
+    expect(testRouter.replace).not.toHaveBeenCalled();
+  },
+);
+
 it('returns from account screens to a bookmark, preserves email between modes and clears password/error', async () => {
   configureCloud();
   await seed();

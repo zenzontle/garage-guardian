@@ -29,6 +29,10 @@ export function GarageContent({ children }: { children: ReactNode }) {
     transferring,
     error,
     setError,
+    refreshError,
+    setRefreshError,
+    refreshing,
+    refresh,
     modal,
     setModal,
     notice,
@@ -132,6 +136,22 @@ export function GarageContent({ children }: { children: ReactNode }) {
                 </button>
               </div>
             )}
+            {refreshError && (
+              <div className="error-banner refresh-banner" role="alert" aria-busy={refreshing}>
+                <CircleAlert size={18} />
+                <span>{t(`errors.${refreshError.code}`, refreshError.values)}</span>
+                <button type="button" disabled={refreshing} onClick={() => void refresh()}>
+                  {t('shared.retryRefresh')}
+                </button>
+                <button
+                  type="button"
+                  aria-label={t('app.dismissError')}
+                  onClick={() => setRefreshError(null)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
             {!isCloudConfigured && (
               <div className="demo-banner">
                 <CircleAlert size={17} />
@@ -149,7 +169,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
             item={modal.item}
             onClose={() => setModal(null)}
             onSave={async (car, starter) => {
-              await perform(async () => {
+              const result = await perform(async () => {
                 await repository!.saveCar(car);
                 if (starter)
                   for (const item of makeStarterSchedules(car.id, [
@@ -162,7 +182,8 @@ export function GarageContent({ children }: { children: ReactNode }) {
                   ]))
                     await repository!.saveSchedule(item);
               });
-              if (!modal.item && currentPath.current === pathname) router.push(carPath(car.id));
+              if (result.refreshed && !modal.item && currentPath.current === pathname)
+                router.push(carPath(car.id));
             }}
           />
         )}
@@ -174,7 +195,9 @@ export function GarageContent({ children }: { children: ReactNode }) {
               snapshot.cars.find((car) => car.id === modal.carId)?.distanceUnit ?? 'miles'
             }
             onClose={() => setModal(null)}
-            onSave={async (item) => perform(() => repository!.saveSchedule(item))}
+            onSave={async (item) => {
+              await perform(() => repository!.saveSchedule(item));
+            }}
           />
         )}
         {modal?.kind === 'visit' && (
@@ -186,7 +209,9 @@ export function GarageContent({ children }: { children: ReactNode }) {
             schedules={snapshot.schedules}
             repository={repository!}
             onClose={() => setModal(null)}
-            onSave={async (item) => perform(() => repository!.saveVisit(item))}
+            onSave={async (item) => {
+              await perform(() => repository!.saveVisit(item));
+            }}
           />
         )}
       </div>

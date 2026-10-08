@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clear } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../test/fake-supabase';
@@ -277,7 +277,7 @@ it('waits for an in-flight guest write before taking the signup transfer snapsho
     await delayed;
     return original.call(this, value);
   });
-  let write!: Promise<void>;
+  let write!: Promise<{ refreshed: boolean }>;
   act(() => {
     write = hook.result.current.run(() => hook.result.current.repository!.saveCar(car));
   });
@@ -321,4 +321,126 @@ it('restores and transfers safely when React Strict Mode mounts effects twice', 
   expect(cloud.execute.mock.calls.filter(([, operation]) => operation === 'upsert')).toHaveLength(
     1,
   );
+});
+
+describe.each(['local', 'cloud'] as const)('%s mutation recovery', (mode) => {
+  it('resolves committed writes on refresh failure and retries only reads without losing the snapshot', async () => {
+    if (mode === 'cloud') cloud.emit(account());
+    const { LocalRepository, SupabaseRepository } = await import('./repository');
+    const { AppError } = await import('./app-error');
+    const hook = await openGarage();
+    await act(async () => {
+      expect(
+        await hook.result.current.run(() => hook.result.current.repository!.saveCar(car)),
+      ).toEqual({ refreshed: true });
+    });
+    const prototype = mode === 'cloud' ? SupabaseRepository.prototype : LocalRepository.prototype;
+    const load = vi.spyOn(prototype, 'load');
+    const save = vi.spyOn(prototype, 'saveCar');
+    load.mockRejectedValueOnce(new AppError('sessionExpired'));
+    const updated = { ...car, name: 'Saved change' };
+    await act(async () => {
+      expect(
+        await hook.result.current.run(() => hook.result.current.repository!.saveCar(updated)),
+      ).toEqual({ refreshed: false });
+    });
+    expect(hook.result.current.error).toBeNull();
+    expect(hook.result.current.refreshError).toEqual({ code: 'refresh' });
+    expect(hook.result.current.snapshot.cars).toEqual([car]);
+    expect(hook.result.current.refreshing).toBe(false);
+    load.mockRejectedValueOnce(new Error('Still unavailable'));
+    await act(async () => hook.result.current.refresh());
+    expect(hook.result.current.refreshError).toEqual({ code: 'refresh' });
+    expect(hook.result.current.snapshot.cars).toEqual([car]);
+    await act(async () => hook.result.current.refresh());
+    expect(hook.result.current.snapshot.cars).toEqual([updated]);
+    expect(hook.result.current.refreshError).toBeNull();
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(load).toHaveBeenCalledTimes(3);
+  });
+});
+
+it('rejects a failed mutation without refreshing and releases the operation lock', async () => {
+  const { LocalRepository } = await import('./repository');
+  const hook = await openGarage();
+  const load = vi.spyOn(LocalRepository.prototype, 'load');
+  const cause = new Error('Write failed');
+  await act(async () => {
+    await expect(
+      hook.result.current.run(async () => {
+        throw cause;
+      }),
+    ).rejects.toBe(cause);
+  });
+  expect(hook.result.current.error).toEqual({ code: 'save' });
+  expect(hook.result.current.refreshError).toBeNull();
+  expect(load).not.toHaveBeenCalled();
+  await act(async () => {
+    await hook.result.current.run(() => hook.result.current.repository!.saveCar(car));
+  });
+  expect(hook.result.current.error).toBeNull();
+  expect(hook.result.current.snapshot.cars).toEqual([car]);
+});
+
+it('serializes refresh and mutations and keeps the last snapshot while refreshing', async () => {
+  const { LocalRepository } = await import('./repository');
+  await new LocalRepository().saveCar(car);
+  const hook = await openGarage();
+  let release!: (data: typeof hook.result.current.snapshot) => void;
+  const load = vi.spyOn(LocalRepository.prototype, 'load').mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+  );
+  let refresh!: Promise<void>;
+  act(() => {
+    refresh = hook.result.current.refresh();
+  });
+  expect(hook.result.current.refreshing).toBe(true);
+  expect(hook.result.current.snapshot.cars).toEqual([car]);
+  const action = vi.fn(async () => {});
+  await act(async () => {
+    await hook.result.current.refresh();
+    await expect(hook.result.current.run(action)).rejects.toThrow('current operation');
+  });
+  expect(action).not.toHaveBeenCalled();
+  expect(load).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    release({ cars: [car], schedules: [], visits: [] });
+    await refresh;
+  });
+  expect(hook.result.current.refreshing).toBe(false);
+  await act(async () => {
+    expect(await hook.result.current.run(action)).toEqual({ refreshed: true });
+  });
+  expect(action).toHaveBeenCalledOnce();
+});
+
+it('ignores an in-flight refresh from an account that has signed out', async () => {
+  cloud.emit(account());
+  const { LocalRepository, SupabaseRepository } = await import('./repository');
+  await new LocalRepository().saveCar(car);
+  const hook = await openGarage();
+  let release!: () => void;
+  vi.spyOn(SupabaseRepository.prototype, 'load').mockImplementationOnce(
+    () =>
+      new Promise((_, reject) => {
+        release = () => reject(new Error('Old refresh failed'));
+      }),
+  );
+  let refresh!: Promise<void>;
+  act(() => {
+    refresh = hook.result.current.refresh();
+  });
+  await act(async () => hook.result.current.signOut());
+  expect(hook.result.current.refreshing).toBe(false);
+  await act(async () => {
+    release();
+    await refresh;
+  });
+  await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
+  expect(hook.result.current.user).toBeNull();
+  expect(hook.result.current.snapshot.cars).toEqual([car]);
+  expect(hook.result.current.refreshError).toBeNull();
 });
