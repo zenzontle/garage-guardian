@@ -67,8 +67,8 @@ export function CarsScreen({ carId }: { carId?: string }) {
       onDeleteCar={async (car) => {
         if (!confirm(t('car.confirmDelete', { name: car.name }))) return;
         try {
-          await perform(() => repository!.deleteCar(car.id));
-          if (currentPath.current === pathname) router.replace('/cars');
+          const result = await perform(() => repository!.deleteCar(car.id));
+          if (result.refreshed && currentPath.current === pathname) router.replace('/cars');
         } catch {
           /* The session displays the failure; retain the requested vehicle. */
         }
