@@ -9,17 +9,20 @@ import { failureOf, type AppFailure } from '@/lib/app-error';
 
 export function AccountForm({
   mode,
+  email,
+  onEmailChange,
   onMode,
   onClose,
   onSubmit,
 }: {
   mode: 'signin' | 'signup';
+  email: string;
+  onEmailChange: (email: string) => void;
   onMode: (mode: 'signin' | 'signup') => void;
   onClose: () => void;
   onSubmit: (email: string, password: string) => Promise<void>;
 }) {
   const t = useTranslations();
-  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AppFailure | null>(null);
@@ -62,7 +65,7 @@ export function AccountForm({
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => onEmailChange(e.target.value)}
               required
               autoComplete="email"
             />

@@ -170,7 +170,9 @@
     "reminderDays": "Coming up: days before due",
     "reminderDistance": "Coming up: {unit} before due",
     "starterHint": "We’ll add common maintenance tasks. Set their intervals from your owner’s manual before reminders begin.",
-    "saveNew": "Add car"
+    "saveNew": "Add car",
+    "unavailableTitle": "Vehicle unavailable",
+    "unavailableDescription": "This vehicle is not in your current garage. It may have been deleted or belong to another account or browser."
   },
   "schedule": {
     "edit": "Edit maintenance task",

@@ -170,7 +170,9 @@
     "reminderDays": "Avisar estos días antes del vencimiento",
     "reminderDistance": "Aviso previo: {unit} antes del vencimiento",
     "starterHint": "Añadiremos tareas de mantenimiento habituales. Establece los intervalos según el manual del propietario para activar los avisos.",
-    "saveNew": "Añadir auto"
+    "saveNew": "Añadir auto",
+    "unavailableTitle": "Auto no disponible",
+    "unavailableDescription": "Este auto no está en tu garaje actual. Puede haberse eliminado o pertenecer a otra cuenta o navegador."
   },
   "schedule": {
     "edit": "Editar tarea de mantenimiento",

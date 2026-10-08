@@ -1,11 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { useTranslations } from 'next-intl';
 import { ArrowRight } from 'lucide-react';
 import { type DueItem } from '@/lib/due';
 import { useDisplay } from '@/i18n/use-display';
 
-export function DueRow({ item, onClick }: { item: DueItem; onClick?: () => void }) {
+export function DueRow({ item, href }: { item: DueItem; href?: string }) {
   const t = useTranslations();
   const { dueDescription } = useDisplay();
   const content = (
@@ -30,11 +31,11 @@ export function DueRow({ item, onClick }: { item: DueItem; onClick?: () => void 
       </span>
     </>
   );
-  return onClick ? (
-    <button className="due-row" onClick={onClick}>
+  return href ? (
+    <Link className="due-row" href={href}>
       {content}
       <ArrowRight size={16} />
-    </button>
+    </Link>
   ) : (
     <div className="due-row">{content}</div>
   );

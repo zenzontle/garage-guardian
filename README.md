@@ -6,6 +6,21 @@ Choose **Miles** (default) or **Kilometers** when adding a car. The distance uni
 
 Each car can have an optional **License plate**, shown in its detail header when present. Add, edit, or clear it alongside VIN. Plates are free text up to **20 characters** after trimming leading and trailing whitespace; case, internal spaces, and punctuation are preserved. Blank input means no plate. No country-specific format, uniqueness rule, registration jurisdiction, or plate lookup is used. Older records load with no plate, and signup transfers preserve saved plates, including interrupted transfers resumed after a reload.
 
+## Navigation
+
+Dashboard lives at `/`, Vehicles at `/cars`, individual vehicles at `/cars/[carId]`,
+Service history at `/history`, and Reports at `/reports`. Vehicles opens the first car
+and replaces `/cars` with its detail URL, or shows the empty garage when no cars exist.
+Reloads, bookmarks, browser Back/Forward, and opening navigation links in a new tab
+work across these screens. Vehicle IDs remain stable when names change.
+
+Sign-in and create-account use `/signin` and `/signup`. Their validated `returnTo`
+parameter returns to the originating workspace screen; direct visits default to Dashboard.
+A missing vehicle keeps its URL and displays an unavailable message. Guest/prototype
+bookmarks depend on data stored in that browser and origin; cloud bookmarks require
+access to the vehicle in the current account. Dialogs and history/report filters remain
+local UI state and are not restored from URLs. No database migration is required.
+
 ## Languages
 
 Use the **English / Español** selector in the header, account screens, or open dialogs. The first render is English on both server and client. After mounting, the app uses a valid saved choice, otherwise the first supported browser language (including regional variants such as `es-MX`), with English fallback. Explicit choices are stored under `garage-guardian:locale` in local storage, independently of accounts and garage data, and survive reload, sign-in, and sign-out. If storage is unavailable, switching still works for the current session. The document's `lang` follows the resolved language. Switching updates provider values without remounting forms or restarting transfers.
@@ -86,8 +101,10 @@ No paid plan or automatic upgrade is required. Free service quotas and Supabase 
 ## Component organization
 
 UI components live in `src/components`, with each component in its own kebab-case file.
-`GarageApp` supplies the locale provider, while `GarageContent` coordinates the garage
-session, navigation, and dialogs. Pages, account forms, car/task/visit dialogs, navigation
+`GarageApp` supplies persistent locale and garage providers through the shared route layout.
+`GarageProvider` owns the session and transient UI state, `GarageContent` renders the shell
+and dialogs, and route screen components connect page components to shared data and actions.
+Pages, account forms, car/task/visit dialogs, navigation
 controls, and bug-report sections import shared UI components directly from their files.
 The locale provider and selector share `src/i18n/locale-context.ts`; date and photo
 preparation helpers live in `src/lib`.

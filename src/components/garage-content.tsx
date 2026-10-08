@@ -1,73 +1,46 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, LogOut, X } from 'lucide-react';
-import { getAllDue } from '@/lib/due';
 import { isCloudConfigured } from '@/lib/repository';
-import { useGarageSession } from '@/lib/use-garage-session';
-import { makeStarterSchedules, type Car, type ScheduleItem, type Visit } from '@/lib/model';
+import { makeStarterSchedules } from '@/lib/model';
+import { accountMode, accountPath, carPath, workspaceScreen } from '@/lib/garage-routes';
+import { useGarage } from './garage-provider';
 import { BugReporter } from './bug-reporter';
 import { LocaleSelector } from './locale-selector';
-import { AccountForm } from './account-form';
-import { Dashboard } from './dashboard';
-import { CarsPage } from './cars-page';
-import { HistoryPage } from './history-page';
-import { ReportsPage } from './reports-page';
 import { CarModal } from './car-modal';
 import { ScheduleModal } from './schedule-modal';
 import { VisitModal } from './visit-modal';
-import { todayISO } from '@/lib/today-iso';
-import type { Page } from './garage-navigation';
 import { GarageSidebar } from './garage-sidebar';
 import { GarageTopbar } from './garage-topbar';
 import { GarageMobileNavigation } from './garage-mobile-navigation';
 
-type ModalState =
-  | { kind: 'car'; item?: Car }
-  | { kind: 'schedule'; item?: ScheduleItem; carId: string }
-  | { kind: 'visit'; item?: Visit; carId?: string }
-  | null;
-
-export function GarageContent() {
+export function GarageContent({ children }: { children: ReactNode }) {
   const t = useTranslations();
-  const garage = useGarageSession();
-  const { repository, snapshot, user, loading, transferring, error, setError } = garage;
-  const [page, setPage] = useState<Page>('dashboard');
-  const [modal, setModal] = useState<ModalState>(null);
-  const [selectedCarId, setSelectedCarId] = useState<string>('');
-  const [authView, setAuthView] = useState<'signin' | 'signup' | null>(null);
-  const [notice, setNotice] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    if (loading) {
-      setModal(null);
-      setSelectedCarId('');
-    }
-    if (user) {
-      setAuthView(null);
-      setNotice(false);
-    }
-  }, [loading, user]);
-
-  async function perform(action: () => Promise<void>) {
-    await garage.run(action);
-    setModal(null);
-  }
-
-  const allDue = useMemo(
-    () => getAllDue(snapshot.cars, snapshot.schedules, snapshot.visits, todayISO()),
-    [snapshot],
-  );
-  const visits = useMemo(
-    () =>
-      [...snapshot.visits].sort(
-        (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
-      ),
-    [snapshot.visits],
-  );
-  const selectedCar = snapshot.cars.find((car) => car.id === selectedCarId) ?? null;
+  const garage = useGarage();
+  const {
+    repository,
+    snapshot,
+    user,
+    loading,
+    transferring,
+    error,
+    setError,
+    modal,
+    setModal,
+    notice,
+    menuOpen,
+    setMenuOpen,
+    visits,
+    perform,
+    currentPath,
+  } = garage;
+  const pathname = usePathname();
+  const router = useRouter();
+  const page = workspaceScreen(pathname);
   const reporter = (
     <BugReporter
       key={user?.id ?? 'guest'}
@@ -87,12 +60,12 @@ export function GarageContent() {
   ) : (
     isCloudConfigured && (
       <div className="account-actions">
-        <button className="button secondary" onClick={() => setAuthView('signin')}>
+        <Link className="button secondary" href={accountPath('signin', pathname)}>
           {t('account.signIn')}
-        </button>
-        <button className="button primary" onClick={() => setAuthView('signup')}>
+        </Link>
+        <Link className="button primary" href={accountPath('signup', pathname)}>
           {t('account.create')}
-        </button>
+        </Link>
       </div>
     )
   );
@@ -122,21 +95,7 @@ export function GarageContent() {
         </div>
       </>
     );
-  if (authView && !user)
-    return (
-      <AccountForm
-        mode={authView}
-        onMode={setAuthView}
-        onClose={() => setAuthView(null)}
-        onSubmit={async (email, password) => {
-          if (authView === 'signup') {
-            const confirmation = await garage.signUp(email, password);
-            if (confirmation) setNotice(true);
-          } else await garage.signIn(email, password);
-          setAuthView(null);
-        }}
-      />
-    );
+  if (accountMode(pathname)) return <>{children}</>;
 
   return (
     <>
@@ -147,10 +106,6 @@ export function GarageContent() {
           menuOpen={menuOpen}
           carCount={snapshot.cars.length}
           user={user}
-          onNavigate={(next) => {
-            setPage(next);
-            setMenuOpen(false);
-          }}
         />
 
         <div className="main-wrap">
@@ -182,60 +137,11 @@ export function GarageContent() {
                 <span>{t('app.prototypeNotice')}</span>
               </div>
             )}
-            {page === 'dashboard' && (
-              <Dashboard
-                cars={snapshot.cars}
-                visits={visits}
-                allDue={allDue}
-                onAddCar={() => setModal({ kind: 'car' })}
-                onAddVisit={() => setModal({ kind: 'visit' })}
-                onViewCar={(id) => {
-                  setSelectedCarId(id);
-                  setPage('cars');
-                }}
-                onViewAll={() => setPage('history')}
-              />
-            )}
-            {page === 'cars' && (
-              <CarsPage
-                cars={snapshot.cars}
-                visits={visits}
-                allDue={allDue}
-                selectedCar={selectedCar}
-                onSelect={setSelectedCarId}
-                onAdd={() => setModal({ kind: 'car' })}
-                onEdit={(item) => setModal({ kind: 'car', item })}
-                onAddSchedule={(carId) => setModal({ kind: 'schedule', carId })}
-                onEditSchedule={(item) => setModal({ kind: 'schedule', carId: item.carId, item })}
-                onAddVisit={(carId) => setModal({ kind: 'visit', carId })}
-                onDeleteCar={async (car) => {
-                  if (confirm(t('car.confirmDelete', { name: car.name })))
-                    await perform(() => repository!.deleteCar(car.id));
-                }}
-                onDeleteSchedule={async (item) => {
-                  if (confirm(t('car.confirmDeleteTask', { name: item.name })))
-                    await perform(() => repository!.deleteSchedule(item.id));
-                }}
-              />
-            )}
-            {page === 'history' && (
-              <HistoryPage
-                cars={snapshot.cars}
-                visits={visits}
-                repository={repository!}
-                onAdd={() => setModal({ kind: 'visit' })}
-                onEdit={(item) => setModal({ kind: 'visit', item })}
-                onDelete={async (visit) => {
-                  if (confirm(t('history.confirmDelete')))
-                    await perform(() => repository!.deleteVisit(visit));
-                }}
-              />
-            )}
-            {page === 'reports' && <ReportsPage cars={snapshot.cars} visits={visits} />}
+            {children}
           </main>
         </div>
 
-        <GarageMobileNavigation page={page} onNavigate={setPage} />
+        <GarageMobileNavigation page={page} />
 
         {modal?.kind === 'car' && (
           <CarModal
@@ -255,8 +161,7 @@ export function GarageContent() {
                   ]))
                     await repository!.saveSchedule(item);
               });
-              setSelectedCarId(car.id);
-              setPage('cars');
+              if (!modal.item && currentPath.current === pathname) router.push(carPath(car.id));
             }}
           />
         )}
