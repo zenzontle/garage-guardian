@@ -1354,7 +1354,7 @@ td strong {
     justify-content: space-around;
     padding-bottom: env(safe-area-inset-bottom);
   }
-  .mobile-tabs button {
+  .mobile-tabs a {
     border: 0;
     background: none;
     color: var(--muted);
@@ -1367,7 +1367,7 @@ td strong {
     font-weight: 750;
     min-width: 63px;
   }
-  .mobile-tabs button.active {
+  .mobile-tabs a.active {
     color: var(--green);
   }
   .report-stat-grid {
@@ -1719,4 +1719,15 @@ textarea::placeholder {
   .bug-report-screenshots {
     grid-template-columns: 1fr;
   }
+}
+
+/* Navigation links retain the existing button presentation. */
+.nav-link,
+.mobile-tabs a,
+.car-tab,
+.vehicle-row,
+a.due-row,
+a.text-link,
+a.button {
+  text-decoration: none;
 }

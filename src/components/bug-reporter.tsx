@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { Bug, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
+import { reportPath } from '@/lib/garage-routes';
 import en from '../../messages/en.json';
 import { LocaleSelector } from './locale-selector';
 import { BugReportFields } from './bug-report-fields';
@@ -209,7 +210,7 @@ export function BugReporter({
       acknowledged: true,
       metadata,
       context: {
-        pathname: window.location.pathname,
+        pathname: reportPath(window.location.pathname),
         screen,
         dialog: appDialog,
         viewport: {

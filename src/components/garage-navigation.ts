@@ -1,6 +1,6 @@
 import { CarFront, ClipboardList, DollarSign, LayoutDashboard } from 'lucide-react';
 
-export type Page = 'dashboard' | 'cars' | 'history' | 'reports';
+export type { WorkspaceScreen as Page } from '@/lib/garage-routes';
 
 export const navigation = [
   { id: 'dashboard', icon: LayoutDashboard },

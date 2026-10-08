@@ -43,6 +43,20 @@ function failSessionLookup(failure: 'missing' | 'rejected') {
   else auth.getSession.mockResolvedValueOnce({ data: { session: null } });
 }
 describe('authenticated public bug reporter', () => {
+  it('previews a vehicle route template without exposing the ID or URL parameters', async () => {
+    window.history.replaceState(null, '', '/cars/private-vehicle?secret=value#fragment');
+    try {
+      const user = await openReport();
+      await review(user);
+      expect(screen.getByText(/Route: \/cars\/\[carId\]/)).toBeDefined();
+      const preview = screen.getByText(/Route: \/cars\/\[carId\]/).textContent;
+      expect(preview).not.toContain('private-vehicle');
+      expect(preview).not.toContain('secret=value');
+      expect(preview).not.toContain('fragment');
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
+  });
   it('hides language selection while loading and restores it in recovery without losing the draft', async () => {
     const user = userEvent.setup();
     const rendered = render(<BugReporter userId="account" screen="loading" dialog="none" />);

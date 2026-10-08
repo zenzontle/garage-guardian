@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { carPath } from '@/lib/garage-routes';
 import { useTranslations } from 'next-intl';
 import { CarFront, ClipboardList, Gauge, Plus, Settings2, Trash2, Wrench } from 'lucide-react';
 import { latestOdometer, type DueItem } from '@/lib/due';
@@ -13,7 +15,6 @@ export function CarsPage({
   visits,
   allDue,
   selectedCar,
-  onSelect,
   onAdd,
   onEdit,
   onAddSchedule,
@@ -26,7 +27,6 @@ export function CarsPage({
   visits: Visit[];
   allDue: DueItem[];
   selectedCar: Car | null;
-  onSelect: (id: string) => void;
   onAdd: () => void;
   onEdit: (car: Car) => void;
   onAddSchedule: (carId: string) => void;
@@ -37,7 +37,7 @@ export function CarsPage({
 }) {
   const t = useTranslations();
   const { number, money, displayDate, formatDistance, dueDescription } = useDisplay();
-  const car = selectedCar ?? cars[0];
+  const car = selectedCar;
   const carDue = car ? allDue.filter((item) => item.car.id === car.id) : [];
   const carVisits = car ? visits.filter((visit) => visit.carId === car.id) : [];
   return (
@@ -53,7 +53,7 @@ export function CarsPage({
           </button>
         }
       />
-      {cars.length === 0 ? (
+      {!car ? (
         <EmptyPanel
           icon={<CarFront size={25} />}
           title={t('car.emptyTitle')}
@@ -66,20 +66,19 @@ export function CarsPage({
         />
       ) : (
         <>
-          <div className="car-switcher" role="tablist" aria-label={t('car.choose')}>
+          <nav className="car-switcher" aria-label={t('car.choose')}>
             {cars.map((item) => (
-              <button
-                role="tab"
-                aria-selected={car.id === item.id}
+              <Link
+                href={carPath(item.id)}
+                aria-current={car.id === item.id ? 'page' : undefined}
                 className={`car-tab ${car.id === item.id ? 'active' : ''}`}
                 key={item.id}
-                onClick={() => onSelect(item.id)}
               >
                 <CarFront size={19} />
                 <span>{item.name}</span>
-              </button>
+              </Link>
             ))}
-          </div>
+          </nav>
           <div className="car-header panel">
             <div className="car-header-icon">
               <CarFront size={30} />

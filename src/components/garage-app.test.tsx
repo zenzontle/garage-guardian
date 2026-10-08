@@ -1,3 +1,4 @@
+import { loadGarageTestApp, testRouter } from '../test/garage-router';
 import * as React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -10,6 +11,7 @@ import { car, visit } from '../test/fixtures';
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 let cloud: ReturnType<typeof fakeSupabase>;
 beforeEach(async () => {
+  testRouter.reset();
   localStorage.clear();
   vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['en-US']);
   await clear();
@@ -45,7 +47,7 @@ describe.each([
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', configured ? 'test-key' : '');
     localStorage.setItem('garage-guardian:locale', 'es');
     if (authenticated) cloud.emit(account());
-    const { GarageApp } = await import('./garage-app');
+    const GarageApp = await loadGarageTestApp();
     const { createRepository } = await import('../lib/repository');
     const { visitsToCsv, reportTotals } = await import('../lib/reports');
     const { getAllDue } = await import('../lib/due');
@@ -81,8 +83,9 @@ describe.each([
     await user.selectOptions(dialog.getByRole('combobox', { name: 'Language' }), 'es');
     fireEvent.change(dialog.getByLabelText(/Matrícula/), { target: { value: ' AbC-123 ' } });
     await user.click(dialog.getByRole('button', { name: 'Añadir auto' }));
-    await screen.findByRole('tab', { name: 'Mi auto / My car' });
+    await screen.findByRole('link', { name: 'Mi auto / My car' });
     const created = await backend.load();
+    expect(testRouter.url).toBe(`/cars/${created.cars[0].id}`);
     expect(created.cars[0]).toMatchObject({
       name: 'Mi auto / My car',
       odometer: 48250,
@@ -144,7 +147,7 @@ describe.each([
       cloud.execute.mock.calls.length,
     ];
     await user.click(
-      within(screen.getByRole('navigation', { name: 'Navegación principal' })).getByRole('button', {
+      within(screen.getByRole('navigation', { name: 'Navegación principal' })).getByRole('link', {
         name: 'Informes',
       }),
     );
@@ -169,6 +172,7 @@ describe.each([
     expect(reportTotals(saved.visits, saved.cars)).toEqual(totals);
     expect(getAllDue(saved.cars, saved.schedules, saved.visits, '2026-10-03')).toEqual(due);
     app.unmount();
+    testRouter.reset();
     render(<GarageApp />);
     await screen.findByRole('heading', { name: 'Your garage at a glance' });
     expect(document.documentElement.lang).toBe('en');
@@ -184,7 +188,7 @@ describe.each([
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', configured ? 'https://garage.supabase.co' : '');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', configured ? 'test-key' : '');
     if (authenticated) cloud.emit(account());
-    const { GarageApp } = await import('./garage-app');
+    const GarageApp = await loadGarageTestApp();
     const { LocalRepository } = await import('../lib/repository');
     const app = render(<GarageApp />);
     const user = userEvent.setup();
@@ -202,7 +206,7 @@ describe.each([
     if (configured) await user.click(await dialog.findByRole('option', { name: 'RAV4' }));
     await user.type(dialog.getByLabelText('Current odometer (miles)'), '100');
     await user.click(dialog.getByRole('button', { name: 'Add car' }));
-    await screen.findByRole('tab', { name: 'Daily driver' });
+    await screen.findByRole('link', { name: 'Daily driver' });
     expect(screen.queryByText(/^Plate:/)).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Edit car' }));
     const edit = within(screen.getByRole('dialog', { name: 'Edit car' }));
@@ -212,7 +216,7 @@ describe.each([
     await user.clear(edit.getByLabelText('Nickname'));
     await user.type(edit.getByLabelText('Nickname'), 'Updated driver');
     await user.click(edit.getByRole('button', { name: 'Save changes' }));
-    await screen.findByRole('tab', { name: 'Updated driver' });
+    await screen.findByRole('link', { name: 'Updated driver' });
     const local = await new LocalRepository().load();
     if (authenticated) {
       expect(local.cars).toEqual([]);
@@ -230,14 +234,15 @@ describe.each([
       else expect(screen.getByText('Local prototype')).toBeDefined();
     }
     app.unmount();
+    testRouter.reset();
     render(<GarageApp />);
     await screen.findByText('Updated driver');
-    await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
+    await user.click(screen.getAllByRole('link', { name: 'My cars' })[0]);
     await user.click(screen.getByRole('button', { name: 'Edit car' }));
     expect((screen.getByLabelText('Make') as HTMLInputElement).value).toBe('Toyota');
     expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('RAV4');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-    await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
+    await user.click(screen.getAllByRole('link', { name: 'My cars' })[0]);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     await user.click(screen.getByRole('button', { name: 'Delete car and records' }));
     await screen.findByText('No cars yet');
@@ -249,7 +254,7 @@ describe.each([
 it('preserves free text in add/edit, scopes models after make changes, and dismisses suggestions before the modal', async () => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://garage.supabase.co');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
-  const { GarageApp } = await import('./garage-app');
+  const GarageApp = await loadGarageTestApp();
   const { LocalRepository } = await import('../lib/repository');
   render(<GarageApp />);
   const user = userEvent.setup();
@@ -273,7 +278,7 @@ it('preserves free text in add/edit, scopes models after make changes, and dismi
   expect(screen.queryByRole('option', { name: 'RAV4' })).toBeNull();
   await user.type(screen.getByLabelText('Model'), ' RAV4 '); // Deliberately arbitrary Honda/model pair.
   await user.click(screen.getByRole('button', { name: 'Add car' }));
-  await screen.findByRole('tab', { name: 'Unlisted' });
+  await screen.findByRole('link', { name: 'Unlisted' });
   expect((await new LocalRepository().load()).cars[0]).toMatchObject({
     make: 'Honda',
     model: 'RAV4',
@@ -300,7 +305,7 @@ it('a catalog outage allows guest save and a later retry without altering saved 
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://garage.supabase.co');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
   cloud.execute.mockRejectedValueOnce(new Error('catalog offline'));
-  const { GarageApp } = await import('./garage-app');
+  const GarageApp = await loadGarageTestApp();
   const { LocalRepository } = await import('../lib/repository');
   render(<GarageApp />);
   const user = userEvent.setup();
@@ -315,7 +320,7 @@ it('a catalog outage allows guest save and a later retry without altering saved 
     fireEvent.change(screen.getByLabelText(label), { target: { value } });
   }
   await user.click(screen.getByRole('button', { name: 'Add car' }));
-  await screen.findByRole('tab', { name: 'Free text' });
+  await screen.findByRole('link', { name: 'Free text' });
   expect((await new LocalRepository().load()).cars[0]).toMatchObject({
     make: 'unknown',
     model: 'existing custom',
@@ -344,7 +349,7 @@ describe.each([
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://garage.supabase.co');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
     if (authenticated) cloud.emit(account());
-    const { GarageApp } = await import('./garage-app');
+    const GarageApp = await loadGarageTestApp();
     const { createRepository } = await import('../lib/repository');
     const repository = createRepository(authenticated ? account().id : undefined);
     let app = render(<GarageApp />);
@@ -368,7 +373,7 @@ describe.each([
     expect(document.activeElement).toBe(plateInput);
     await user.type(plateInput, '  AbC  - 123  ');
     await user.click(dialog.getByRole('button', { name: 'Add car' }));
-    await screen.findByRole('tab', { name: 'Plate driver' });
+    await screen.findByRole('link', { name: 'Plate driver' });
     expect(screen.getByText('Plate: AbC - 123').textContent).toBe('Plate: AbC  - 123');
     const created = (await repository.load()).cars[0];
     expect(created).toMatchObject({
@@ -396,9 +401,10 @@ describe.each([
     expect((await repository.load()).cars[0]).toEqual({ ...created, plate: 'W'.repeat(20) });
 
     app.unmount();
+    testRouter.reset();
     app = render(<GarageApp />);
     await screen.findByText('Plate driver');
-    await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
+    await user.click(screen.getAllByRole('link', { name: 'My cars' })[0]);
     expect(screen.getByText(`Plate: ${'W'.repeat(20)}`)).toBeDefined();
     await user.click(screen.getByRole('button', { name: 'Edit car' }));
     dialog = within(screen.getByRole('dialog', { name: 'Edit car' }));
@@ -409,9 +415,10 @@ describe.each([
     expect(screen.queryByText(/^Plate:/)).toBeNull();
     expect((await repository.load()).cars[0]).toEqual({ ...created, plate: '' });
     app.unmount();
+    testRouter.reset();
     render(<GarageApp />);
     await screen.findByText('Plate driver');
-    await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
+    await user.click(screen.getAllByRole('link', { name: 'My cars' })[0]);
     expect(screen.queryByText(/^Plate:/)).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Edit car' }));
     expect((screen.getByLabelText(/License plate/) as HTMLInputElement).value).toBe('');
@@ -421,7 +428,7 @@ describe.each([
 it('switches creation defaults while preserving typed odometer readings and customized reminder windows', async () => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');
-  const { GarageApp } = await import('./garage-app');
+  const GarageApp = await loadGarageTestApp();
   render(<GarageApp />);
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: 'Add a car' }));
@@ -464,7 +471,7 @@ describe.each([
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', authenticated ? 'https://garage.supabase.co' : '');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', authenticated ? 'test-key' : '');
     if (authenticated) cloud.emit(account());
-    const { GarageApp } = await import('./garage-app');
+    const GarageApp = await loadGarageTestApp();
     const app = render(<GarageApp />);
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Add a car' }));
@@ -479,7 +486,7 @@ describe.each([
     }
     await user.selectOptions(dialog.getByLabelText('Distance unit'), 'kilometers');
     await user.click(dialog.getByRole('button', { name: 'Add car' }));
-    await screen.findByRole('tab', { name: 'Metric driver' });
+    await screen.findByRole('link', { name: 'Metric driver' });
     expect(screen.getByText(/100 km current odometer/)).toBeDefined();
     await user.click(screen.getByRole('button', { name: 'Add task' }));
     dialog = within(screen.getByRole('dialog', { name: 'Add maintenance task' }));
@@ -517,9 +524,10 @@ describe.each([
     });
     expect(saved.visits[0].odometer).toBe(1200);
     app.unmount();
+    testRouter.reset();
     render(<GarageApp />);
     await screen.findByText('Metric driver');
-    await user.click(screen.getAllByRole('button', { name: 'My cars' })[0]);
+    await user.click(screen.getAllByRole('link', { name: 'My cars' })[0]);
     await user.click(screen.getByRole('button', { name: 'Edit car' }));
     dialog = within(screen.getByRole('dialog', { name: 'Edit car' }));
     const unit = dialog.getByLabelText('Distance unit') as HTMLInputElement;
@@ -554,10 +562,10 @@ it('sorts mixed-unit history by equivalent distance and refreshes a new visit re
   });
   await local.saveVisit({ ...visit, odometer: 1000 });
   await local.saveVisit({ ...visit, id: 'metric-visit', carId: 'metric', odometer: 1600 });
-  const { GarageApp } = await import('./garage-app');
+  const GarageApp = await loadGarageTestApp();
   render(<GarageApp />);
   const user = userEvent.setup();
-  await user.click((await screen.findAllByRole('button', { name: 'Service history' }))[0]);
+  await user.click((await screen.findAllByRole('link', { name: 'Service history' }))[0]);
   await user.selectOptions(screen.getByLabelText('Sort service history'), 'odometer_high');
   const rows = within(screen.getByRole('table')).getAllByRole('row').slice(1);
   expect(rows[0].textContent).toContain('1,000 mi');
@@ -576,13 +584,13 @@ it('lets guests leave the auth form and shows confirmation-pending signup feedba
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://garage.supabase.co');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
   cloud.requireConfirmation();
-  const { GarageApp } = await import('./garage-app');
+  const GarageApp = await loadGarageTestApp();
   render(<GarageApp />);
   const user = userEvent.setup();
-  await user.click(await screen.findByRole('button', { name: 'Sign in' }));
+  await user.click(await screen.findByRole('link', { name: 'Sign in' }));
   await user.click(screen.getByRole('button', { name: 'Continue without an account' }));
   expect(screen.getByRole('button', { name: 'Add a car' })).toBeDefined();
-  await user.click(screen.getByRole('button', { name: 'Create account' }));
+  await user.click(screen.getByRole('link', { name: 'Create account' }));
   await user.type(screen.getByLabelText('Email'), 'new@example.com');
   await user.type(screen.getByLabelText('Password'), 'password');
   await user.click(screen.getByRole('button', { name: 'Create account' }));
@@ -596,7 +604,7 @@ it('offers retry and sign-out after an authenticated cloud load failure', async 
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
   cloud.emit(account());
   cloud.execute.mockResolvedValueOnce({ data: null, error: new Error('Cloud unavailable') });
-  const { GarageApp } = await import('./garage-app');
+  const GarageApp = await loadGarageTestApp();
   render(<GarageApp />);
   await screen.findByRole('alert');
   expect(screen.queryByRole('button', { name: 'Add a car' })).toBeNull();
@@ -616,10 +624,10 @@ it('updates an existing missing-photo error when the language changes', async ()
     ...visit,
     photos: [{ id: 'missing', name: 'receipt.webp', path: 'missing', contentType: 'image/webp' }],
   });
-  const { GarageApp } = await import('./garage-app');
+  const GarageApp = await loadGarageTestApp();
   render(<GarageApp />);
   const user = userEvent.setup();
-  await user.click(await screen.findByRole('button', { name: 'Historial de servicio' }));
+  await user.click(await screen.findByRole('link', { name: 'Historial de servicio' }));
   await user.click(screen.getByRole('button', { name: 'Oil change' }));
   await user.click(screen.getByRole('button', { name: 'receipt.webp' }));
   await screen.findByText(
@@ -643,10 +651,10 @@ it('localizes a recognized auth failure and confirmation notice while preserving
     code: 'invalid_credentials',
     message: 'Private diagnostic',
   });
-  const { GarageApp } = await import('./garage-app');
+  const GarageApp = await loadGarageTestApp();
   render(<GarageApp />);
   const user = userEvent.setup();
-  await user.click(await screen.findByRole('button', { name: 'Sign in' }));
+  await user.click(await screen.findByRole('link', { name: 'Sign in' }));
   await user.type(screen.getByLabelText('Email'), 'new@example.com');
   await user.type(screen.getByLabelText('Password'), 'password');
   await user.click(screen.getByRole('button', { name: 'Sign in' }));
@@ -689,7 +697,7 @@ it('hides language selection during a transfer, allows it in recovery, and retai
     await gate;
     return { data: null, error: new Error('Private provider details') };
   });
-  const { GarageApp } = await import('./garage-app');
+  const GarageApp = await loadGarageTestApp();
   const user = userEvent.setup();
   render(<GarageApp />);
   expect(screen.getByRole('heading', { name: 'Opening your garage' })).toBeDefined();
@@ -712,7 +720,7 @@ it('hides language selection during a transfer, allows it in recovery, and retai
   await screen.findByRole('heading', { name: 'Tu garaje de un vistazo' });
   expect((await createRepository(account().id).load()).cars).toEqual([car]);
   await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
-  await screen.findByRole('button', { name: 'Crear cuenta' });
+  await screen.findByRole('link', { name: 'Crear cuenta' });
   expect(screen.getByRole('combobox', { name: 'Idioma' })).toHaveProperty('value', 'es');
   expect(localStorage.getItem('garage-guardian:locale')).toBe('es');
 });

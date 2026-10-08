@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { carPath } from '@/lib/garage-routes';
 import { useTranslations } from 'next-intl';
 import {
   ArrowRight,
@@ -25,16 +27,12 @@ export function Dashboard({
   allDue,
   onAddCar,
   onAddVisit,
-  onViewCar,
-  onViewAll,
 }: {
   cars: Car[];
   visits: Visit[];
   allDue: DueItem[];
   onAddCar: () => void;
   onAddVisit: () => void;
-  onViewCar: (id: string) => void;
-  onViewAll: () => void;
 }) {
   const t = useTranslations();
   const { number, money, displayDate, formatDistance } = useDisplay();
@@ -109,11 +107,7 @@ export function Dashboard({
               {due.length + upcoming.length ? (
                 <div className="due-list">
                   {[...due, ...upcoming].slice(0, 6).map((item) => (
-                    <DueRow
-                      key={item.schedule.id}
-                      item={item}
-                      onClick={() => onViewCar(item.car.id)}
-                    />
+                    <DueRow key={item.schedule.id} item={item} href={carPath(item.car.id)} />
                   ))}
                 </div>
               ) : (
@@ -145,7 +139,7 @@ export function Dashboard({
                     (item) => item.car.id === car.id && item.status === 'due',
                   ).length;
                   return (
-                    <button className="vehicle-row" key={car.id} onClick={() => onViewCar(car.id)}>
+                    <Link className="vehicle-row" key={car.id} href={carPath(car.id)}>
                       <span className="vehicle-icon">
                         <CarFront size={22} />
                       </span>
@@ -160,7 +154,7 @@ export function Dashboard({
                         <span className="tiny-alert">{t('dashboard.dueCount', { count })}</span>
                       )}
                       <ArrowRight size={17} />
-                    </button>
+                    </Link>
                   );
                 })}
               </div>
@@ -175,10 +169,10 @@ export function Dashboard({
                 <span className="eyebrow">{t('dashboard.activity')}</span>
                 <h2>{t('dashboard.recent')}</h2>
               </div>
-              <button className="text-link" onClick={onViewAll}>
+              <Link className="text-link" href="/history">
                 {t('dashboard.viewAll')}
                 <ArrowRight size={16} />
-              </button>
+              </Link>
             </div>
             {visits.length ? (
               <div className="recent-list">
