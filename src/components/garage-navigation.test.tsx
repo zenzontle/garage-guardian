@@ -218,22 +218,37 @@ it('returns from account screens to a bookmark, preserves email between modes an
   expect(screen.getByLabelText('Email')).toHaveProperty('value', 'me@example.com');
   expect(screen.getByLabelText('Password')).toHaveProperty('value', '');
   expect(screen.queryByRole('alert')).toBeNull();
+  expect(testRouter.entries).toEqual(['/cars/second', accountPath('signup', '/cars/second')]);
+  await user.click(screen.getByRole('button', { name: 'Already have an account? Sign in' }));
+  await user.click(screen.getByRole('button', { name: 'Create an account' }));
+  expect(testRouter.entries).toEqual(['/cars/second', accountPath('signup', '/cars/second')]);
   await user.click(screen.getByRole('button', { name: 'Continue without an account' }));
   expect(testRouter.url).toBe('/cars/second');
   expect(screen.getByRole('heading', { name: 'Second vehicle' })).toBeDefined();
+  act(() => testRouter.back());
+  expect(testRouter.url).toBe('/cars/second');
+  expect(screen.queryByLabelText('Password')).toBeNull();
 });
 
 it('signs in to the original screen, retains it on sign-out, and offers sign-in for unavailable cloud bookmarks', async () => {
   configureCloud();
-  testRouter.reset(accountPath('signin', '/cars/private'));
+  testRouter.reset('/cars/private');
   const App = await loadGarageTestApp();
   render(<App />);
   const user = userEvent.setup();
+  await screen.findByText('Vehicle unavailable');
+  await user.click(screen.getAllByRole('link', { name: 'Sign in' })[0]);
+  await user.click(screen.getByRole('button', { name: 'Create an account' }));
+  await user.click(screen.getByRole('button', { name: 'Already have an account? Sign in' }));
   await user.type(await screen.findByLabelText('Email'), 'me@example.com');
   await user.type(screen.getByLabelText('Password'), 'password');
   await user.click(screen.getByRole('button', { name: 'Sign in' }));
   await screen.findByText('Vehicle unavailable');
   expect(testRouter.url).toBe('/cars/private');
+  expect(testRouter.entries).toEqual(['/cars/private', '/cars/private']);
+  act(() => testRouter.back());
+  expect(testRouter.url).toBe('/cars/private');
+  expect(screen.queryByLabelText('Password')).toBeNull();
   await user.click(screen.getByRole('button', { name: 'Sign out' }));
   await screen.findByText('Vehicle unavailable');
   expect(testRouter.url).toBe('/cars/private');

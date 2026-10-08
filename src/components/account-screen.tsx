@@ -22,7 +22,7 @@ export function AccountScreen({ mode, returnTo }: { mode: AccountMode; returnTo:
       mode={mode}
       email={garage.accountEmail}
       onEmailChange={garage.setAccountEmail}
-      onMode={(next) => router.push(accountPath(next, returnTo))}
+      onMode={(next) => router.replace(accountPath(next, returnTo))}
       onClose={() => router.replace(returnTo)}
       onSubmit={async (email, password) => {
         if (mode === 'signup') {
