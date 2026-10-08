@@ -11,11 +11,13 @@ import { navigation, type Page } from './garage-navigation';
 export function GarageSidebar({
   page,
   menuOpen,
+  onNavigate,
   carCount,
   user,
 }: {
   page: Page;
   menuOpen: boolean;
+  onNavigate: () => void;
   carCount: number;
   user: { email?: string } | null;
 }) {
@@ -38,6 +40,7 @@ export function GarageSidebar({
             key={id}
             className={`nav-link ${page === id ? 'active' : ''}`}
             href={workspacePaths[id]}
+            onClick={onNavigate}
             aria-current={page === id ? 'page' : undefined}
           >
             <Icon size={19} />

@@ -145,6 +145,32 @@ it('closes dialogs and the mobile menu on browser navigation', async () => {
   expect(screen.queryByRole('dialog')).toBeNull();
 });
 
+it.each(['/', '/cars', '/history', '/reports'])(
+  'closes the mobile drawer when its active link is selected at %s',
+  async (url) => {
+    testRouter.reset(url);
+    const App = await loadGarageTestApp();
+    const app = render(<App />);
+    const user = userEvent.setup();
+    const menu = await screen.findByRole('button', { name: 'Open menu' });
+    const activeLink = within(screen.getByRole('navigation', { name: 'Main navigation' }))
+      .getAllByRole('link')
+      .find((link) => link.getAttribute('aria-current') === 'page')!;
+
+    await user.click(menu);
+    expect(app.container.querySelector('.sidebar.open')).not.toBeNull();
+    await user.click(activeLink);
+    expect(app.container.querySelector('.sidebar.open')).toBeNull();
+    expect(testRouter.url).toBe(url);
+
+    await user.click(menu);
+    activeLink.focus();
+    await user.keyboard('{Enter}');
+    expect(app.container.querySelector('.sidebar.open')).toBeNull();
+    expect(testRouter.url).toBe(url);
+  },
+);
+
 it('retains a vehicle after failed edit/delete, and replaces the URL only after successful deletion', async () => {
   const { LocalRepository } = await seed();
   testRouter.reset(carPath(car.id));

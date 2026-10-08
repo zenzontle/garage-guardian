@@ -104,6 +104,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
         <GarageSidebar
           page={page}
           menuOpen={menuOpen}
+          onNavigate={() => setMenuOpen(false)}
           carCount={snapshot.cars.length}
           user={user}
         />
