@@ -38,6 +38,88 @@ function configureCloud() {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
 }
 
+it('moves vehicle-link focus without navigating until Enter and retains native Tab stops', async () => {
+  await seed();
+  testRouter.reset(carPath(car.id));
+  const App = await loadGarageTestApp();
+  render(<App />);
+  const user = userEvent.setup();
+  const first = await screen.findByRole('link', { name: car.name });
+  const second = screen.getByRole('link', { name: 'Second vehicle' });
+  const scroll = vi.fn();
+  first.scrollIntoView = second.scrollIntoView = scroll;
+  first.focus();
+  await user.keyboard('{ArrowLeft}');
+  expect(document.activeElement).toBe(second);
+  expect(testRouter.url).toBe(carPath(car.id));
+  await user.keyboard('{ArrowRight}');
+  expect(document.activeElement).toBe(first);
+  await user.keyboard('{End}');
+  expect(document.activeElement).toBe(second);
+  await user.keyboard('{Home}');
+  expect(document.activeElement).toBe(first);
+  await user.keyboard('{Control>}{ArrowRight}{/Control}');
+  expect(document.activeElement).toBe(first);
+  await user.tab();
+  expect(document.activeElement).toBe(second);
+  expect(first.tabIndex).toBe(0);
+  expect(second.tabIndex).toBe(0);
+  expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+  await user.keyboard('{Enter}');
+  expect(testRouter.url).toBe('/cars/second');
+  expect(second.getAttribute('aria-current')).toBe('page');
+  act(() => testRouter.back());
+  expect(first.getAttribute('aria-current')).toBe('page');
+});
+
+it('announces drawer state, focuses its active link, and closes on Escape, blur and desktop resize', async () => {
+  let matches = true;
+  const listeners = new Set<() => void>();
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      get matches() {
+        return matches;
+      },
+      addEventListener: (_event: string, listener: () => void) => listeners.add(listener),
+      removeEventListener: (_event: string, listener: () => void) => listeners.delete(listener),
+    })),
+  );
+  const App = await loadGarageTestApp();
+  const app = render(<App />);
+  const user = userEvent.setup();
+  const trigger = await screen.findByRole('button', { name: 'Open menu' });
+  const sidebar = document.getElementById(trigger.getAttribute('aria-controls')!);
+  expect(sidebar).not.toBeNull();
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  await user.click(trigger);
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  expect(trigger.getAttribute('aria-label')).toBe('Close menu');
+  const current = within(sidebar!).getByRole('link', { name: 'Dashboard' });
+  expect(document.activeElement).toBe(current);
+  await user.keyboard('{Escape}');
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(trigger);
+  await user.click(trigger);
+  const add = screen.getByRole('button', { name: 'Add a car' });
+  act(() => add.focus());
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(add);
+  await user.click(trigger);
+  act(() => trigger.focus());
+  await user.tab();
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  await user.click(trigger);
+  act(() => {
+    matches = false;
+    listeners.forEach((listener) => listener());
+  });
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(current);
+  app.unmount();
+  expect(listeners.size).toBe(0);
+});
+
 it('retraces screens and vehicles with Back/Forward without reloading the garage, and restores a bookmark', async () => {
   const { LocalRepository } = await seed();
   const loads = vi.spyOn(LocalRepository.prototype, 'load');

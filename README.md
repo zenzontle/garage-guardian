@@ -21,6 +21,16 @@ bookmarks depend on data stored in that browser and origin; cloud bookmarks requ
 access to the vehicle in the current account. Dialogs and history/report filters remain
 local UI state and are not restored from URLs. No database migration is required.
 
+Vehicle links support Left/Right (with wrapping) and Home/End to move focus; Enter
+opens the focused vehicle. Every link also remains reachable with Tab. On phones,
+opening the navigation drawer focuses the current page link; Escape closes it and
+returns focus to the menu button. The drawer also closes when focus leaves or the
+viewport becomes desktop.
+
+Service history uses stacked visit cards at widths of 720px and below and a table
+above that breakpoint. Both views share filters, sorting, CSV export, and expanded
+visit details. Shared styles use larger text and a minimum 44px target for actions.
+
 ## Languages
 
 Use the **English / Español** selector in the header, account screens, or open dialogs. The first render is English on both server and client. After mounting, the app uses a valid saved choice, otherwise the first supported browser language (including regional variants such as `es-MX`), with English fallback. Explicit choices are stored under `garage-guardian:locale` in local storage, independently of accounts and garage data, and survive reload, sign-in, and sign-out. If storage is unavailable, switching still works for the current session. The document's `lang` follows the resolved language. Switching updates provider values without remounting forms or restarting transfers.

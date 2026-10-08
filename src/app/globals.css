@@ -34,7 +34,7 @@ body {
     BlinkMacSystemFont,
     'Segoe UI',
     sans-serif;
-  font-size: 14px;
+  font-size: 1rem;
   line-height: 1.5;
 }
 button,
@@ -45,6 +45,8 @@ textarea {
 }
 button {
   cursor: pointer;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
 }
 button:disabled {
   cursor: not-allowed;
@@ -101,21 +103,21 @@ a {
 }
 .brand strong {
   display: block;
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.2;
   letter-spacing: -0.04em;
 }
 .brand small {
   display: block;
   color: var(--muted);
-  font-size: 9px;
+  font-size: 0.875rem;
   font-weight: 800;
   letter-spacing: 0.15em;
   margin-top: 4px;
 }
 .sidebar-label,
 .eyebrow {
-  font-size: 10px;
+  font-size: 0.875rem;
   font-weight: 800;
   letter-spacing: 0.13em;
   color: var(--muted);
@@ -195,11 +197,11 @@ a {
   text-overflow: ellipsis;
 }
 .sidebar-summary strong {
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .sidebar-summary small,
 .account-line small {
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .account-line {
@@ -224,11 +226,11 @@ a {
   flex: 1;
 }
 .account-line strong {
-  font-size: 11px;
+  font-size: 0.875rem;
 }
 .account-line .icon-button {
-  width: 28px;
-  height: 28px;
+  width: 2.75rem;
+  height: 2.75rem;
 }
 .main-wrap {
   flex: 1;
@@ -244,7 +246,7 @@ a {
   padding: 0 42px;
 }
 .breadcrumbs {
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--muted);
   letter-spacing: 0.08em;
   font-weight: 800;
@@ -261,7 +263,7 @@ a {
   gap: 8px;
   align-items: center;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .content {
   max-width: 1450px;
@@ -276,7 +278,7 @@ a {
   margin-bottom: 29px;
 }
 .page-heading h1 {
-  font-size: 30px;
+  font-size: 1.875rem;
   letter-spacing: -0.045em;
   line-height: 1.2;
   margin: 7px 0 7px;
@@ -285,7 +287,7 @@ a {
 .page-heading p {
   margin: 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.875rem;
 }
 .heading-action {
   padding-top: 7px;
@@ -294,14 +296,14 @@ a {
   border: 1px solid transparent;
   border-radius: 8px;
   padding: 10px 15px;
-  min-height: 39px;
+  min-height: 2.75rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   font-weight: 700;
-  font-size: 12px;
-  white-space: nowrap;
+  font-size: 0.875rem;
+  white-space: normal;
   transition:
     background 0.15s,
     transform 0.15s;
@@ -335,8 +337,10 @@ a {
   gap: 6px;
   align-items: center;
   font-weight: 750;
-  font-size: 12px;
+  font-size: 0.875rem;
   padding: 6px 0;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
 }
 .text-link:hover {
   text-decoration: underline;
@@ -348,8 +352,9 @@ a {
   display: inline-grid;
   place-items: center;
   border-radius: 7px;
-  width: 31px;
-  height: 31px;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex-shrink: 0;
 }
 .icon-button:hover {
   background: var(--surface-raised);
@@ -364,7 +369,7 @@ a {
 }
 .error-text {
   color: var(--orange);
-  font-size: 12px;
+  font-size: 0.875rem;
   margin: 0;
 }
 .error-banner,
@@ -378,7 +383,7 @@ a {
   border-radius: 9px;
   padding: 11px 13px;
   margin-bottom: 18px;
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .error-banner button {
   margin-left: auto;
@@ -440,20 +445,20 @@ a {
   background: var(--orange-soft);
 }
 .stat-label {
-  font-size: 12px;
+  font-size: 0.875rem;
   color: var(--muted);
   font-weight: 650;
 }
 .stat-card > strong {
   display: block;
-  font-size: 29px;
+  font-size: 1.8125rem;
   line-height: 1.1;
   letter-spacing: -0.06em;
 }
 .stat-card > small {
   display: block;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.875rem;
   margin-top: 7px;
 }
 .panel {
@@ -481,12 +486,12 @@ a {
   margin-bottom: 18px;
 }
 .section-heading h2 {
-  font-size: 17px;
+  font-size: 1.0625rem;
   letter-spacing: -0.035em;
   margin: 5px 0 0;
 }
 .count-badge {
-  font-size: 12px;
+  font-size: 0.875rem;
   font-weight: 750;
   background: var(--green-soft);
   color: var(--green);
@@ -558,7 +563,7 @@ a {
 .recent-main strong,
 .schedule-main strong {
   display: block;
-  font-size: 12px;
+  font-size: 0.875rem;
   font-weight: 750;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -569,7 +574,7 @@ a {
 .recent-main small,
 .schedule-main small {
   display: block;
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--muted);
   margin-top: 3px;
   overflow: hidden;
@@ -577,7 +582,7 @@ a {
   white-space: nowrap;
 }
 .status-pill {
-  font-size: 10px;
+  font-size: 0.875rem;
   font-weight: 750;
   padding: 4px 8px;
   border-radius: 30px;
@@ -606,7 +611,7 @@ a {
   gap: 8px;
   align-items: center;
   color: var(--yellow);
-  font-size: 11px;
+  font-size: 0.875rem;
   border-top: 1px solid var(--line);
   padding-top: 13px;
   margin-top: 8px;
@@ -619,7 +624,7 @@ a {
   border-radius: 9px;
 }
 .tiny-alert {
-  font-size: 10px;
+  font-size: 0.875rem;
   color: var(--orange);
   background: var(--orange-soft);
   padding: 4px 7px;
@@ -634,11 +639,11 @@ a {
 }
 .panel-empty strong {
   color: var(--text);
-  font-size: 13px;
+  font-size: 0.875rem;
 }
 .panel-empty p {
   margin: 3px 0 0;
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .recent-panel {
@@ -655,7 +660,7 @@ a {
   border-top: 0;
 }
 .recent-row > strong {
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .service-icon {
   width: 34px;
@@ -687,14 +692,14 @@ a {
   margin-bottom: 15px;
 }
 .empty-hero h2 {
-  font-size: 21px;
+  font-size: 1.3125rem;
   letter-spacing: -0.04em;
   margin: 0 0 7px;
 }
 .empty-hero p {
   max-width: 380px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 0.875rem;
   margin: 0 0 22px;
 }
 .empty-panel {
@@ -717,12 +722,12 @@ a {
 .empty-panel h2 {
   margin: 0;
   color: var(--text);
-  font-size: 18px;
+  font-size: 1.125rem;
   letter-spacing: -0.03em;
 }
 .empty-panel p {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.875rem;
   margin: 5px 0 16px;
 }
 .car-switcher {
@@ -742,6 +747,8 @@ a {
   gap: 8px;
   font-weight: 700;
   white-space: nowrap;
+  min-height: 2.75rem;
+  flex-shrink: 0;
 }
 .car-tab.active {
   background: var(--green);
@@ -770,7 +777,7 @@ a {
   min-width: 0;
 }
 .car-header h2 {
-  font-size: 22px;
+  font-size: 1.375rem;
   letter-spacing: -0.04em;
   margin: 3px 0;
 }
@@ -780,7 +787,7 @@ a {
   gap: 6px;
   color: var(--muted);
   margin: 0;
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .car-header .car-plate {
   display: block;
@@ -798,7 +805,7 @@ a {
   gap: 18px;
 }
 .section-hint {
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--muted);
   margin: -8px 0 14px;
 }
@@ -836,7 +843,7 @@ a {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0 11px;
-  height: 39px;
+  min-height: 2.75rem;
   flex: 1;
   min-width: 180px;
   color: var(--muted);
@@ -845,23 +852,23 @@ a {
   border: 0;
   outline: 0;
   width: 100%;
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .table-toolbar select,
 .report-filters select {
-  height: 39px;
+  min-height: 2.75rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
   padding: 0 11px;
   color: var(--text);
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .date-filter {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .date-filter input {
@@ -869,11 +876,12 @@ a {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 9px;
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--text);
 }
 .table-scroll {
   overflow: auto;
+  position: relative;
 }
 table {
   border-collapse: collapse;
@@ -882,7 +890,7 @@ table {
   text-align: left;
 }
 th {
-  font-size: 10px;
+  font-size: 0.875rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--muted);
@@ -893,7 +901,7 @@ th {
 }
 td {
   padding: 15px 18px;
-  font-size: 12px;
+  font-size: 0.875rem;
   color: var(--muted);
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
@@ -909,10 +917,11 @@ td strong {
   background: none;
   border: 0;
   color: var(--green);
-  font-size: 12px;
+  font-size: 0.875rem;
   text-align: left;
   padding: 0;
   font-weight: 650;
+  overflow-wrap: anywhere;
 }
 .row-actions {
   display: flex;
@@ -927,7 +936,7 @@ td strong {
   gap: 25px;
 }
 .visit-detail strong {
-  font-size: 11px;
+  font-size: 0.875rem;
 }
 .visit-detail p {
   margin: 3px 0;
@@ -941,7 +950,7 @@ td strong {
 .table-footer {
   padding: 13px 18px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.875rem;
 }
 .report-filters {
   display: flex;
@@ -961,14 +970,14 @@ td strong {
   padding: 22px;
 }
 .report-total strong {
-  font-size: 31px;
+  font-size: 1.9375rem;
   letter-spacing: -0.05em;
   display: block;
   margin: 8px 0 1px;
 }
 .report-total small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.875rem;
 }
 .report-grid {
   display: grid;
@@ -985,7 +994,7 @@ td strong {
   grid-template-columns: 68px 1fr 80px;
   align-items: center;
   gap: 12px;
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .bar-row strong {
@@ -1010,7 +1019,7 @@ td strong {
   padding: 11px 0;
   border-top: 1px solid var(--line);
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .breakdown-row:first-child {
   border-top: 0;
@@ -1048,13 +1057,13 @@ td strong {
 }
 .modal-header h2 {
   margin: 0;
-  font-size: 20px;
+  font-size: 1.25rem;
   letter-spacing: -0.04em;
 }
 .modal-header p {
   margin: 4px 0 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .modal-body {
   padding: 23px 25px;
@@ -1067,7 +1076,7 @@ td strong {
   display: grid;
   gap: 6px;
   color: var(--text);
-  font-size: 11px;
+  font-size: 0.875rem;
   font-weight: 750;
 }
 .form-stack input:not([type='file']):not([type='checkbox']),
@@ -1080,8 +1089,8 @@ td strong {
   padding: 10px 11px;
   color: var(--text);
   outline: 0;
-  font-size: 12px;
-  min-height: 39px;
+  font-size: 0.875rem;
+  min-height: 2.75rem;
 }
 .form-stack input:focus,
 .form-stack select:focus,
@@ -1105,7 +1114,7 @@ td strong {
   font-weight: 500;
 }
 .field-help {
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--muted);
   margin: -7px 0 0;
 }
@@ -1118,7 +1127,8 @@ td strong {
   align-items: center;
   gap: 8px;
   color: var(--text);
-  font-size: 12px;
+  font-size: 0.875rem;
+  min-height: 2.75rem;
 }
 .checkbox-line input {
   accent-color: var(--green);
@@ -1132,7 +1142,7 @@ td strong {
   border-radius: 8px;
   padding: 11px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.875rem;
 }
 .info-callout svg {
   flex: none;
@@ -1157,28 +1167,28 @@ td strong {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 9px;
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .item-editor-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 130px 28px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 190px 2.75rem;
   gap: 6px;
   align-items: center;
   margin-top: 7px;
 }
 .item-editor-row .icon-button {
-  width: 28px;
+  width: 2.75rem;
 }
 .photo-picker {
   display: grid;
   gap: 7px;
 }
 .photo-picker input {
-  font-size: 11px;
+  font-size: 0.875rem;
 }
 .photo-picker small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.875rem;
 }
 .file-chip {
   display: inline-flex;
@@ -1190,7 +1200,7 @@ td strong {
   padding: 4px 9px;
   width: max-content;
   max-width: 100%;
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--muted);
 }
 .file-chip button {
@@ -1219,13 +1229,13 @@ td strong {
   padding: 0;
 }
 .auth-card h1 {
-  font-size: 27px;
+  font-size: 1.6875rem;
   letter-spacing: -0.05em;
   margin: 38px 0 3px;
 }
 .auth-card p {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.875rem;
   margin: 0 0 25px;
 }
 .auth-card .subtle {
@@ -1287,7 +1297,7 @@ td strong {
     margin-right: auto;
   }
   .today-pill {
-    font-size: 0;
+    display: none;
   }
   .today-pill svg {
     width: 18px;
@@ -1302,18 +1312,18 @@ td strong {
     gap: 14px;
   }
   .page-heading h1 {
-    font-size: 25px;
+    font-size: 1.5625rem;
   }
   .page-heading p {
-    font-size: 12px;
+    font-size: 0.875rem;
   }
   .heading-action {
     padding-top: 3px;
   }
   .heading-action .button {
-    font-size: 0;
+    font-size: 0.875rem;
     padding: 9px;
-    min-width: 38px;
+    min-width: 2.75rem;
   }
   .heading-action .button svg {
     width: 19px;
@@ -1327,13 +1337,13 @@ td strong {
     min-height: 125px;
   }
   .stat-card > strong {
-    font-size: 23px;
+    font-size: 1.4375rem;
   }
   .stat-label {
-    font-size: 11px;
+    font-size: 0.875rem;
   }
   .stat-card > small {
-    font-size: 10px;
+    font-size: 0.875rem;
   }
   .dashboard-grid .panel,
   .car-content-grid .panel,
@@ -1352,7 +1362,7 @@ td strong {
     flex: 1;
   }
   .car-header-copy h2 {
-    font-size: 19px;
+    font-size: 1.1875rem;
   }
   .mobile-tabs {
     display: flex;
@@ -1362,7 +1372,7 @@ td strong {
     right: 0;
     background: var(--surface);
     border-top: 1px solid var(--line);
-    height: 65px;
+    min-height: calc(4.5rem + env(safe-area-inset-bottom));
     z-index: 40;
     justify-content: space-around;
     padding-bottom: env(safe-area-inset-bottom);
@@ -1376,9 +1386,10 @@ td strong {
     flex-direction: column;
     gap: 3px;
     padding: 10px 4px;
-    font-size: 10px;
+    font-size: 0.75rem;
     font-weight: 750;
-    min-width: 63px;
+    min-width: 0;
+    flex: 1;
   }
   .mobile-tabs a.active {
     color: var(--green);
@@ -1390,7 +1401,7 @@ td strong {
     padding: 16px;
   }
   .report-total strong {
-    font-size: 23px;
+    font-size: 1.4375rem;
   }
   .bar-row {
     grid-template-columns: 55px 1fr 69px;
@@ -1427,8 +1438,8 @@ td strong {
   .sidebar.open {
     display: flex;
     position: fixed;
-    top: 56px;
-    bottom: 65px;
+    top: 5.5rem;
+    bottom: calc(4.5rem + env(safe-area-inset-bottom));
     height: auto;
     width: 245px;
     box-shadow: 10px 0 30px rgba(0, 0, 0, 0.08);
@@ -1462,13 +1473,13 @@ td strong {
   }
   .schedule-row {
     display: grid;
-    grid-template-columns: 9px minmax(0, 1fr) 28px 28px;
+    grid-template-columns: 9px minmax(0, 1fr) 2.75rem 2.75rem;
   }
   .schedule-row .status-pill {
     display: none;
   }
   .schedule-row .icon-button {
-    width: 28px;
+    width: 2.75rem;
   }
   .schedule-main {
     min-width: 0;
@@ -1480,7 +1491,7 @@ td strong {
   min-width: 0;
 }
 .form-stack .money-input input {
-  padding-right: 27px;
+  padding-right: 11px;
   min-width: 0;
   appearance: textfield;
   -moz-appearance: textfield;
@@ -1491,18 +1502,13 @@ td strong {
   margin: 0;
 }
 .money-steppers {
-  position: absolute;
-  right: 5px;
-  top: 5px;
-  bottom: 5px;
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  width: 20px;
+  display: flex;
+  gap: 0.25rem;
 }
 .money-steppers button {
   display: grid;
   place-items: center;
-  padding: 0;
+  padding: 0.5rem;
   border: 0;
   background: transparent;
   color: var(--muted);
@@ -1544,7 +1550,7 @@ textarea::placeholder {
   color: var(--on-accent);
 }
 .brand small {
-  font-size: 8px;
+  font-size: 0.875rem;
   letter-spacing: 0.12em;
   white-space: nowrap;
 }
@@ -1570,7 +1576,7 @@ textarea::placeholder {
   flex-wrap: wrap;
   margin-bottom: 24px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .account-actions,
 .recovery-actions {
@@ -1582,7 +1588,7 @@ textarea::placeholder {
   margin-top: 16px;
 }
 .storage-account .button {
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .auth-card .error-text {
   color: var(--orange);
@@ -1621,7 +1627,7 @@ textarea::placeholder {
   padding: 10px 9px;
   min-height: 44px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 0.875rem;
   cursor: pointer;
   overflow-wrap: anywhere;
 }
@@ -1631,7 +1637,7 @@ textarea::placeholder {
   color: var(--green);
 }
 .combobox-help {
-  font-size: 11px;
+  font-size: 0.875rem;
   color: var(--muted);
   font-weight: 400;
 }
@@ -1643,7 +1649,7 @@ textarea::placeholder {
   background: none;
   text-decoration: underline;
   color: var(--green);
-  font-size: 11px;
+  font-size: 0.875rem;
 }
 .bug-report-launcher {
   position: fixed;
@@ -1663,7 +1669,7 @@ textarea::placeholder {
 .bug-report-diagnostic pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 12px;
+  font-size: 0.875rem;
   line-height: 1.6;
   background: var(--surface-raised);
   border: 1px solid var(--line);
@@ -1681,7 +1687,7 @@ textarea::placeholder {
   min-width: 0;
 }
 .bug-report-diagnostics legend {
-  font-size: 12px;
+  font-size: 0.875rem;
   font-weight: 700;
 }
 .bug-report-diagnostic {
@@ -1706,7 +1712,7 @@ textarea::placeholder {
 .bug-report-screenshots figcaption {
   display: grid;
   gap: 8px;
-  font-size: 12px;
+  font-size: 0.875rem;
 }
 .bug-report-modal summary {
   cursor: pointer;

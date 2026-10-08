@@ -66,7 +66,40 @@ export function CarsPage({
         />
       ) : (
         <>
-          <nav className="car-switcher" aria-label={t('car.choose')}>
+          <nav
+            className="car-switcher"
+            aria-label={t('car.choose')}
+            onFocusCapture={(event) =>
+              event.target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+            }
+            onKeyDown={(event) => {
+              if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+              const links = Array.from(
+                event.currentTarget.querySelectorAll<HTMLAnchorElement>('a'),
+              );
+              const index = links.indexOf(event.target as HTMLAnchorElement);
+              if (index < 0) return;
+              let next: number;
+              switch (event.key) {
+                case 'ArrowLeft':
+                  next = (index - 1 + links.length) % links.length;
+                  break;
+                case 'ArrowRight':
+                  next = (index + 1) % links.length;
+                  break;
+                case 'Home':
+                  next = 0;
+                  break;
+                case 'End':
+                  next = links.length - 1;
+                  break;
+                default:
+                  return;
+              }
+              event.preventDefault();
+              links[next].focus();
+            }}
+          >
             {cars.map((item) => (
               <Link
                 href={carPath(item.id)}

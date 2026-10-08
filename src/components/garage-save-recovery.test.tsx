@@ -124,7 +124,7 @@ describe.each(['local', 'cloud'] as const)('%s save recovery', (mode) => {
     await act(async () => {
       release();
     });
-    await screen.findByRole('button', { name: 'Saved service' });
+    await within(await screen.findByRole('table')).findByRole('button', { name: 'Saved service' });
     expect(screen.queryByRole('alert')).toBeNull();
     expect(save).toHaveBeenCalledOnce();
     expect(upload).toHaveBeenCalledOnce();
@@ -184,7 +184,9 @@ describe.each(['local', 'cloud'] as const)('%s save recovery', (mode) => {
     app.unmount();
     const GarageApp = await loadGarageTestApp();
     render(<GarageApp />);
-    await user.click(await screen.findByRole('button', { name: 'Edit visit' }));
+    await user.click(
+      within(await screen.findByRole('table')).getByRole('button', { name: 'Edit visit' }),
+    );
     const element = screen.getByRole('dialog');
     const dialog = within(element);
     await user.click(dialog.getByRole('button', { name: 'Remove old.webp' }));

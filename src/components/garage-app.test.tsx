@@ -628,18 +628,19 @@ it('updates an existing missing-photo error when the language changes', async ()
   render(<GarageApp />);
   const user = userEvent.setup();
   await user.click(await screen.findByRole('link', { name: 'Historial de servicio' }));
-  await user.click(screen.getByRole('button', { name: 'Oil change' }));
-  await user.click(screen.getByRole('button', { name: 'receipt.webp' }));
-  await screen.findByText(
+  const history = within(screen.getByRole('table'));
+  await user.click(history.getByRole('button', { name: 'Oil change' }));
+  await user.click(history.getByRole('button', { name: 'receipt.webp' }));
+  await history.findByText(
     'La foto receipt.webp ya no está disponible. Tus registros locales se conservan.',
   );
   await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
   expect(
-    screen.getByText(
+    history.getByText(
       'Photo receipt.webp is no longer available. Your local records have been kept.',
     ),
   ).toBeDefined();
-  expect(screen.getByRole('button', { name: 'Oil change' }).getAttribute('aria-expanded')).toBe(
+  expect(history.getByRole('button', { name: 'Oil change' }).getAttribute('aria-expanded')).toBe(
     'true',
   );
 });

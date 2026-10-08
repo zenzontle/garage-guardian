@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { useCallback, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -42,6 +42,8 @@ export function GarageContent({ children }: { children: ReactNode }) {
     perform,
     currentPath,
   } = garage;
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const closeMenu = useCallback(() => setMenuOpen(false), [setMenuOpen]);
   const pathname = usePathname();
   const router = useRouter();
   const page = workspaceScreen(pathname);
@@ -108,13 +110,19 @@ export function GarageContent({ children }: { children: ReactNode }) {
         <GarageSidebar
           page={page}
           menuOpen={menuOpen}
-          onNavigate={() => setMenuOpen(false)}
+          onNavigate={closeMenu}
+          menuTrigger={menuTrigger}
           carCount={snapshot.cars.length}
           user={user}
         />
 
         <div className="main-wrap">
-          <GarageTopbar page={page} onMenuToggle={() => setMenuOpen(!menuOpen)} />
+          <GarageTopbar
+            page={page}
+            menuOpen={menuOpen}
+            menuTrigger={menuTrigger}
+            onMenuToggle={() => setMenuOpen(!menuOpen)}
+          />
           <main className="content">
             {isCloudConfigured && (
               <div className="storage-account">

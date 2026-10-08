@@ -9,6 +9,7 @@ import { visitsToCsv } from '@/lib/reports';
 import { PageHeading } from './page-heading';
 import { EmptyPanel } from './empty-panel';
 import { HistoryRow } from './history-row';
+import { HistoryCard } from './history-card';
 
 export function HistoryPage({
   cars,
@@ -31,6 +32,15 @@ export function HistoryPage({
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [sort, setSort] = useState('newest');
+  const [expandedVisits, setExpandedVisits] = useState<Set<string>>(() => new Set());
+  function toggleVisit(id: string) {
+    setExpandedVisits((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   const filtered = visits
     .filter(
       (visit) =>
@@ -76,28 +86,34 @@ export function HistoryPage({
         }
       />
       <div className="panel table-panel">
-        <div className="table-toolbar">
-          <div className="search-field">
-            <Search size={18} />
-            <input
-              aria-label={t('history.search')}
-              placeholder={t('history.searchPlaceholder')}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-          <select
-            aria-label={t('history.filterCar')}
-            value={carId}
-            onChange={(e) => setCarId(e.target.value)}
-          >
-            <option value="">{t('shared.allCars')}</option>
-            {cars.map((car) => (
-              <option key={car.id} value={car.id}>
-                {car.name}
-              </option>
-            ))}
-          </select>
+        <div className="table-toolbar history-toolbar">
+          <label className="history-filter history-search">
+            <span>{t('history.search')}</span>
+            <span className="search-field">
+              <Search size={18} />
+              <input
+                aria-label={t('history.search')}
+                placeholder={t('history.searchPlaceholder')}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </span>
+          </label>
+          <label className="history-filter">
+            <span>{t('history.filterCar')}</span>
+            <select
+              aria-label={t('history.filterCar')}
+              value={carId}
+              onChange={(e) => setCarId(e.target.value)}
+            >
+              <option value="">{t('shared.allCars')}</option>
+              {cars.map((car) => (
+                <option key={car.id} value={car.id}>
+                  {car.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="date-filter">
             {t('history.from')}
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -106,53 +122,74 @@ export function HistoryPage({
             {t('history.to')}
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </label>
-          <select
-            aria-label={t('history.sort')}
-            value={sort}
-            onChange={(e) => setSort(e.target.value)}
-          >
-            <option value="newest">{t('history.newest')}</option>
-            <option value="oldest">{t('history.oldest')}</option>
-            <option value="cost_high">{t('history.highCost')}</option>
-            <option value="cost_low">{t('history.lowCost')}</option>
-            <option value="odometer_high">{t('history.highOdometer')}</option>
-          </select>
+          <label className="history-filter">
+            <span>{t('history.sort')}</span>
+            <select
+              aria-label={t('history.sort')}
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              <option value="newest">{t('history.newest')}</option>
+              <option value="oldest">{t('history.oldest')}</option>
+              <option value="cost_high">{t('history.highCost')}</option>
+              <option value="cost_low">{t('history.lowCost')}</option>
+              <option value="odometer_high">{t('history.highOdometer')}</option>
+            </select>
+          </label>
           <button className="button secondary" onClick={downloadCsv} disabled={!filtered.length}>
             <ArrowDownToLine size={17} />
             {t('history.export')}
           </button>
         </div>
         {filtered.length ? (
-          <div className="table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th>{t('shared.date')}</th>
-                  <th>{t('shared.vehicle')}</th>
-                  <th>{t('history.service')}</th>
-                  <th>{t('history.odometer')}</th>
-                  <th>{t('shared.provider')}</th>
-                  <th>{t('history.cost')}</th>
-                  <th>{t('shared.photos')}</th>
-                  <th>
-                    <span className="sr-only">{t('history.actions')}</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((visit) => (
-                  <HistoryRow
-                    key={visit.id}
-                    visit={visit}
-                    car={cars.find((car) => car.id === visit.carId)}
-                    repository={repository}
-                    onEdit={() => onEdit(visit)}
-                    onDelete={() => onDelete(visit)}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t('shared.date')}</th>
+                    <th>{t('shared.vehicle')}</th>
+                    <th>{t('history.service')}</th>
+                    <th>{t('history.odometer')}</th>
+                    <th>{t('shared.provider')}</th>
+                    <th>{t('history.cost')}</th>
+                    <th>{t('shared.photos')}</th>
+                    <th>
+                      <span className="sr-only">{t('history.actions')}</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((visit) => (
+                    <HistoryRow
+                      key={visit.id}
+                      visit={visit}
+                      car={cars.find((car) => car.id === visit.carId)}
+                      repository={repository}
+                      expanded={expandedVisits.has(visit.id)}
+                      onToggle={() => toggleVisit(visit.id)}
+                      onEdit={() => onEdit(visit)}
+                      onDelete={() => onDelete(visit)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <ul className="history-cards" role="list" aria-label={t('navigation.history')}>
+              {filtered.map((visit) => (
+                <HistoryCard
+                  key={visit.id}
+                  visit={visit}
+                  car={cars.find((car) => car.id === visit.carId)}
+                  repository={repository}
+                  expanded={expandedVisits.has(visit.id)}
+                  onToggle={() => toggleVisit(visit.id)}
+                  onEdit={() => onEdit(visit)}
+                  onDelete={() => onDelete(visit)}
+                />
+              ))}
+            </ul>
+          </>
         ) : (
           <EmptyPanel
             icon={<ClipboardList size={23} />}
