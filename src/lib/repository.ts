@@ -2,6 +2,7 @@
 
 import { del, get, set, update } from 'idb-keyval';
 import { AppError } from './app-error';
+import { recordDiagnostic } from './bug-reports/diagnostics';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
   EMPTY_SNAPSHOT,
@@ -71,7 +72,8 @@ export class LocalRepository implements Repository {
       snapshot.visits = upsert(snapshot.visits, visit);
     });
     for (const photo of previous?.photos ?? []) {
-      if (!visit.photos.some((entry) => entry.path === photo.path)) await this.removePhoto(photo);
+      if (!visit.photos.some((entry) => entry.path === photo.path))
+        await this.removePhoto(photo).catch(recordDiagnostic);
     }
   }
   async deleteVisit(visit: Visit) {
@@ -311,7 +313,8 @@ export class SupabaseRepository implements Repository {
     const { error } = await this.client.from('visits').upsert(visitToRow(visit, this.userId));
     if (error) throw error;
     for (const photo of (previous?.photos as Photo[] | undefined) ?? []) {
-      if (!visit.photos.some((entry) => entry.path === photo.path)) await this.removePhoto(photo);
+      if (!visit.photos.some((entry) => entry.path === photo.path))
+        await this.removePhoto(photo).catch(recordDiagnostic);
     }
   }
   async deleteVisit(visit: Visit) {

@@ -61,8 +61,9 @@ function useGarageState() {
   );
 
   async function perform(action: () => Promise<void>) {
-    await garage.run(action);
+    const result = await garage.run(action);
     setModal(null);
+    return result;
   }
 
   return {

@@ -6,6 +6,9 @@ import type { User } from '@supabase/supabase-js';
 import { EMPTY_SNAPSHOT, type Snapshot } from './model';
 import { createRepository, supabase, type Repository } from './repository';
 import { pendingTransfer, registerSignup, transferSignupData } from './signup-transfer';
+import { recordDiagnostic } from './bug-reports/diagnostics';
+
+export type MutationResult = { refreshed: boolean };
 
 export function useGarageSession() {
   const [repository, setRepository] = useState<Repository | null>(null);
@@ -14,6 +17,8 @@ export function useGarageSession() {
   const [loading, setLoading] = useState(true);
   const [transferring, setTransferring] = useState(false);
   const [error, setError] = useState<AppFailure | null>(null);
+  const [refreshError, setRefreshError] = useState<AppFailure | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const generation = useRef(0);
   const operations = useRef(new Set<Promise<unknown>>());
   const signupWork = useRef<Promise<unknown> | null>(null);
@@ -40,6 +45,8 @@ export function useGarageSession() {
       setRepository(null);
       setSnapshot(EMPTY_SNAPSHOT);
       setError(null);
+      setRefreshError(null);
+      setRefreshing(false);
       setLoading(true);
       setTransferring(false);
 
@@ -129,8 +136,31 @@ export function useGarageSession() {
     };
   }, [project]);
 
+  const reloadSnapshot = useCallback(
+    async (version: number): Promise<boolean> => {
+      if (!repository || generation.current !== version) return false;
+      setRefreshing(true);
+      try {
+        const data = await repository.load();
+        if (generation.current !== version) return false;
+        setSnapshot(data);
+        setRefreshError(null);
+        return true;
+      } catch (cause) {
+        if (generation.current === version) {
+          recordDiagnostic(cause);
+          setRefreshError({ code: 'refresh' });
+        }
+        return false;
+      } finally {
+        if (generation.current === version) setRefreshing(false);
+      }
+    },
+    [repository],
+  );
+
   const run = useCallback(
-    async (action: () => Promise<void>) => {
+    async (action: () => Promise<void>): Promise<MutationResult> => {
       if (!repository || mutationBusy.current) throw new AppError('operationBusy');
       mutationBusy.current = true;
       const version = generation.current;
@@ -138,24 +168,36 @@ export function useGarageSession() {
       const work = (async () => {
         try {
           await action();
-          const data = await repository.load();
-          if (generation.current === version) setSnapshot(data);
         } catch (cause) {
           if (generation.current === version) setError(failureOf(cause, 'save'));
           throw cause;
-        } finally {
-          mutationBusy.current = false;
         }
+        // A failed reload cannot undo a successful mutation.
+        return { refreshed: await reloadSnapshot(version) };
       })();
       operations.current.add(work);
       try {
-        await work;
+        return await work;
       } finally {
+        mutationBusy.current = false;
         operations.current.delete(work);
       }
     },
-    [repository],
+    [repository, reloadSnapshot],
   );
+
+  const refresh = useCallback(async (): Promise<void> => {
+    if (!repository || mutationBusy.current) return;
+    mutationBusy.current = true;
+    const work = reloadSnapshot(generation.current);
+    operations.current.add(work);
+    try {
+      await work;
+    } finally {
+      mutationBusy.current = false;
+      operations.current.delete(work);
+    }
+  }, [repository, reloadSnapshot]);
 
   async function signUp(email: string, password: string): Promise<boolean> {
     if (!supabase) throw new AppError('cloudNotConfigured');
@@ -204,6 +246,10 @@ export function useGarageSession() {
     transferring,
     error,
     setError,
+    refreshError,
+    setRefreshError,
+    refreshing,
+    refresh,
     run,
     signUp,
     signIn,

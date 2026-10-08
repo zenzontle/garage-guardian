@@ -211,3 +211,46 @@ it('does not fall back to local storage after a cloud write failure', async () =
   await expect(createRepository(account().id).saveCar(car)).rejects.toThrow('Cloud unavailable');
   expect(await get('garage-guardian:local:v1')).toBeUndefined();
 });
+
+it.each(['local', 'cloud'] as const)(
+  '%s visit save survives old-photo cleanup failure and continues cleaning remaining photos',
+  async (mode) => {
+    const { LocalRepository, SupabaseRepository } = await import('./repository');
+    const { startDiagnostics, recentDiagnostics, clearDiagnostics } =
+      await import('./bug-reports/diagnostics');
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    const repository =
+      mode === 'local' ? new LocalRepository() : new SupabaseRepository(cloud.client, account().id);
+    await repository.saveCar(car);
+    const file = new File(['receipt'], 'receipt.webp', { type: 'image/webp' });
+    const old = await repository.uploadPhoto(visit.id, file);
+    const removed = await repository.uploadPhoto(visit.id, file);
+    const retained = await repository.uploadPhoto(visit.id, file);
+    await repository.saveVisit({ ...visit, photos: [old, removed, retained] });
+    const uploaded = await repository.uploadPhoto(visit.id, file);
+    const updated = { ...visit, notes: 'Saved edit', photos: [retained, uploaded] };
+    const cleanup = vi
+      .spyOn(repository, 'removePhoto')
+      .mockRejectedValueOnce(new Error('Cleanup failed'));
+    const stop = startDiagnostics();
+    try {
+      await expect(repository.saveVisit(updated)).resolves.toBeUndefined();
+      expect((await repository.load()).visits).toEqual([updated]);
+      expect(cleanup.mock.calls.map(([photo]) => photo.path)).toEqual([old.path, removed.path]);
+      expect(recentDiagnostics().some((entry) => entry.message === 'Cleanup failed')).toBe(true);
+      if (mode === 'local') {
+        expect(await get(`photo:${uploaded.path}`)).toBeInstanceOf(Blob);
+        expect(await get(`photo:${retained.path}`)).toBeInstanceOf(Blob);
+        expect(await get(`photo:${removed.path}`)).toBeUndefined();
+      } else {
+        expect(cloud.photos.has(uploaded.path)).toBe(true);
+        expect(cloud.photos.has(retained.path)).toBe(true);
+        expect(cloud.photos.has(removed.path)).toBe(false);
+      }
+    } finally {
+      stop();
+      clearDiagnostics();
+    }
+  },
+);

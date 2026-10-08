@@ -386,6 +386,19 @@ a {
   background: none;
   color: inherit;
 }
+.refresh-banner {
+  flex-wrap: wrap;
+}
+.refresh-banner span {
+  flex: 1 1 180px;
+}
+.refresh-banner button {
+  margin-left: 0;
+}
+.refresh-banner button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
 .demo-banner {
   border-color: #5b4d2d;
   background: var(--yellow-soft);
