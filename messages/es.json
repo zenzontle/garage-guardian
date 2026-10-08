@@ -83,6 +83,7 @@
     "guestStorage": "Invitado — guardado en este navegador",
     "prototypeNotice": "Prototipo local: tus datos se guardan en este navegador. Añade las credenciales de Supabase para activar la sincronización privada en la nube.",
     "openMenu": "Abrir menú",
+    "closeMenu": "Cerrar menú",
     "dismissError": "Cerrar mensaje de error",
     "vehicleCount": "{count, plural, one {# vehículo} other {# vehículos}}",
     "moving": "Transfiriendo tu garaje a Supabase",

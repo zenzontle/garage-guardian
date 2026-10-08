@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import './localization.css';
+import './usability.css';
 
 export const metadata: Metadata = {
   title: 'Garage Guardian',

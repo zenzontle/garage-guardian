@@ -1,0 +1,207 @@
+/* Shared sizing keeps controls usable with touch and enlarged text. */
+.button svg,
+.text-link svg,
+.table-expand svg {
+  flex-shrink: 0;
+}
+.page-heading,
+.section-heading,
+.items-header,
+.modal-footer,
+.car-header-actions {
+  flex-wrap: wrap;
+}
+.page-heading > div,
+.section-heading > div,
+.recent-main,
+.due-main,
+.car-header-copy,
+.vehicle-row > span,
+.visit-detail > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.recent-main strong,
+.recent-main small,
+.due-main strong,
+.due-main small,
+.schedule-main strong,
+.schedule-main small,
+.vehicle-row strong,
+.vehicle-row small,
+.car-header-copy p,
+.photo-links .text-link,
+.file-chip {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.sidebar {
+  overflow-y: auto;
+}
+.search-field:focus-within {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+}
+.form-stack input:not([type='checkbox']),
+.form-stack select,
+.form-stack textarea,
+.table-toolbar input,
+.table-toolbar select,
+.report-filters select,
+.locale-selector select {
+  font-size: 1rem;
+  min-height: 2.75rem;
+  min-width: 0;
+}
+.money-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.25rem;
+}
+.history-filter {
+  display: grid;
+  gap: 0.375rem;
+  font-size: 0.875rem;
+  color: var(--muted);
+  min-width: 0;
+}
+.history-search {
+  flex: 1 1 15rem;
+}
+.history-toolbar {
+  align-items: end;
+}
+.history-toolbar .search-field {
+  min-width: 0;
+}
+.history-toolbar .date-filter {
+  display: grid;
+  gap: 0.375rem;
+}
+.history-toolbar > .button {
+  align-self: end;
+}
+.history-cards {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.history-card {
+  padding: 1rem;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.history-card-heading {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.history-card-heading > div {
+  min-width: 0;
+}
+.history-card-heading time,
+.history-card-heading > div > strong {
+  display: block;
+}
+.history-card-heading time,
+.history-card-facts dt {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.history-card .table-expand {
+  width: 100%;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+.history-card-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.75rem 0;
+}
+.history-card-facts dd {
+  margin: 0;
+}
+.history-card .row-actions {
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.history-card .visit-detail {
+  border-top: 1px solid var(--line);
+  margin-top: 1rem;
+  padding-top: 1rem;
+  flex-direction: column;
+  gap: 1rem;
+}
+@media (max-width: 1180px) {
+  .history-toolbar .history-search {
+    flex-basis: 100%;
+  }
+}
+@media (max-width: 720px) {
+  html {
+    scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+  }
+  .content {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+  }
+  .topbar {
+    height: 5.5rem;
+    padding: 0.5rem 1rem;
+  }
+  .topbar-right {
+    flex-shrink: 0;
+  }
+  .sidebar.open {
+    overflow-y: auto;
+    max-width: calc(100% - 1rem);
+  }
+  .page-heading {
+    gap: 0.75rem;
+  }
+  .history-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+  .report-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .history-toolbar .search-field,
+  .history-toolbar input,
+  .history-toolbar select,
+  .history-toolbar .button {
+    width: 100%;
+    min-width: 0;
+  }
+  .history-toolbar .search-field {
+    flex: none;
+  }
+  .table-panel .table-scroll {
+    display: none;
+  }
+  .history-cards {
+    display: block;
+  }
+  .item-editor-row {
+    grid-template-columns: minmax(0, 1fr) 2.75rem;
+  }
+  .item-editor-row select {
+    grid-column: 1 / -1;
+  }
+  .item-editor-row input:first-of-type {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .item-editor-row .money-input {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .item-editor-row .icon-button {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}

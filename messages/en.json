@@ -83,6 +83,7 @@
     "guestStorage": "Guest — stored in this browser",
     "prototypeNotice": "Local prototype: your data stays in this browser. Add Supabase credentials to enable private cloud sync.",
     "openMenu": "Open menu",
+    "closeMenu": "Close menu",
     "dismissError": "Dismiss error",
     "vehicleCount": "{count, plural, one {# vehicle} other {# vehicles}}",
     "moving": "Moving your garage to Supabase",

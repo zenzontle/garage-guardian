@@ -1,44 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { useId } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowDownToLine, ChevronDown, Settings2, Trash2 } from 'lucide-react';
+import { ChevronDown, Settings2, Trash2 } from 'lucide-react';
 import { type Repository } from '@/lib/repository';
-import { type Car, type Visit, type Photo } from '@/lib/model';
+import { type Car, type Visit } from '@/lib/model';
 import { useDisplay } from '@/i18n/use-display';
-import { failureOf, type AppFailure } from '@/lib/app-error';
+import { HistoryVisitDetail } from './history-visit-detail';
+
+export type HistoryVisitProps = {
+  visit: Visit;
+  car?: Car;
+  repository: Repository;
+  expanded: boolean;
+  onToggle: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+};
 
 export function HistoryRow({
   visit,
   car,
   repository,
+  expanded,
+  onToggle,
   onEdit,
   onDelete,
-}: {
-  visit: Visit;
-  car?: Car;
-  repository: Repository;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
+}: HistoryVisitProps) {
   const t = useTranslations();
   const { number, money, displayDate, formatDistance } = useDisplay();
-  const [expanded, setExpanded] = useState(false);
-  const [photoError, setPhotoError] = useState<AppFailure | null>(null);
-  async function downloadPhoto(photo: Photo) {
-    try {
-      setPhotoError(null);
-      const url = await repository.photoUrl(photo);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = photo.name;
-      link.target = '_blank';
-      link.click();
-      if (url.startsWith('blob:')) setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (cause) {
-      setPhotoError(failureOf(cause, 'photo'));
-    }
-  }
+  const detailId = useId();
   return (
     <>
       <tr>
@@ -49,11 +40,12 @@ export function HistoryRow({
         <td>
           <button
             className="table-expand"
-            onClick={() => setExpanded(!expanded)}
+            onClick={onToggle}
             aria-expanded={expanded}
+            aria-controls={detailId}
           >
             {visit.items.map((item) => item.name).join(', ') || t('shared.serviceVisit')}
-            <ChevronDown size={15} />
+            <ChevronDown size={15} aria-hidden="true" />
           </button>
         </td>
         <td>{formatDistance(visit.odometer, car?.distanceUnit)}</td>
@@ -65,65 +57,23 @@ export function HistoryRow({
         <td>
           <div className="row-actions">
             <button className="icon-button" onClick={onEdit} aria-label={t('history.edit')}>
-              <Settings2 size={16} />
+              <Settings2 size={16} aria-hidden="true" />
             </button>
             <button
               className="icon-button danger"
               onClick={onDelete}
               aria-label={t('history.delete')}
             >
-              <Trash2 size={16} />
+              <Trash2 size={16} aria-hidden="true" />
             </button>
           </div>
         </td>
       </tr>
-      {expanded && (
-        <tr className="detail-row">
-          <td colSpan={8}>
-            <div className="visit-detail">
-              <div>
-                <strong>{t('history.itemsCompleted')}</strong>
-                <p>
-                  {visit.items
-                    .map(
-                      (item) =>
-                        `${item.name}${item.costCents !== null ? ` (${money(item.costCents)})` : ''}`,
-                    )
-                    .join(' · ') || t('history.noneRecorded')}
-                </p>
-              </div>
-              {visit.notes && (
-                <div>
-                  <strong>{t('shared.notes')}</strong>
-                  <p>{visit.notes}</p>
-                </div>
-              )}
-              {visit.photos.length > 0 && (
-                <div>
-                  <strong>{t('shared.photos')}</strong>
-                  <div className="photo-links">
-                    {visit.photos.map((photo) => (
-                      <button
-                        key={photo.id}
-                        className="text-link"
-                        onClick={() => void downloadPhoto(photo)}
-                      >
-                        <ArrowDownToLine size={15} />
-                        {photo.name}
-                      </button>
-                    ))}
-                  </div>
-                  {photoError && (
-                    <p className="error-text">
-                      {t(`errors.${photoError.code}`, photoError.values)}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
+      <tr className="detail-row" id={detailId} hidden={!expanded}>
+        <td colSpan={8}>
+          {expanded && <HistoryVisitDetail visit={visit} repository={repository} />}
+        </td>
+      </tr>
     </>
   );
 }
