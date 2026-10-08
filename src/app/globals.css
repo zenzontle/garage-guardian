@@ -1750,3 +1750,19 @@ a.text-link,
 a.button {
   text-decoration: none;
 }
+/* Account forms share the existing dialog and auth-card spacing. */
+.account-fields {
+  display: grid;
+  gap: 1rem;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.account-section + .account-section {
+  border-top: 1px solid var(--line);
+  padding-top: 1.5rem;
+}
+.account-section p {
+  overflow-wrap: anywhere;
+}

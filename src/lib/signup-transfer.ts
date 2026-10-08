@@ -17,6 +17,12 @@ export async function pendingTransfer(project: string): Promise<Transfer | undef
   return get<Transfer>(transferKey(project));
 }
 
+export async function clearAccountTransfer(project: string, userId: string) {
+  await update<Transfer | undefined>(transferKey(project), (previous) =>
+    previous?.userId === userId ? undefined : previous,
+  );
+}
+
 export async function registerSignup(project: string, user: User, hasSession: boolean) {
   // Supabase can return an obfuscated user with no identities for an existing email.
   if (!hasSession && !user.identities?.length) return;

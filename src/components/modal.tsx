@@ -10,11 +10,13 @@ export function Modal({
   subtitle,
   onClose,
   children,
+  busy = false,
 }: {
   title: string;
   subtitle?: string;
   onClose: () => void;
   children: ReactNode;
+  busy?: boolean;
 }) {
   const t = useTranslations();
   const dialog = useRef<HTMLDivElement>(null);
@@ -72,7 +74,12 @@ export function Modal({
             <h2>{title}</h2>
           </div>
           <LocaleSelector />
-          <button className="icon-button" onClick={onClose} aria-label={t('shared.close')}>
+          <button
+            className="icon-button"
+            disabled={busy}
+            onClick={onClose}
+            aria-label={t('shared.close')}
+          >
             <X size={20} />
           </button>
           {subtitle && <p>{subtitle}</p>}

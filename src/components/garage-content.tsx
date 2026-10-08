@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -17,6 +17,8 @@ import { VisitModal } from './visit-modal';
 import { GarageSidebar } from './garage-sidebar';
 import { GarageTopbar } from './garage-topbar';
 import { GarageMobileNavigation } from './garage-mobile-navigation';
+import { AccountSettingsDialog } from './account-settings-dialog';
+import { AccountRecoveryScreen } from './account-recovery-screen';
 
 export function GarageContent({ children }: { children: ReactNode }) {
   const t = useTranslations();
@@ -46,6 +48,9 @@ export function GarageContent({ children }: { children: ReactNode }) {
   const closeMenu = useCallback(() => setMenuOpen(false), [setMenuOpen]);
   const pathname = usePathname();
   const router = useRouter();
+  useEffect(() => {
+    if (garage.recovering && pathname !== '/auth/recovery') router.replace('/auth/recovery');
+  }, [garage.recovering, pathname, router]);
   const page = workspaceScreen(pathname);
   const reporter = (
     <BugReporter
@@ -53,16 +58,35 @@ export function GarageContent({ children }: { children: ReactNode }) {
       userId={user?.id}
       screen={loading ? 'loading' : !repository ? 'recovery' : page}
       dialog={
-        modal?.kind === 'car' ? (modal.item ? 'edit-car' : 'add-car') : (modal?.kind ?? 'none')
+        modal?.kind === 'car'
+          ? modal.item
+            ? 'edit-car'
+            : 'add-car'
+          : modal?.kind === 'account'
+            ? 'none'
+            : (modal?.kind ?? 'none')
       }
     />
   );
 
   const accountActions = user ? (
-    <button className="button secondary" onClick={() => void garage.signOut()}>
-      <LogOut size={17} />
-      {t('account.signOut')}
-    </button>
+    <div className="account-actions">
+      <button
+        className="button secondary"
+        disabled={garage.accountBusy}
+        onClick={() => setModal({ kind: 'account' })}
+      >
+        {t('account.settings')}
+      </button>
+      <button
+        className="button secondary"
+        disabled={garage.accountBusy}
+        onClick={() => void garage.signOut()}
+      >
+        <LogOut size={17} />
+        {t('account.signOut')}
+      </button>
+    </div>
   ) : (
     isCloudConfigured && (
       <div className="account-actions">
@@ -76,10 +100,15 @@ export function GarageContent({ children }: { children: ReactNode }) {
     )
   );
 
+  if (garage.recovering) return <AccountRecoveryScreen />;
+  if (pathname === '/auth/recovery') return <>{children}</>;
+  const settings =
+    modal?.kind === 'account' && user ? <AccountSettingsDialog key={`account:${user.id}`} /> : null;
   if (loading || !repository)
     return (
       <>
         {reporter}
+        {settings}
         <div className="auth-page">
           <div className="auth-card">
             {!loading && <LocaleSelector />}
@@ -133,6 +162,14 @@ export function GarageContent({ children }: { children: ReactNode }) {
             {notice && (
               <div className="demo-banner" role="status">
                 {t('account.confirmation')}
+                <Link className="text-link" href={`${accountPath('signin', pathname)}&resend=1`}>
+                  {t('account.resendConfirmation')}
+                </Link>
+              </div>
+            )}
+            {garage.accountNotice && (
+              <div className="demo-banner" role="status">
+                {t(`account.${garage.accountNotice}`)}
               </div>
             )}
             {error && (
@@ -171,6 +208,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
         </div>
 
         <GarageMobileNavigation page={page} />
+        {settings}
 
         {modal?.kind === 'car' && (
           <CarModal

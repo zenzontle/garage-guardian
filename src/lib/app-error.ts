@@ -33,6 +33,11 @@ export function failureOf(cause: unknown, fallback: ErrorCode = 'generic'): AppF
       return { code: 'accountExists' };
     case 'weak_password':
       return { code: 'weakPassword' };
+    case 'same_password':
+      return { code: 'samePassword' };
+    case 'otp_expired':
+    case 'otp_disabled':
+      return { code: 'recoveryInvalid' };
     case 'over_request_rate_limit':
     case 'over_email_send_rate_limit':
       return { code: 'rateLimited' };

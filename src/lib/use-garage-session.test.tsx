@@ -12,6 +12,8 @@ let cloud: ReturnType<typeof fakeSupabase>;
 
 beforeEach(async () => {
   await clear();
+  sessionStorage.clear();
+  window.history.replaceState(null, '', '/');
   vi.resetModules();
   vi.doMock('react', () => React);
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', project);
@@ -20,6 +22,298 @@ beforeEach(async () => {
   vi.mocked(createClient).mockReturnValue(
     cloud.client as unknown as ReturnType<typeof createClient>,
   );
+});
+
+it('updates same-ID user metadata without rebuilding the repository', async () => {
+  cloud.emit(account());
+  const hook = await openGarage();
+  const repository = hook.result.current.repository;
+  const calls = cloud.from.mock.calls.length;
+  act(() => cloud.emit({ ...account(), email: 'confirmed@example.com' }, 'USER_UPDATED'));
+  expect(hook.result.current.user?.email).toBe('confirmed@example.com');
+  expect(hook.result.current.repository).toBe(repository);
+  expect(cloud.from.mock.calls.length).toBe(calls);
+});
+
+it('suspends signup transfer during recovery, survives same-tab reload, and resumes after ordinary sign-in', async () => {
+  const { LocalRepository } = await import('./repository');
+  const { registerSignup } = await import('./signup-transfer');
+  await new LocalRepository().saveCar(car);
+  await registerSignup(project, account(), true);
+  const hook = await openGarage();
+  window.history.replaceState(
+    null,
+    '',
+    '/auth/recovery#access_token=secret&refresh_token=secret&type=recovery',
+  );
+  act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+  expect(hook.result.current.recovering).toBe(true);
+  expect(hook.result.current.repository).toBeNull();
+  expect(window.location.hash).toBe('');
+  expect(sessionStorage.getItem(`garage-guardian:recovery:${project}`)).not.toContain('secret');
+  hook.unmount();
+  const reopened = await openGarage();
+  expect(reopened.result.current.recovering).toBe(true);
+  expect(cloud.from).not.toHaveBeenCalled();
+  expect((await new LocalRepository().load()).cars).toEqual([car]);
+  await act(async () => reopened.result.current.signIn('owner@example.com', 'password'));
+  await waitFor(() => expect(reopened.result.current.repository).not.toBeNull());
+  expect(reopened.result.current.snapshot.cars).toEqual([car]);
+  expect(sessionStorage.getItem(`garage-guardian:recovery:${project}`)).toBeNull();
+});
+
+it('requires a recovery event or a marker bound to this session, not just the recovery URL', async () => {
+  cloud.emit(account());
+  window.history.replaceState(
+    null,
+    '',
+    '/auth/recovery?error=access_denied&error_code=otp_expired',
+  );
+  const hook = await openGarage();
+  expect(hook.result.current.recovering).toBe(false);
+  expect(window.location.search).toBe('');
+  act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+  hook.unmount();
+  cloud.newSession();
+  const reopened = await openGarage();
+  expect(reopened.result.current.recovering).toBe(false);
+});
+
+it('clears recovery on identity change and rejects password mismatch before updating', async () => {
+  const hook = await openGarage();
+  act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+  await act(async () => {
+    await expect(hook.result.current.resetPassword('abcdef', 'different')).rejects.toMatchObject({
+      code: 'passwordMismatch',
+    });
+  });
+  expect(cloud.auth.updateUser).not.toHaveBeenCalled();
+  act(() => cloud.emit(account('another')));
+  await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
+  expect(hook.result.current.recovering).toBe(false);
+  expect(sessionStorage.length).toBe(0);
+});
+
+it('resets the recovery password, revokes refresh sessions, and clears the local account', async () => {
+  const hook = await openGarage();
+  act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+  await act(async () => hook.result.current.resetPassword('new-password', 'new-password'));
+  expect(cloud.auth.updateUser).toHaveBeenCalledWith({ password: 'new-password' });
+  expect(cloud.auth.signOut).toHaveBeenCalledWith({ scope: 'global' });
+  expect(hook.result.current.user).toBeNull();
+  expect(hook.result.current.accountNotice).toBe('passwordChanged');
+  expect(hook.result.current.recovering).toBe(false);
+});
+
+it('uses browser recovery/resend with fixed same-origin redirects and a shared 60-second cooldown', async () => {
+  const hook = await openGarage();
+  await act(async () => hook.result.current.requestRecovery('owner@example.com'));
+  expect(cloud.auth.resetPasswordForEmail).toHaveBeenCalledWith('owner@example.com', {
+    redirectTo: `${window.location.origin}/auth/recovery`,
+  });
+  await act(async () => hook.result.current.resendConfirmation('owner@example.com'));
+  expect(cloud.auth.resend).toHaveBeenCalledWith({
+    type: 'signup',
+    email: 'owner@example.com',
+    options: { emailRedirectTo: `${window.location.origin}/` },
+  });
+  await act(async () => {
+    await expect(
+      hook.result.current.resendConfirmation('different@example.com'),
+    ).rejects.toMatchObject({ code: 'resendCooldown' });
+  });
+  expect(cloud.auth.resend).toHaveBeenCalledTimes(1);
+});
+
+it('refreshes pending email metadata without replacing the current address or repository', async () => {
+  cloud.emit(account());
+  const hook = await openGarage();
+  const repository = hook.result.current.repository;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}', { status: 200 })),
+  );
+  cloud.auth.getUser.mockResolvedValueOnce({
+    data: { user: { ...account(), new_email: 'pending@example.com' } },
+    error: null,
+  });
+  await act(async () => hook.result.current.changeEmail('current-password', 'pending@example.com'));
+  expect(hook.result.current.user?.email).toBe(account().email);
+  expect(hook.result.current.user?.new_email).toBe('pending@example.com');
+  expect(hook.result.current.repository).toBe(repository);
+});
+
+it('blocks account mutations during a failed signup transfer', async () => {
+  const hook = await openGarage();
+  cloud.execute.mockResolvedValueOnce({ data: null, error: new Error('Offline') });
+  const { LocalRepository } = await import('./repository');
+  await new LocalRepository().saveCar(car);
+  await act(async () => hook.result.current.signUp('new@example.com', 'password'));
+  await waitFor(() => expect(hook.result.current.error?.code).toBe('transfer'));
+  await act(async () => {
+    await expect(
+      hook.result.current.changeEmail('password', 'new@example.com'),
+    ).rejects.toMatchObject({ code: 'operationBusy' });
+  });
+});
+
+it('waits for existing work during deletion, pauses new writes, and preserves guest records/photos', async () => {
+  const { LocalRepository } = await import('./repository');
+  const local = new LocalRepository();
+  await local.saveCar(car);
+  const photo = await local.uploadPhoto(
+    visit.id,
+    new File(['guest'], 'guest.webp', { type: 'image/webp' }),
+  );
+  await local.saveVisit({ ...visit, photos: [photo] });
+  cloud.emit(account());
+  const hook = await openGarage();
+  const repository = hook.result.current.repository!;
+  const fetch = vi.fn(async () => new Response('{}', { status: 200 }));
+  vi.stubGlobal('fetch', fetch);
+  let release!: () => void;
+  const delayed = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let work!: Promise<unknown>;
+  act(() => {
+    work = hook.result.current.run(() => delayed);
+  });
+  let deletion!: Promise<void>;
+  act(() => {
+    deletion = hook.result.current.deleteAccount('password', true);
+  });
+  expect(fetch).not.toHaveBeenCalled();
+  await expect(
+    repository.uploadPhoto(visit.id, new File(['blocked'], 'blocked.webp')),
+  ).rejects.toMatchObject({ code: 'operationBusy' });
+  await act(async () => {
+    release();
+    await work;
+    await deletion;
+  });
+  await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
+  expect(hook.result.current.accountNotice).toBe('deleted');
+  expect(hook.result.current.user).toBeNull();
+  expect(hook.result.current.snapshot.cars).toEqual([car]);
+  expect((await local.readPhoto(photo)).size).toBe(5);
+});
+
+it('does not claim deletion or discard guest data after a failed/lost response', async () => {
+  cloud.emit(account());
+  const hook = await openGarage();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => {
+      throw new Error('Lost response');
+    }),
+  );
+  await act(async () => {
+    await expect(hook.result.current.deleteAccount('password', true)).rejects.toThrow(
+      'Lost response',
+    );
+  });
+  expect(hook.result.current.user?.id).toBe(account().id);
+  expect(hook.result.current.accountNotice).toBeNull();
+  expect(hook.result.current.accountBusy).toBe(false);
+});
+
+it('clears recovery on cancellation and on a new session for the same account', async () => {
+  const hook = await openGarage();
+  act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+  await act(async () => hook.result.current.signOut());
+  expect(hook.result.current.recovering).toBe(false);
+  expect(sessionStorage.length).toBe(0);
+  act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+  cloud.newSession();
+  act(() => cloud.emit(account()));
+  await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
+  expect(hook.result.current.recovering).toBe(false);
+});
+
+it('invalidates an old recovery marker when an expired or reused callback carries an error', async () => {
+  const hook = await openGarage();
+  act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+  hook.unmount();
+  window.history.replaceState(
+    null,
+    '',
+    '/auth/recovery#error=access_denied&error_code=otp_expired',
+  );
+  const reopened = await openGarage();
+  expect(reopened.result.current.recovering).toBe(false);
+  expect(window.location.hash).toBe('');
+  expect(sessionStorage.length).toBe(0);
+});
+
+it('retries failed recovery revocation after reload without repeating the password update', async () => {
+  const hook = await openGarage();
+  act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+  cloud.auth.signOut.mockRejectedValueOnce(new Error('Network unavailable'));
+  await act(async () => {
+    await expect(
+      hook.result.current.resetPassword('new-password', 'new-password'),
+    ).rejects.toMatchObject({ code: 'sessionRevocation' });
+  });
+  hook.unmount();
+  const reopened = await openGarage();
+  expect(reopened.result.current.recovering).toBe(true);
+  await act(async () => reopened.result.current.resetPassword('new-password', 'new-password'));
+  expect(cloud.auth.updateUser).toHaveBeenCalledTimes(1);
+  expect(reopened.result.current.accountNotice).toBe('passwordChanged');
+});
+
+it('does not revoke a replacement account after a password request finishes under an old identity', async () => {
+  cloud.emit(account());
+  const hook = await openGarage();
+  let release!: () => void;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(new Response('{}'));
+        }),
+    ),
+  );
+  let work!: Promise<void>;
+  act(() => {
+    work = hook.result.current.changePassword('password', 'new-password', 'new-password');
+  });
+  const canceled = expect(work).rejects.toMatchObject({ code: 'sessionChanged' });
+  await waitFor(() => expect(fetch).toHaveBeenCalled());
+  act(() => cloud.emit(account('replacement')));
+  await act(async () => {
+    release();
+    await canceled;
+  });
+  expect(cloud.auth.signOut).not.toHaveBeenCalled();
+  expect(hook.result.current.user?.id).toBe('replacement');
+});
+
+it('returns to sign-in after account password changes and retains another account’s transfer marker on deletion', async () => {
+  cloud.emit(account());
+  const hook = await openGarage();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}')),
+  );
+  cloud.auth.signOut.mockImplementationOnce(async () => {
+    cloud.emit(null);
+    return { error: new Error('Local logout response lost after credentials were cleared') };
+  });
+  await act(async () =>
+    hook.result.current.changePassword('password', 'new-password', 'new-password'),
+  );
+  expect(cloud.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  expect(hook.result.current.accountNotice).toBe('passwordChanged');
+  expect(hook.result.current.user).toBeNull();
+  const { registerSignup, pendingTransfer } = await import('./signup-transfer');
+  await registerSignup(project, account('unrelated'), true);
+  await act(async () => hook.result.current.signIn('owner@example.com', 'password'));
+  await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
+  await act(async () => hook.result.current.deleteAccount('password', true));
+  expect((await pendingTransfer(project))?.userId).toBe('unrelated');
 });
 
 async function openGarage() {
