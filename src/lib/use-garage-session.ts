@@ -61,6 +61,7 @@ export function useGarageSession() {
     const receive = (nextUser: User | null, force = false) => {
       const nextIdentity = nextUser?.id ?? null;
       if (!active) return;
+      if (nextUser) setAccountNotice(null);
       if (recoverySession.current && nextUser?.id === recoverySession.current.user.id) {
         currentUser.current = nextUser;
         setUser(nextUser);
@@ -328,11 +329,11 @@ export function useGarageSession() {
     transition.current(data.user, wasRecovering);
   }
 
-  async function signOut() {
+  async function signOut(scope: 'global' | 'local' = 'global') {
     if (!supabase) return true;
     if (accountLock.current) return false;
     try {
-      const { error } = await supabase.auth.signOut();
+      const { error } = await supabase.auth.signOut({ scope });
       if (error) {
         setError(failureOf(error, 'auth'));
         return false;
@@ -485,7 +486,10 @@ export function useGarageSession() {
         await Promise.allSettled([...operations.current]);
         if (currentUser.current?.id !== deletedUser) throw new AppError('sessionChanged');
         await requestAccount('DELETE', { currentPassword, acknowledged: true });
-        await clearAccountTransfer(project, deletedUser);
+        await clearAccountTransfer(project, deletedUser).catch(() => {
+          // Auth deletion is confirmed; unavailable local storage must not
+          // prevent signing out and returning to the preserved guest garage.
+        });
         // Local scope clears persisted browser credentials even after Auth was deleted.
         await supabase!.auth.signOut({ scope: 'local' });
         clearRecovery();

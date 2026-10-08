@@ -19,7 +19,7 @@ export function AccountRecoveryScreen() {
   const [requesting, setRequesting] = useState(false);
   async function cancel() {
     try {
-      if (garage.recovering && !(await garage.signOut())) {
+      if (garage.recovering && !(await garage.signOut('local'))) {
         setError({ code: 'auth' });
         return;
       }

@@ -218,6 +218,73 @@ it('does not claim deletion or discard guest data after a failed/lost response',
   expect(hook.result.current.accountBusy).toBe(false);
 });
 
+it('finishes confirmed deletion even when signup-transfer marker cleanup fails', async () => {
+  const { LocalRepository } = await import('./repository');
+  const local = new LocalRepository();
+  await local.saveCar(car);
+  cloud.emit(account());
+  const hook = await openGarage();
+  const transfer = await import('./signup-transfer');
+  const cleanup = vi
+    .spyOn(transfer, 'clearAccountTransfer')
+    .mockRejectedValueOnce(new Error('IndexedDB unavailable'));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}')),
+  );
+  await act(async () => hook.result.current.deleteAccount('password', true));
+  await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
+  expect(cleanup).toHaveBeenCalledWith(project, account().id);
+  expect(cloud.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+  expect(hook.result.current.user).toBeNull();
+  expect(hook.result.current.snapshot.cars).toEqual([car]);
+  expect(hook.result.current.accountNotice).toBe('deleted');
+  expect(hook.result.current.accountBusy).toBe(false);
+  cleanup.mockRestore();
+});
+
+it.each(['password', 'delete'] as const)(
+  'clears the %s success notice after sign-in but retains it after failed sign-in',
+  async (kind) => {
+    cloud.emit(account());
+    const hook = await openGarage();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('{}')),
+    );
+    await act(async () =>
+      kind === 'password'
+        ? hook.result.current.changePassword('password', 'new-password', 'new-password')
+        : hook.result.current.deleteAccount('password', true),
+    );
+    const notice = kind === 'password' ? 'passwordChanged' : 'deleted';
+    expect(hook.result.current.accountNotice).toBe(notice);
+    cloud.auth.signInWithPassword.mockRejectedValueOnce(new Error('Incorrect password'));
+    await act(async () => {
+      await expect(hook.result.current.signIn('owner@example.com', 'wrong')).rejects.toThrow(
+        'Incorrect password',
+      );
+    });
+    expect(hook.result.current.accountNotice).toBe(notice);
+    await act(async () => hook.result.current.signIn('owner@example.com', 'new-password'));
+    expect(hook.result.current.accountNotice).toBeNull();
+  },
+);
+
+it('clears an account notice when a different account signs in through an auth event', async () => {
+  cloud.emit(account());
+  const hook = await openGarage();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}')),
+  );
+  await act(async () => hook.result.current.deleteAccount('password', true));
+  expect(hook.result.current.accountNotice).toBe('deleted');
+  act(() => cloud.emit(account('replacement'), 'SIGNED_IN'));
+  expect(hook.result.current.user?.id).toBe('replacement');
+  expect(hook.result.current.accountNotice).toBeNull();
+});
+
 it('clears recovery on cancellation and on a new session for the same account', async () => {
   const hook = await openGarage();
   act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));

@@ -130,6 +130,22 @@ describe.each([
     await screen.findByRole('heading', { name: copy.account.welcome });
     expect(screen.getByRole('status').textContent).toBe(copy.account.passwordChanged);
   });
+  it('cancels recovery with local sign-out and clears its marker', async () => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    testRouter.reset('/');
+    const App = await loadGarageTestApp();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { name: copy.dashboard.title });
+    act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+    await screen.findByRole('heading', { name: copy.account.resetTitle });
+    await user.click(screen.getByRole('button', { name: copy.account.backSignin }));
+    await screen.findByRole('heading', { name: copy.account.welcome });
+    expect(cloud.auth.signOut).toHaveBeenCalledTimes(1);
+    expect(cloud.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(sessionStorage.length).toBe(0);
+    expect(screen.queryByText(copy.account.passwordChanged)).toBeNull();
+  });
 });
 
 it('disables all account forms during an in-flight request and retains drafts on network failure', async () => {
