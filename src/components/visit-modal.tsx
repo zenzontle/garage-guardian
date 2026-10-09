@@ -47,7 +47,9 @@ export function VisitModal({
   const [selectedCarId, setSelectedCarId] = useState(item?.carId ?? carId ?? cars[0]?.id ?? '');
   const [date, setDate] = useState(item?.date ?? todayISO());
   const [odometer, setOdometer] = useState(
-    String(item?.odometer ?? (initialCar ? latestOdometer(initialCar, visits) : '')),
+    item
+      ? String(item.odometer ?? '')
+      : String(initialCar ? latestOdometer(initialCar, visits) : ''),
   );
   const [totalCost, setTotalCost] = useState(item ? (item.totalCostCents / 100).toFixed(2) : '');
   const [provider, setProvider] = useState(item?.provider ?? '');
@@ -68,9 +70,17 @@ export function VisitModal({
   const distanceUnit = distanceUnitOrDefault(
     cars.find((car) => car.id === selectedCarId)?.distanceUnit,
   );
-  const carSchedules = schedules.filter(
-    (schedule) => schedule.carId === selectedCarId && schedule.isActive,
-  );
+  const scheduledServiceNames = new Set([
+    t('starter.service'),
+    'Scheduled service',
+    'Servicio programado',
+  ]);
+  const carSchedules = schedules
+    .filter((schedule) => schedule.carId === selectedCarId && schedule.isActive)
+    .sort(
+      (a, b) =>
+        Number(scheduledServiceNames.has(b.name)) - Number(scheduledServiceNames.has(a.name)),
+    );
   function updateEntry(key: string, update: Partial<EditVisitItem>) {
     setItems((current) =>
       current.map((entry) => (entry.key === key ? { ...entry, ...update } : entry)),
@@ -83,12 +93,11 @@ export function VisitModal({
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFormError(null);
-    const miles = Number(odometer),
+    const miles = odometer.trim() === '' ? null : Number(odometer),
       cents = Math.round(Number(totalCost || '0') * 100);
     if (
       !selectedCarId ||
-      !Number.isInteger(miles) ||
-      miles < 0 ||
+      (miles !== null && (!Number.isInteger(miles) || miles < 0)) ||
       !Number.isInteger(cents) ||
       cents < 0
     ) {
@@ -208,7 +217,6 @@ export function VisitModal({
                 step="1"
                 value={odometer}
                 onChange={(e) => setOdometer(e.target.value)}
-                required
               />
             </label>
             <label>
@@ -218,7 +226,6 @@ export function VisitModal({
                 value={totalCost}
                 onChange={setTotalCost}
                 placeholder="0.00"
-                required
               />
             </label>
           </div>

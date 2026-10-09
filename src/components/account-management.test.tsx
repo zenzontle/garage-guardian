@@ -109,7 +109,9 @@ describe.each([
     const last = within(dialog).getByRole('button', { name: copy.account.changePassword });
     last.focus();
     await user.tab();
-    expect(document.activeElement).toBe(within(dialog).getByRole('combobox'));
+    expect(document.activeElement).toBe(
+      within(dialog).getByRole('button', { name: copy.shared.close }),
+    );
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(trigger);

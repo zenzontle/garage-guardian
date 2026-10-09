@@ -40,7 +40,9 @@ export function HistoryCard({
       <dl className="history-card-facts">
         <div>
           <dt>{t('history.odometer')}</dt>
-          <dd>{formatDistance(visit.odometer, car?.distanceUnit)}</dd>
+          <dd>
+            {visit.odometer === null ? '—' : formatDistance(visit.odometer, car?.distanceUnit)}
+          </dd>
         </div>
         <div>
           <dt>{t('shared.provider')}</dt>

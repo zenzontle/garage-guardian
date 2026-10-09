@@ -125,3 +125,15 @@ describe('due calculations', () => {
     expect(addMonths('2026-01-31', 1)).toBe('2026-02-28');
   });
 });
+
+it('preserves date reminders without inventing a mileage baseline for unknown readings', () => {
+  const unknown = { ...visit, odometer: null };
+  expect(latestOdometer(car, [unknown])).toBe(car.odometer);
+  const result = getDueItem(schedule, car, [unknown], '2026-10-09');
+  expect(result.dueMiles).toBeNull();
+  expect(result.dueDate).toBe(addMonths(visit.date, 6));
+  expect(result.status).toBe('later');
+  expect(
+    getDueItem({ ...schedule, intervalMonths: null }, car, [unknown], '2026-10-09').status,
+  ).toBe('setup');
+});

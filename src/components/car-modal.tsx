@@ -6,7 +6,6 @@ import { ClipboardList } from 'lucide-react';
 import { isCloudConfigured } from '@/lib/repository';
 import {
   normalizePlate,
-  PLATE_MAX_LENGTH,
   defaultReminderDistance,
   distanceUnitOrDefault,
   newId,
@@ -207,12 +206,8 @@ export function CarModal({
               <input
                 value={plate}
                 onChange={(e) => setPlate(e.target.value)}
-                aria-describedby="plate-help"
                 placeholder={t('car.plateExample')}
               />
-              <span id="plate-help" className="field-help">
-                {t('car.plateHelp', { count: PLATE_MAX_LENGTH })}
-              </span>
             </label>
           </div>
           <div className="form-grid">

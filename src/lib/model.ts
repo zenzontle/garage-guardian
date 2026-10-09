@@ -49,7 +49,7 @@ export type Visit = {
   id: string;
   carId: string;
   date: string;
-  odometer: number;
+  odometer: number | null;
   totalCostCents: number;
   provider: string;
   notes: string;

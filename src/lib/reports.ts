@@ -59,7 +59,7 @@ export function visitsToCsv(visits: Visit[], cars: Car[]): string {
   const rows = visits.map((visit) => [
     visit.date,
     cars.find((car) => car.id === visit.carId)?.name ?? 'Unknown car',
-    visit.odometer,
+    visit.odometer ?? '',
     distanceAbbreviation(cars.find((car) => car.id === visit.carId)?.distanceUnit),
     visit.provider,
     visit.items.map((item) => item.name).join('; '),

@@ -3,7 +3,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { X } from 'lucide-react';
-import { LocaleSelector } from './locale-selector';
 
 export function Modal({
   title,
@@ -73,7 +72,6 @@ export function Modal({
           <div>
             <h2>{title}</h2>
           </div>
-          <LocaleSelector />
           <button
             className="icon-button"
             disabled={busy}

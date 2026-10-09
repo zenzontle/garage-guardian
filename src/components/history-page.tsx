@@ -58,8 +58,8 @@ export function HistoryPage({
       if (sort === 'cost_low') return a.totalCostCents - b.totalCostCents;
       if (sort === 'odometer_high')
         return (
-          distanceInMiles(b.odometer, cars.find((car) => car.id === b.carId)?.distanceUnit) -
-          distanceInMiles(a.odometer, cars.find((car) => car.id === a.carId)?.distanceUnit)
+          distanceInMiles(b.odometer ?? -1, cars.find((car) => car.id === b.carId)?.distanceUnit) -
+          distanceInMiles(a.odometer ?? -1, cars.find((car) => car.id === a.carId)?.distanceUnit)
         );
       return b.date.localeCompare(a.date);
     });

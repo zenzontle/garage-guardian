@@ -226,7 +226,9 @@ export function CarsPage({
                         </strong>
                         <small>
                           {displayDate(visit.date)} ·{' '}
-                          {formatDistance(visit.odometer, car?.distanceUnit)}
+                          {visit.odometer === null
+                            ? '—'
+                            : formatDistance(visit.odometer, car?.distanceUnit)}
                         </small>
                       </span>
                       <strong>{money(visit.totalCostCents)}</strong>

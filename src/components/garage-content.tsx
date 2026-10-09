@@ -155,7 +155,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
           <main className="content">
             {isCloudConfigured && (
               <div className="storage-account">
-                <span>{user ? t('app.cloudStorage') : t('app.guestStorage')}</span>
+                {!user && <span>{t('app.guestStorage')}</span>}
                 {accountActions}
               </div>
             )}
