@@ -19,24 +19,34 @@ export function sameRecoverySession(first: Session, second: Session) {
 export function rememberRecovery(session: Session, finishing = false) {
   const id = binding(session);
   try {
-    if (id) sessionStorage.setItem(key(), JSON.stringify({ id, finishing }));
+    if (id) {
+      // Match Auth's persistence so closing a tab cannot lift recovery restrictions.
+      localStorage.setItem(key(), JSON.stringify({ id, finishing }));
+      sessionStorage.removeItem(key());
+    }
   } catch {
     /* Recovery remains usable without reload persistence. */
   }
 }
 export function storedRecovery(session: Session): { finishing: boolean } | null {
   try {
-    const stored = JSON.parse(sessionStorage.getItem(key()) ?? 'null') as {
+    const persisted = localStorage.getItem(key());
+    const stored = JSON.parse(persisted ?? sessionStorage.getItem(key()) ?? 'null') as {
       id: string;
       finishing: boolean;
     } | null;
-    return stored?.id === binding(session) ? { finishing: Boolean(stored.finishing) } : null;
+    const id = binding(session);
+    if (!id || stored?.id !== id) return null;
+    // Migrate an existing tab's marker when upgrading from tab-only storage.
+    if (!persisted) rememberRecovery(session, Boolean(stored.finishing));
+    return { finishing: Boolean(stored.finishing) };
   } catch {
     return null;
   }
 }
 export function clearRecovery() {
   try {
+    localStorage.removeItem(key());
     sessionStorage.removeItem(key());
   } catch {
     /* Storage is optional. */

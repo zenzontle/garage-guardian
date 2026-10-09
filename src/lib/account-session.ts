@@ -1,5 +1,6 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { AppError } from './app-error';
+import { sameRecoverySession } from './account-recovery';
 
 // Explicitly shared with client configuration; preserve Supabase's existing key.
 export const accountAuthStorageKey = (project: string) =>
@@ -34,6 +35,41 @@ export function serializeAccountSignIns(client: SupabaseClient) {
     };
   }
   return client;
+}
+
+export async function signOutPasswordSession(
+  client: SupabaseClient,
+  session: Session,
+  scope: 'local' | 'global',
+) {
+  const code = scope === 'global' ? 'sessionRevocation' : 'auth';
+  try {
+    const auth = client.auth as unknown as LockedAuth;
+    if (!auth.lock || !auth._acquireLock || !auth._useSession || !auth._signOut)
+      throw new AppError(code);
+    await auth.initialize();
+    await auth._acquireLock(-1, async () => {
+      const readSession = async () => {
+        const current = await auth._useSession(async (result) => result);
+        if (current.error) throw new AppError(code);
+        if (current.data.session && !sameRecoverySession(session, current.data.session))
+          throw new AppError('sessionChanged');
+        return current.data.session;
+      };
+      if (!(await readSession())) {
+        // Local cleanup can already be complete; global revocation needs a token.
+        if (scope === 'global') throw new AppError(code);
+        return;
+      }
+      const { error } = await auth._signOut({ scope }).catch(() => ({ error: true }));
+      const remaining = await readSession();
+      // A lost local logout response is harmless if credentials are gone.
+      if ((error && scope === 'global') || remaining) throw new AppError(code);
+    });
+  } catch (cause) {
+    if (cause instanceof AppError && cause.code === 'sessionChanged') throw cause;
+    throw new AppError(code);
+  }
 }
 
 export async function clearDeletedAccountSession(

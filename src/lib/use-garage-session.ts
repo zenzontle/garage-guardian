@@ -22,7 +22,7 @@ import {
   storedRecovery,
 } from './account-recovery';
 import type { AccountDelete, AccountPatch } from './account-contract';
-import { clearDeletedAccountSession } from './account-session';
+import { clearDeletedAccountSession, signOutPasswordSession } from './account-session';
 import en from '../../messages/en.json';
 
 export type MutationResult = { refreshed: boolean };
@@ -406,24 +406,18 @@ export function useGarageSession() {
         code && Object.hasOwn(en.errors, code) ? (code as keyof typeof en.errors) : 'auth',
       );
     }
+    return data.session;
   }
 
-  async function finishPasswordChange(global: boolean) {
-    const { error } = await supabase!.auth
-      .signOut({ scope: global ? 'global' : 'local' })
-      .catch(() => ({ error: true }));
-    let failed = Boolean(error);
-    if (error && !global) {
-      // The server already revoked refresh sessions. A lost logout response
-      // can still leave the SDK's local credentials successfully cleared.
-      const local = await supabase!.auth.getSession();
-      failed = Boolean(local.error || local.data.session);
+  async function finishPasswordChange(session: Session, global: boolean) {
+    try {
+      await signOutPasswordSession(supabase!, session, global ? 'global' : 'local');
+    } catch (cause) {
+      setError(failureOf(cause, 'auth'));
+      throw cause;
     }
-    if (failed) {
-      const code = global ? 'sessionRevocation' : 'auth';
-      setError({ code });
-      throw new AppError(code);
-    }
+    if (currentUser.current && currentUser.current.id !== session.user.id)
+      throw new AppError('sessionChanged');
     clearRecovery();
     recoverySession.current = null;
     recoveryFinishing.current = false;
@@ -446,7 +440,7 @@ export function useGarageSession() {
         recoveryFinishing.current = true;
         rememberRecovery(recoverySession.current!, true);
       }
-      await finishPasswordChange(true);
+      await finishPasswordChange(session, true);
     }, true);
   }
 
@@ -472,8 +466,12 @@ export function useGarageSession() {
     if (newPassword !== confirmation) throw new AppError('passwordMismatch');
     if (newPassword.length < 6) throw new AppError('weakPassword');
     await accountOperation(async () => {
-      await requestAccount('PATCH', { kind: 'password', currentPassword, newPassword });
-      await finishPasswordChange(false);
+      const session = await requestAccount('PATCH', {
+        kind: 'password',
+        currentPassword,
+        newPassword,
+      });
+      await finishPasswordChange(session, false);
     });
   }
 

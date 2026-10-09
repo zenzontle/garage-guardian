@@ -143,7 +143,7 @@ describe.each([
     await screen.findByRole('heading', { name: copy.account.welcome });
     expect(cloud.auth.signOut).toHaveBeenCalledTimes(1);
     expect(cloud.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
-    expect(sessionStorage.length).toBe(0);
+    expect(localStorage.getItem('garage-guardian:recovery:https://garage.supabase.co')).toBeNull();
     expect(screen.queryByText(copy.account.passwordChanged)).toBeNull();
   });
 });
