@@ -20,7 +20,11 @@ import {
   storedRecovery,
 } from './account-recovery';
 import type { AccountPatch } from './account-contract';
-import { signOutPasswordSession, updateRecoveryPassword } from './account-session';
+import {
+  assertPasswordSignOutSupport,
+  signOutPasswordSession,
+  updateRecoveryPassword,
+} from './account-session';
 import en from '../../messages/en.json';
 
 export type MutationResult = { refreshed: boolean };
@@ -485,6 +489,8 @@ export function useGarageSession() {
     if (newPassword !== confirmation) throw new AppError('passwordMismatch');
     if (newPassword.length < 6) throw new AppError('weakPassword');
     await accountOperation(async () => {
+      // Fail before the server changes the password if safe local cleanup is unavailable.
+      assertPasswordSignOutSupport(supabase!);
       const session = await requestAccount({
         kind: 'password',
         currentPassword,

@@ -470,6 +470,41 @@ it('does not revoke a replacement account after a password request finishes unde
   expect(hook.result.current.user?.id).toBe('replacement');
 });
 
+it.each(['lock', '_acquireLock', '_useSession', '_signOut'])(
+  'rejects password changes before the PATCH when Auth %s is unavailable',
+  async (capability) => {
+    cloud.emit(account());
+    const hook = await openGarage();
+    const repository = hook.result.current.repository;
+    const auth = cloud.client.auth as unknown as Record<string, unknown>;
+    const original = auth[capability];
+    auth[capability] = undefined;
+    const request = vi.fn(async () => new Response('{}'));
+    vi.stubGlobal('fetch', request);
+
+    await act(async () => {
+      await expect(
+        hook.result.current.changePassword('password', 'new-password', 'new-password'),
+      ).rejects.toMatchObject({ code: 'auth' });
+    });
+
+    expect(request).not.toHaveBeenCalled();
+    expect(cloud.auth.signOut).not.toHaveBeenCalled();
+    expect(hook.result.current.user?.id).toBe(account().id);
+    expect(hook.result.current.repository).toBe(repository);
+    expect(hook.result.current.accountNotice).toBeNull();
+    expect(hook.result.current.accountBusy).toBe(false);
+
+    auth[capability] = original;
+    await act(async () =>
+      hook.result.current.changePassword('password', 'new-password', 'new-password'),
+    );
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(hook.result.current.user).toBeNull();
+    expect(hook.result.current.accountNotice).toBe('passwordChanged');
+  },
+);
+
 it('returns to sign-in after account password changes without altering signup transfer markers', async () => {
   cloud.emit(account());
   const hook = await openGarage();

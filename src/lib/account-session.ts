@@ -66,6 +66,15 @@ export async function updateRecoveryPassword(
   });
 }
 
+export function assertPasswordSignOutSupport(
+  client: SupabaseClient,
+  code: 'auth' | 'sessionRevocation' = 'auth',
+) {
+  const auth = client.auth as unknown as LockedAuth;
+  if (!auth.lock || !auth._acquireLock || !auth._useSession || !auth._signOut)
+    throw new AppError(code);
+}
+
 export async function signOutPasswordSession(
   client: SupabaseClient,
   session: Session,
@@ -73,9 +82,8 @@ export async function signOutPasswordSession(
 ) {
   const code = scope === 'global' ? 'sessionRevocation' : 'auth';
   try {
+    assertPasswordSignOutSupport(client, code);
     const auth = client.auth as unknown as LockedAuth;
-    if (!auth.lock || !auth._acquireLock || !auth._useSession || !auth._signOut)
-      throw new AppError(code);
     await auth.initialize();
     await auth._acquireLock(-1, async () => {
       const readSession = () => readBoundSession(auth, session, code);
