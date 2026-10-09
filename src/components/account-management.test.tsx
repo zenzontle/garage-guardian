@@ -146,6 +146,50 @@ describe.each([
     expect(localStorage.getItem('garage-guardian:recovery:https://garage.supabase.co')).toBeNull();
     expect(screen.queryByText(copy.account.passwordChanged)).toBeNull();
   });
+
+  it('preserves a replacement login while recovery cancellation waits for the auth lock', async () => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    testRouter.reset('/');
+    const App = await loadGarageTestApp();
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { name: copy.dashboard.title });
+    act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+    await screen.findByRole('heading', { name: copy.account.resetTitle });
+    // Model the public SDK method taking the lock before reading its session.
+    const signOut = cloud.auth.signOut.getMockImplementation()!;
+    cloud.client.auth.signOut = async (options) => {
+      await cloud.auth._acquireLock(-1, () => signOut({ scope: options?.scope ?? 'global' }));
+      return { error: null };
+    };
+    let release!: () => void;
+    let settled!: () => void;
+    const finished = new Promise<void>((resolve) => {
+      settled = resolve;
+    });
+    cloud.auth._acquireLock.mockImplementationOnce(async (_timeout, work) => {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      try {
+        return await work();
+      } finally {
+        settled();
+      }
+    });
+    const back = screen.getByRole('button', { name: copy.account.backSignin });
+    await user.click(back);
+    await waitFor(() => expect(release).toBeTypeOf('function'));
+    expect(back.closest('fieldset')?.disabled).toBe(true);
+    act(() => cloud.emit(account('replacement')));
+    await act(async () => {
+      release();
+      await finished;
+    });
+    expect((await cloud.auth.getSession()).data.session?.user.id).toBe('replacement');
+    expect(cloud.auth.signOut).not.toHaveBeenCalled();
+    expect(testRouter.url).toBe('/auth/recovery');
+  });
 });
 
 it('disables all account forms during an in-flight request and retains drafts on network failure', async () => {

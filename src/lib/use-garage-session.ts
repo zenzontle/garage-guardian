@@ -22,7 +22,11 @@ import {
   storedRecovery,
 } from './account-recovery';
 import type { AccountDelete, AccountPatch } from './account-contract';
-import { clearDeletedAccountSession, signOutPasswordSession } from './account-session';
+import {
+  clearDeletedAccountSession,
+  signOutPasswordSession,
+  updateRecoveryPassword,
+} from './account-session';
 import en from '../../messages/en.json';
 
 export type MutationResult = { refreshed: boolean };
@@ -433,14 +437,28 @@ export function useGarageSession() {
     if (password.length < 6) throw new AppError('weakPassword');
     await accountOperation(async () => {
       if (!recoveryFinishing.current) {
-        const { error } = await supabase!.auth.updateUser({ password });
-        if (error) throw new AppError(failureOf({ code: error.code }, 'auth').code);
+        await updateRecoveryPassword(supabase!, session, password);
         if (!recoverySession.current || !sameRecoverySession(session, recoverySession.current))
           throw new AppError('sessionChanged');
         recoveryFinishing.current = true;
         rememberRecovery(recoverySession.current!, true);
       }
       await finishPasswordChange(session, true);
+    }, true);
+  }
+
+  async function cancelRecovery() {
+    const session = recoverySession.current;
+    if (!session) return;
+    await accountOperation(async () => {
+      await signOutPasswordSession(supabase!, session, 'local');
+      if (recoverySession.current && sameRecoverySession(session, recoverySession.current)) {
+        clearRecovery();
+        recoverySession.current = null;
+        recoveryFinishing.current = false;
+        setRecovering(false);
+        transition.current(null, true);
+      }
     }, true);
   }
 
@@ -529,6 +547,7 @@ export function useGarageSession() {
     requestRecovery,
     resendConfirmation,
     resetPassword,
+    cancelRecovery,
     changeEmail,
     changePassword,
     deleteAccount,

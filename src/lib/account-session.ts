@@ -1,5 +1,5 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
-import { AppError } from './app-error';
+import { AppError, failureOf } from './app-error';
 import { sameRecoverySession } from './account-recovery';
 
 // Explicitly shared with client configuration; preserve Supabase's existing key.
@@ -15,6 +15,7 @@ type LockedAuth = Pick<SupabaseClient['auth'], 'initialize' | 'signInWithPasswor
     work: (result: Awaited<ReturnType<SupabaseClient['auth']['getSession']>>) => Promise<R>,
   ) => Promise<R>;
   _signOut: SupabaseClient['auth']['signOut'];
+  _updateUser: SupabaseClient['auth']['updateUser'];
   _removeSession: () => Promise<void>;
 };
 
@@ -37,6 +38,35 @@ export function serializeAccountSignIns(client: SupabaseClient) {
   return client;
 }
 
+async function readBoundSession(
+  auth: LockedAuth,
+  session: Session,
+  code: 'auth' | 'sessionRevocation',
+) {
+  const current = await auth._useSession(async (result) => result);
+  if (current.error) throw new AppError(code);
+  if (current.data.session && !sameRecoverySession(session, current.data.session))
+    throw new AppError('sessionChanged');
+  return current.data.session;
+}
+
+export async function updateRecoveryPassword(
+  client: SupabaseClient,
+  session: Session,
+  password: string,
+) {
+  const auth = client.auth as unknown as LockedAuth;
+  if (!auth.lock || !auth._acquireLock || !auth._useSession || !auth._updateUser)
+    throw new AppError('auth');
+  await auth.initialize();
+  await auth._acquireLock(-1, async () => {
+    if (!(await readBoundSession(auth, session, 'auth'))) throw new AppError('recoveryInvalid');
+    // The public method reacquires the lock; use the installed SDK primitive.
+    const { error } = await auth._updateUser({ password });
+    if (error) throw new AppError(failureOf({ code: error.code }, 'auth').code);
+  });
+}
+
 export async function signOutPasswordSession(
   client: SupabaseClient,
   session: Session,
@@ -49,13 +79,7 @@ export async function signOutPasswordSession(
       throw new AppError(code);
     await auth.initialize();
     await auth._acquireLock(-1, async () => {
-      const readSession = async () => {
-        const current = await auth._useSession(async (result) => result);
-        if (current.error) throw new AppError(code);
-        if (current.data.session && !sameRecoverySession(session, current.data.session))
-          throw new AppError('sessionChanged');
-        return current.data.session;
-      };
+      const readSession = () => readBoundSession(auth, session, code);
       if (!(await readSession())) {
         // Local cleanup can already be complete; global revocation needs a token.
         if (scope === 'global') throw new AppError(code);

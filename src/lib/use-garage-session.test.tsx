@@ -515,7 +515,7 @@ it('clears an account notice when a different account signs in through an auth e
 it('clears recovery on cancellation and on a new session for the same account', async () => {
   const hook = await openGarage();
   act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
-  await act(async () => hook.result.current.signOut());
+  await act(async () => hook.result.current.cancelRecovery());
   expect(hook.result.current.recovering).toBe(false);
   expect(localStorage.getItem(`garage-guardian:recovery:${project}`)).toBeNull();
   act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
@@ -605,6 +605,7 @@ it.each(['password', 'recovery'] as const)(
       expect(await outcome).toMatchObject({ code: 'sessionChanged' });
     });
     expect(cloud.auth.signOut).not.toHaveBeenCalled();
+    if (kind === 'recovery') expect(cloud.auth.updateUser).not.toHaveBeenCalled();
     expect(hook.result.current.user?.id).toBe('replacement');
     expect(hook.result.current.accountNotice).toBeNull();
   },

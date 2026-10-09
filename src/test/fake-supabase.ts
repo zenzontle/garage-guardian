@@ -188,6 +188,7 @@ export function fakeSupabase() {
       work: (result: Awaited<ReturnType<typeof auth.getSession>>) => Promise<R>,
     ) => work(await auth.getSession()),
     _signOut: (options: { scope: 'local' }) => auth.signOut(options),
+    _updateUser: (attributes: { password: string }) => auth.updateUser(attributes),
     _removeSession: async () => {
       const { error } = await auth.signOut({ scope: 'local' });
       if (error) throw error;

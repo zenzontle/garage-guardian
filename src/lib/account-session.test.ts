@@ -10,6 +10,7 @@ import {
   clearDeletedAccountSession,
   serializeAccountSignIns,
   signOutPasswordSession,
+  updateRecoveryPassword,
 } from './account-session';
 import { account } from '../test/fake-supabase';
 
@@ -48,6 +49,7 @@ function storedClient(projectUrl = project) {
       work: (result: Awaited<ReturnType<typeof auth.getSession>>) => Promise<R>,
     ) => work(await auth.getSession()),
     _signOut: (options: { scope: 'local' }) => auth.signOut(options),
+    _updateUser: vi.fn(async () => ({ data: { user: account() }, error: null })),
     _removeSession: async () => {
       const { error } = await auth.signOut({ scope: 'local' });
       if (error) throw error;
@@ -153,7 +155,7 @@ it('reports cleanup failure rather than completion when persisted storage cannot
 
 it.each(
   (['signInWithPassword', 'signUp'] as const).flatMap((method) =>
-    (['deletion', 'local', 'global'] as const).map((scope) => ({ method, scope })),
+    (['deletion', 'local', 'global', 'reset'] as const).map((scope) => ({ method, scope })),
   ),
 )(
   'preserves a replacement account when $scope cleanup waits for another client’s $method lock',
@@ -206,9 +208,11 @@ it.each(
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
     requested.mockClear();
     const cleanup =
-      scope === 'deletion'
-        ? clearDeletedAccountSession(deleted, sessionProject, account().id)
-        : signOutPasswordSession(deleted, originalSession, scope);
+      scope === 'reset'
+        ? updateRecoveryPassword(deleted, originalSession, 'new-password')
+        : scope === 'deletion'
+          ? clearDeletedAccountSession(deleted, sessionProject, account().id)
+          : signOutPasswordSession(deleted, originalSession, scope);
     const rejected = expect(cleanup).rejects.toMatchObject({ code: 'sessionChanged' });
     await vi.waitFor(() => expect(requested).toHaveBeenCalled());
     expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe(account().id);
@@ -222,7 +226,7 @@ it.each(
   },
 );
 
-it.each(['local', 'global'] as const)(
+it.each(['local', 'global', 'reset'] as const)(
   'preserves a new session for the same account during %s password completion',
   async (scope) => {
     const { client, auth, key } = storedClient();
@@ -232,7 +236,11 @@ it.each(['local', 'global'] as const)(
       access_token: `header.${btoa(JSON.stringify({ session_id: 'replacement-session' }))}.signature`,
     };
     localStorage.setItem(key, JSON.stringify(replacement));
-    await expect(signOutPasswordSession(client, original, scope)).rejects.toMatchObject({
+    await expect(
+      scope === 'reset'
+        ? updateRecoveryPassword(client, original, 'new-password')
+        : signOutPasswordSession(client, original, scope),
+    ).rejects.toMatchObject({
       code: 'sessionChanged',
     });
     expect(auth.signOut).not.toHaveBeenCalled();
@@ -311,7 +319,7 @@ it('holds the shared lock until local removal finishes before another client can
   await Promise.all([deleted.auth.stopAutoRefresh(), otherTab.auth.stopAutoRefresh()]);
 });
 
-it.each(['deletion', 'local', 'global'] as const)(
+it.each(['deletion', 'local', 'global', 'reset'] as const)(
   'fails closed for %s cleanup when no shared auth lock is configured',
   async (scope) => {
     const sessionProject = 'https://no-lock.supabase.co';
@@ -324,9 +332,11 @@ it.each(['deletion', 'local', 'global'] as const)(
     await client.auth.initialize();
     const session = (await client.auth.getSession()).data.session!;
     await expect(
-      scope === 'deletion'
-        ? clearDeletedAccountSession(client, sessionProject, account().id)
-        : signOutPasswordSession(client, session, scope),
+      scope === 'reset'
+        ? updateRecoveryPassword(client, session, 'new-password')
+        : scope === 'deletion'
+          ? clearDeletedAccountSession(client, sessionProject, account().id)
+          : signOutPasswordSession(client, session, scope),
     ).rejects.toMatchObject({
       code:
         scope === 'deletion'
@@ -353,3 +363,91 @@ it.each(['local', 'global'] as const)(
     expect(auth.signOut).not.toHaveBeenCalled();
   },
 );
+
+it('holds the auth lock through the recovery password update before another client can sign in', async () => {
+  const sessionProject = 'https://recovery-update-race.supabase.co';
+  const { key } = storedClient(sessionProject);
+  const replacement = {
+    ...JSON.parse(localStorage.getItem(key)!),
+    expires_in: 3600,
+    user: account('replacement'),
+  };
+  let release!: () => void;
+  const updateFetch = vi.fn<(url: RequestInfo | URL, options?: RequestInit) => Promise<Response>>(
+    () =>
+      new Promise<Response>((resolve) => {
+        release = () => resolve(new Response(JSON.stringify({ user: account() })));
+      }),
+  );
+  const recovery = createClient(sessionProject, 'test-key', {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
+    global: { fetch: updateFetch },
+  });
+  const signInFetch = vi.fn(async () => new Response(JSON.stringify(replacement)));
+  const otherTab = serializeAccountSignIns(
+    createClient(sessionProject, 'test-key', {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
+      global: { fetch: signInFetch },
+    }),
+  );
+  await Promise.all([recovery.auth.initialize(), otherTab.auth.initialize()]);
+  const session = (await recovery.auth.getSession()).data.session!;
+  const updating = updateRecoveryPassword(recovery, session, 'new-password');
+  await vi.waitFor(() => expect(updateFetch).toHaveBeenCalledTimes(1));
+  expect(updateFetch.mock.calls[0][1]).toMatchObject({
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  });
+  expect(JSON.parse(updateFetch.mock.calls[0][1]!.body as string)).toMatchObject({
+    password: 'new-password',
+  });
+  const signingIn = otherTab.auth.signInWithPassword({
+    email: 'replacement@example.com',
+    password: 'password',
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(signInFetch).not.toHaveBeenCalled();
+  release();
+  await updating;
+  await signingIn;
+  expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe('replacement');
+  await Promise.all([recovery.auth.stopAutoRefresh(), otherTab.auth.stopAutoRefresh()]);
+});
+
+it('rejects a missing recovery session before calling the password update primitive', async () => {
+  const { client, auth, key } = storedClient();
+  const session = (await auth.getSession()).data.session;
+  localStorage.removeItem(key);
+  const updateUser = vi.spyOn(
+    client.auth as unknown as { _updateUser: typeof client.auth.updateUser },
+    '_updateUser',
+  );
+  await expect(updateRecoveryPassword(client, session, 'new-password')).rejects.toMatchObject({
+    code: 'recoveryInvalid',
+  });
+  expect(updateUser).not.toHaveBeenCalled();
+});
+
+it('translates a provider password rejection while preserving the recovery session', async () => {
+  const sessionProject = 'https://recovery-weak-password.supabase.co';
+  const { key } = storedClient(sessionProject);
+  const client = createClient(sessionProject, 'test-key', {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
+    global: {
+      fetch: vi.fn(
+        async () =>
+          new Response(JSON.stringify({ code: 'weak_password', msg: 'Password rejected' }), {
+            status: 422,
+            headers: { 'X-Supabase-Api-Version': '2024-01-01' },
+          }),
+      ),
+    },
+  });
+  const session = (await client.auth.getSession()).data.session!;
+  await expect(updateRecoveryPassword(client, session, 'weak-password')).rejects.toMatchObject({
+    code: 'weakPassword',
+  });
+  expect((await client.auth.getSession()).data.session?.user.id).toBe(session.user.id);
+  expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe(session.user.id);
+  await client.auth.stopAutoRefresh();
+});
