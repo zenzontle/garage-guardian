@@ -35,7 +35,7 @@ function daysBetween(from: string, to: string): number {
 export function latestOdometer(car: Car, visits: Visit[]): number {
   return visits
     .filter((visit) => visit.carId === car.id)
-    .reduce((highest, visit) => Math.max(highest, visit.odometer), car.odometer);
+    .reduce((highest, visit) => Math.max(highest, visit.odometer ?? highest), car.odometer);
 }
 
 export function getDueItem(
@@ -49,7 +49,7 @@ export function getDueItem(
       (visit) =>
         visit.carId === car.id && visit.items.some((item) => item.scheduleItemId === schedule.id),
     )
-    .sort((a, b) => b.date.localeCompare(a.date) || b.odometer - a.odometer);
+    .sort((a, b) => b.date.localeCompare(a.date) || (b.odometer ?? -1) - (a.odometer ?? -1));
   const lastDone = completed[0] ?? null;
   const isRecurring = schedule.intervalMiles !== null || schedule.intervalMonths !== null;
 
@@ -72,7 +72,7 @@ export function getDueItem(
       : null
     : schedule.firstDueDate;
   const dueMiles = lastDone
-    ? schedule.intervalMiles !== null
+    ? schedule.intervalMiles !== null && lastDone.odometer !== null
       ? lastDone.odometer + schedule.intervalMiles
       : null
     : schedule.firstDueMiles;

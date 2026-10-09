@@ -1496,31 +1496,10 @@ td strong {
   appearance: textfield;
   -moz-appearance: textfield;
 }
-.money-input input::-webkit-inner-spin-button,
-.money-input input::-webkit-outer-spin-button {
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
-}
-.money-steppers {
-  display: flex;
-  gap: 0.25rem;
-}
-.money-steppers button {
-  display: grid;
-  place-items: center;
-  padding: 0.5rem;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  border-radius: 3px;
-}
-.money-steppers button:hover {
-  background: var(--green-soft);
-  color: var(--green);
-}
-.money-steppers button:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 1px;
 }
 
 button {
@@ -1765,4 +1744,9 @@ a.button {
 }
 .account-section p {
   overflow-wrap: anywhere;
+}
+
+input[type='number'] {
+  appearance: textfield;
+  -moz-appearance: textfield;
 }

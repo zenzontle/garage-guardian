@@ -108,7 +108,7 @@ export function GarageSidebar({
             <strong>
               {user?.email || (isCloudConfigured ? t('app.guest') : t('app.prototype'))}
             </strong>
-            <small>{user ? t('app.cloudStorage') : t('app.localStorage')}</small>
+            {!user && <small>{t('app.localStorage')}</small>}
           </span>
         </div>
       </div>

@@ -70,7 +70,7 @@ describe.each([
     expect((await dialog.findByRole('alert')).textContent).toBe(
       'La matrícula debe tener 20 caracteres o menos.',
     );
-    await user.selectOptions(dialog.getByRole('combobox', { name: 'Idioma' }), 'en');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
     expect(screen.getByRole('dialog')).toBe(dialogElement);
     expect(dialog.getByRole('alert').textContent).toBe(
       'License plate must be 20 characters or fewer.',
@@ -80,7 +80,7 @@ describe.each([
       '48250',
     );
     expect(saveCar).not.toHaveBeenCalled();
-    await user.selectOptions(dialog.getByRole('combobox', { name: 'Language' }), 'es');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
     fireEvent.change(dialog.getByLabelText(/Matrícula/), { target: { value: ' AbC-123 ' } });
     await user.click(dialog.getByRole('button', { name: 'Añadir auto' }));
     await screen.findByRole('link', { name: 'Mi auto / My car' });
@@ -122,12 +122,12 @@ describe.each([
       visitDialog.getByRole('spinbutton', { name: 'Costo de la tarea en dólares' }),
       { target: { value: '100.25' } },
     );
-    await user.selectOptions(visitDialog.getByRole('combobox', { name: 'Idioma' }), 'en');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
     expect(screen.getByRole('dialog')).toBe(visitElement);
     expect(
       (visitDialog.getByRole('spinbutton', { name: 'Total cost (USD)' }) as HTMLInputElement).value,
     ).toBe('1234.56');
-    await user.selectOptions(visitDialog.getByRole('combobox', { name: 'Language' }), 'es');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Language' }), 'es');
     await user.click(visitDialog.getByRole('button', { name: 'Guardar visita' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     const saved = await backend.load();
@@ -194,7 +194,7 @@ describe.each([
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'Add a car' }));
     const dialog = within(screen.getByRole('dialog', { name: 'Add a car' }));
-    expect(dialog.queryAllByRole('combobox')).toHaveLength(configured ? 4 : 2); // Includes language and distance-unit selects.
+    expect(dialog.queryAllByRole('combobox')).toHaveLength(configured ? 3 : 1); // Includes the distance-unit select.
     expect((dialog.getByLabelText('Distance unit') as HTMLSelectElement).value).toBe('miles');
     expect((dialog.getByLabelText('Coming up: miles before due') as HTMLInputElement).value).toBe(
       '500',
@@ -212,7 +212,7 @@ describe.each([
     const edit = within(screen.getByRole('dialog', { name: 'Edit car' }));
     expect((edit.getByLabelText('Make') as HTMLInputElement).value).toBe('Toyota');
     expect((edit.getByLabelText('Model') as HTMLInputElement).value).toBe('RAV4');
-    expect(edit.queryAllByRole('combobox')).toHaveLength(configured ? 3 : 1);
+    expect(edit.queryAllByRole('combobox')).toHaveLength(configured ? 2 : 0);
     await user.clear(edit.getByLabelText('Nickname'));
     await user.type(edit.getByLabelText('Nickname'), 'Updated driver');
     await user.click(edit.getByRole('button', { name: 'Save changes' }));
@@ -223,7 +223,7 @@ describe.each([
       expect(await get('garage-guardian:local:v1')).toBeUndefined();
       expect([...cloud.tables.get('cars')!.values()][0].name).toBe('Updated driver');
       expect([...cloud.tables.get('schedule_items')!.values()]).toHaveLength(6);
-      expect(screen.getAllByText('Stored in Supabase')).toHaveLength(2);
+      expect(screen.queryByText('Stored in Supabase')).toBeNull();
     } else {
       expect(local.cars[0].name).toBe('Updated driver');
       expect(local.schedules).toHaveLength(6);

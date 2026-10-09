@@ -56,7 +56,7 @@ export function EditableCombobox({
           aria-expanded={expanded}
           aria-controls={expanded ? `${id}-list` : undefined}
           aria-activedescendant={activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined}
-          aria-describedby={`${id}-help`}
+          aria-describedby={failed || loading ? `${id}-help` : undefined}
           autoComplete="off"
           value={value}
           placeholder={placeholder}
@@ -129,13 +129,11 @@ export function EditableCombobox({
           </ul>
         )}
       </div>
-      <span id={`${id}-help`} className="combobox-help" role="status">
-        {failed
-          ? t('autocomplete.unavailable')
-          : loading
-            ? t('autocomplete.loading')
-            : t('autocomplete.hint')}
-      </span>
+      {(failed || loading) && (
+        <span id={`${id}-help`} className="combobox-help" role="status">
+          {failed ? t('autocomplete.unavailable') : t('autocomplete.loading')}
+        </span>
+      )}
       {failed && (
         <button type="button" className="combobox-retry" onClick={onRetry}>
           {t('autocomplete.retry', { label: label.toLowerCase() })}
