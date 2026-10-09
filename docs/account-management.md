@@ -11,6 +11,8 @@ For [ZEN-10](https://linear.app/zenzontle/issue/ZEN-10/account-recovery-and-mana
 
 The browser sends recovery and confirmation-resend email requests to Supabase, with redirects built from the current origin and fixed paths. Confirmation resend has a shared 60-second cooldown, including failed attempts. Provider auth rate limits remain authoritative. The project recovery marker uses localStorage alongside the persisted Auth session, so restrictions survive closing the recovery tab and reopening the app. It contains only the user identity, JWT session ID, and revocation-retry status, never credentials; existing tab-only markers migrate when read. Completion, cancellation, sign-out, or a new identity/session clears the marker. An ordinary signed-in visit to `/auth/recovery` cannot reset a password. An invalid callback preserves restrictions on an existing session-bound recovery session. Recovery suspends pending signup transfer until ordinary sign-in resumes it.
 
+Recovery bootstrap starts when the browser client is created. It captures the callback before Supabase clears the URL and, after successful initialization, binds the matching session before the hook handles `INITIAL_SESSION` or loads a garage. A client-lifetime auth observer also records recovery events before React subscribes, so delayed hydration cannot lose the restriction. Failed callbacks and replacement logins do not create a new recovery binding.
+
 ## API contract
 
 `PATCH /api/account` accepts exactly one of:

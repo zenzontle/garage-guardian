@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clear } from 'idb-keyval';
+import { clear, get, set } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../test/fake-supabase';
 import { car, schedule, visit } from '../test/fixtures';
@@ -38,6 +38,91 @@ it('updates same-ID user metadata without rebuilding the repository', async () =
   expect(hook.result.current.user?.email).toBe('confirmed@example.com');
   expect(hook.result.current.repository).toBe(repository);
   expect(cloud.from.mock.calls.length).toBe(calls);
+});
+
+it('bootstraps a recovery callback processed by the SDK before the hook subscribes', async () => {
+  const { LocalRepository } = await import('./repository');
+  const { registerSignup } = await import('./signup-transfer');
+  const local = new LocalRepository();
+  await local.saveCar(car);
+  await registerSignup(project, account(), true);
+  cloud.emit(account());
+  const session = (await cloud.auth.getSession()).data.session!;
+  const callback = new URLSearchParams({
+    access_token: session.access_token,
+    refresh_token: session.refresh_token,
+    expires_in: '3600',
+    token_type: 'bearer',
+    type: 'recovery',
+  });
+  window.history.replaceState(null, '', `/auth/recovery#${callback}`);
+  vi.resetModules();
+  const sdk =
+    await vi.importActual<typeof import('@supabase/supabase-js')>('@supabase/supabase-js');
+  const fetch = vi.fn(async () => new Response(JSON.stringify(account())));
+  vi.mocked(createClient).mockImplementationOnce((url, key, options) =>
+    sdk.createClient(url, key, {
+      ...options,
+      auth: { ...options?.auth, lock: sdk.processLock, autoRefreshToken: false },
+      global: { fetch },
+    }),
+  );
+  const { supabase } = await import('./repository');
+  await supabase!.auth.initialize();
+  // Let the one-shot notification finish before mounting the hook.
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(window.location.hash).toBe('');
+  const hook = await openGarage();
+  expect(hook.result.current.recovering).toBe(true);
+  expect(hook.result.current.repository).toBeNull();
+  expect(hook.result.current.transferring).toBe(false);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(await local.load()).toEqual({ cars: [car], schedules: [], visits: [] });
+  const marker = localStorage.getItem(`garage-guardian:recovery:${project}`)!;
+  expect(marker).not.toContain(session.access_token);
+  expect(marker).not.toContain(session.refresh_token);
+  hook.unmount();
+  sessionStorage.clear();
+  const reloaded = await openGarage();
+  expect(reloaded.result.current.recovering).toBe(true);
+  expect(fetch).toHaveBeenCalledTimes(1);
+  await supabase!.auth.stopAutoRefresh();
+});
+
+it('waits for recovery bootstrap before handling an initial session or loading a garage', async () => {
+  const guest = { cars: [car], schedules: [], visits: [] };
+  await set('garage-guardian:local:v1', guest);
+  await set(`garage-guardian:signup-transfer:v1:${project}`, {
+    userId: account().id,
+    status: 'pending',
+  });
+  cloud.emit(account());
+  const session = (await cloud.auth.getSession()).data.session!;
+  window.history.replaceState(
+    null,
+    '',
+    `/auth/recovery#${new URLSearchParams({ type: 'recovery', access_token: session.access_token })}`,
+  );
+  let release!: () => void;
+  cloud.auth.initialize.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve({ error: null });
+      }),
+  );
+  const { useGarageSession } = await import('./use-garage-session');
+  const hook = renderHook(() => useGarageSession());
+  act(() => cloud.emit(account(), 'INITIAL_SESSION'));
+  expect(hook.result.current.loading).toBe(true);
+  expect(cloud.from).not.toHaveBeenCalled();
+  await act(async () => {
+    release();
+  });
+  await waitFor(() => expect(hook.result.current.loading).toBe(false));
+  expect(hook.result.current.recovering).toBe(true);
+  expect(hook.result.current.repository).toBeNull();
+  expect(cloud.from).not.toHaveBeenCalled();
+  expect(await get('garage-guardian:local:v1')).toEqual(guest);
 });
 
 it('suspends signup transfer during recovery after closing the tab and resumes after ordinary sign-in', async () => {

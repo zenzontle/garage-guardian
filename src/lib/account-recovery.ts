@@ -1,4 +1,35 @@
-import type { Session } from '@supabase/supabase-js';
+import type { Session, SupabaseClient } from '@supabase/supabase-js';
+
+export function bootstrapRecovery(client: SupabaseClient): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  // Capture the callback before SDK initialization clears its credentials.
+  const url = new URL(window.location.href);
+  const params = new URLSearchParams(url.hash.slice(1));
+  url.searchParams.forEach((value, name) => params.set(name, value));
+  const callbackToken =
+    params.get('type') === 'recovery' &&
+    !['error', 'error_code', 'error_description'].some((name) => params.has(name))
+      ? params.get('access_token')
+      : null;
+  // This observer lives with the browser client, before any React subscription.
+  client.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY' && session) rememberRecovery(session);
+  });
+  return client.auth
+    .initialize()
+    .then(async ({ error }) => {
+      if (error || !callbackToken) return;
+      const { data, error: sessionError } = await client.auth.getSession();
+      // Do not restrict a replacement login or an existing session on a failed callback.
+      if (!sessionError && data.session?.access_token === callbackToken) {
+        rememberRecovery(data.session);
+        clearAuthCallback();
+      }
+    })
+    .catch(() => {
+      // The hook still handles getSession errors; retain any existing restriction.
+    });
+}
 
 const key = () => `garage-guardian:recovery:${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''}`;
 // Store only identity and session ID, never callback credentials or tokens.

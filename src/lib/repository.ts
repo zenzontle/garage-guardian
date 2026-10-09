@@ -3,6 +3,7 @@
 import { del, get, set, update } from 'idb-keyval';
 import { AppError } from './app-error';
 import { accountAuthStorageKey, serializeAccountSignIns } from './account-session';
+import { bootstrapRecovery } from './account-recovery';
 import { recordDiagnostic } from './bug-reports/diagnostics';
 import { createClient, navigatorLock, type SupabaseClient } from '@supabase/supabase-js';
 import {
@@ -371,6 +372,8 @@ export const supabase = isCloudConfigured
       ),
     )
   : null;
+
+export const recoveryInitialization = supabase ? bootstrapRecovery(supabase) : Promise.resolve();
 
 export function createRepository(userId?: string): Repository {
   if (supabase && userId) {

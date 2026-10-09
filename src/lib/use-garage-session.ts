@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppError, failureOf, type AppFailure } from './app-error';
-import type { Session, User } from '@supabase/supabase-js';
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { EMPTY_SNAPSHOT, type Snapshot } from './model';
-import { createRepository, supabase, type Repository } from './repository';
+import { createRepository, recoveryInitialization, supabase, type Repository } from './repository';
 import {
   clearAccountTransfer,
   pendingTransfer,
@@ -175,7 +175,12 @@ export function useGarageSession() {
         setRefreshing(false);
         clearAuthCallback();
       };
-      const { data: listener } = client.auth.onAuthStateChange((event, session) => {
+      let bootstrapped = false;
+      const ready = recoveryInitialization.then(() => {
+        bootstrapped = true;
+      });
+      const handleAuth = (event: AuthChangeEvent, session: Session | null) => {
+        if (!active) return;
         const stored = session ? storedRecovery(session) : null;
         const currentRecovery = recoverySession.current;
         if (
@@ -195,9 +200,14 @@ export function useGarageSession() {
           }
           receive(session?.user ?? null, Boolean(currentRecovery));
         }
+      };
+      const { data: listener } = client.auth.onAuthStateChange((event, session) => {
+        if (bootstrapped) handleAuth(event, session);
+        else void ready.then(() => handleAuth(event, session));
       });
       const initialize = async () => {
         try {
+          await ready;
           const { data, error } = await client.auth.getSession();
           if (!active || identity !== undefined) return;
           if (error) throw error;
