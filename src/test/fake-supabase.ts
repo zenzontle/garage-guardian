@@ -145,6 +145,9 @@ export function fakeSupabase() {
     })),
   };
   const auth = {
+    lock: true,
+    initialize: vi.fn(async () => ({ error: null })),
+    _acquireLock: vi.fn(async <R>(_timeout: number, work: () => Promise<R>) => work()),
     getUser: vi.fn(async () => ({ data: { user }, error: null })),
     resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
     resend: vi.fn(async () => ({ data: {}, error: null })),
@@ -173,14 +176,26 @@ export function fakeSupabase() {
         error: null,
       };
     }),
-    signOut: vi.fn(async () => {
+    signOut: vi.fn<
+      (options?: { scope: 'local' | 'global' | 'others' }) => Promise<{ error: Error | null }>
+    >(async () => {
       emit(null);
       return { error: null as Error | null };
     }),
   };
+  Object.assign(auth, {
+    _useSession: async <R>(
+      work: (result: Awaited<ReturnType<typeof auth.getSession>>) => Promise<R>,
+    ) => work(await auth.getSession()),
+    _signOut: (options: { scope: 'local' }) => auth.signOut(options),
+    _removeSession: async () => {
+      const { error } = await auth.signOut({ scope: 'local' });
+      if (error) throw error;
+    },
+  });
   const storage = { from: vi.fn(() => bucket) };
   return {
-    client: { from, storage, auth } as unknown as SupabaseClient,
+    client: { from, storage, auth: { ...auth } } as unknown as SupabaseClient,
     auth,
     from,
     bucket,

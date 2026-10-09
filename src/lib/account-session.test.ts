@@ -1,6 +1,15 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { accountAuthStorageKey, clearDeletedAccountSession } from './account-session';
+import {
+  createClient,
+  navigatorLock,
+  processLock,
+  type SupabaseClient,
+} from '@supabase/supabase-js';
+import {
+  accountAuthStorageKey,
+  clearDeletedAccountSession,
+  serializeAccountSignIns,
+} from './account-session';
 import { account } from '../test/fake-supabase';
 
 const project = 'https://account-session.supabase.co';
@@ -22,12 +31,27 @@ function storedClient(projectUrl = project) {
     }),
   );
   const auth = {
-    signOut: vi.fn(async () => ({ error: null as Error | null })),
+    lock: true,
+    initialize: vi.fn(async () => ({ error: null })),
+    _acquireLock: vi.fn(async <R>(_timeout: number, work: () => Promise<R>) => work()),
+    signOut: vi.fn<(options?: { scope: 'local' }) => Promise<{ error: Error | null }>>(
+      async () => ({ error: null }),
+    ),
     getSession: vi.fn(async () => ({
       data: { session: JSON.parse(localStorage.getItem(key) ?? 'null') },
       error: null,
     })),
   };
+  Object.assign(auth, {
+    _useSession: async <R>(
+      work: (result: Awaited<ReturnType<typeof auth.getSession>>) => Promise<R>,
+    ) => work(await auth.getSession()),
+    _signOut: (options: { scope: 'local' }) => auth.signOut(options),
+    _removeSession: async () => {
+      const { error } = await auth.signOut({ scope: 'local' });
+      if (error) throw error;
+    },
+  });
   return { auth, key, client: { auth } as unknown as SupabaseClient };
 }
 
@@ -35,7 +59,7 @@ it('preserves the SDK’s existing storage key and can load its persisted sessio
   const existingProject = 'https://existing-session.supabase.co';
   const { key } = storedClient(existingProject);
   const existing = createClient(existingProject, 'test-key', {
-    auth: { autoRefreshToken: false, detectSessionInUrl: false },
+    auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
     global: {
       fetch: vi.fn(
         async () => new Response(JSON.stringify({ message: 'User deleted' }), { status: 404 }),
@@ -124,4 +148,138 @@ it('reports cleanup failure rather than completion when persisted storage cannot
     code: 'accountDeletionSessionCleanup',
   });
   expect(localStorage.getItem(key)).not.toBeNull();
+});
+
+it.each(['signInWithPassword', 'signUp'] as const)(
+  'preserves a replacement account when cleanup waits for another client’s %s lock',
+  async (method) => {
+    const sessionProject = `https://${method.toLowerCase()}-race.supabase.co`;
+    const { key } = storedClient(sessionProject);
+    const replacement = {
+      ...JSON.parse(localStorage.getItem(key)!),
+      expires_in: 3600,
+      user: account('replacement'),
+    };
+    let release!: () => void;
+    const fetch = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          release = () => resolve(new Response(JSON.stringify(replacement)));
+        }),
+    );
+    vi.stubGlobal('navigator', {
+      locks: {
+        request: (
+          name: string,
+          _options: unknown,
+          work: (lock: { name: string }) => Promise<unknown>,
+        ) => processLock(name, -1, () => work({ name })),
+      },
+    });
+    const requested = vi.fn();
+    const lock: typeof navigatorLock = (name, timeout, work) => {
+      requested(name);
+      return navigatorLock(name, timeout, work);
+    };
+    const deleted = createClient(sessionProject, 'test-key', {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false, lock },
+      global: { fetch: vi.fn() },
+    });
+    const otherTab = serializeAccountSignIns(
+      createClient(sessionProject, 'test-key', {
+        auth: { autoRefreshToken: false, detectSessionInUrl: false, lock },
+        global: { fetch },
+      }),
+    );
+    await Promise.all([deleted.auth.initialize(), otherTab.auth.initialize()]);
+    const signIn = otherTab.auth[method]({
+      email: 'replacement@example.com',
+      password: 'password',
+    });
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+    requested.mockClear();
+    const cleanup = clearDeletedAccountSession(deleted, sessionProject, account().id);
+    const rejected = expect(cleanup).rejects.toMatchObject({ code: 'sessionChanged' });
+    await vi.waitFor(() => expect(requested).toHaveBeenCalled());
+    expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe(account().id);
+    release();
+    await signIn;
+    await rejected;
+    expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe('replacement');
+    expect((await otherTab.auth.getSession()).data.session?.user.id).toBe('replacement');
+    await Promise.all([deleted.auth.stopAutoRefresh(), otherTab.auth.stopAutoRefresh()]);
+  },
+);
+
+it('holds the shared lock until local removal finishes before another client can sign in', async () => {
+  const sessionProject = 'https://removal-race.supabase.co';
+  const { key } = storedClient(sessionProject);
+  const replacement = {
+    ...JSON.parse(localStorage.getItem(key)!),
+    expires_in: 3600,
+    user: account('replacement'),
+  };
+  let release!: () => void;
+  let removing = false;
+  const deleted = createClient(sessionProject, 'test-key', {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      lock: processLock,
+      storage: {
+        getItem: (name) => localStorage.getItem(name),
+        setItem: (name, value) => localStorage.setItem(name, value),
+        removeItem: async (name) => {
+          if (name === key) {
+            removing = true;
+            await new Promise<void>((resolve) => {
+              release = resolve;
+            });
+          }
+          localStorage.removeItem(name);
+        },
+      },
+    },
+    global: { fetch: vi.fn(async () => new Response('{}', { status: 404 })) },
+  });
+  const fetch = vi.fn(async () => new Response(JSON.stringify(replacement)));
+  const otherTab = serializeAccountSignIns(
+    createClient(sessionProject, 'test-key', {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
+      global: { fetch },
+    }),
+  );
+  await Promise.all([deleted.auth.initialize(), otherTab.auth.initialize()]);
+  const cleanup = clearDeletedAccountSession(deleted, sessionProject, account().id);
+  await vi.waitFor(() => expect(removing).toBe(true));
+  const signIn = otherTab.auth.signInWithPassword({
+    email: 'replacement@example.com',
+    password: 'password',
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(fetch).not.toHaveBeenCalled();
+  release();
+  await cleanup;
+  await signIn;
+  expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe('replacement');
+  await Promise.all([deleted.auth.stopAutoRefresh(), otherTab.auth.stopAutoRefresh()]);
+});
+
+it('fails closed when no shared auth lock is configured', async () => {
+  const sessionProject = 'https://no-lock.supabase.co';
+  const { key } = storedClient(sessionProject);
+  const fetch = vi.fn();
+  const client = createClient(sessionProject, 'test-key', {
+    auth: { autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch },
+  });
+  await client.auth.initialize();
+  await expect(
+    clearDeletedAccountSession(client, sessionProject, account().id),
+  ).rejects.toMatchObject({
+    code: 'accountDeletionSessionCleanup',
+  });
+  expect(localStorage.getItem(key)).not.toBeNull();
+  expect(fetch).not.toHaveBeenCalled();
+  await client.auth.stopAutoRefresh();
 });
