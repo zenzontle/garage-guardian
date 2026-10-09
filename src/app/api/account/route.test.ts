@@ -202,19 +202,44 @@ it('waits for the metadata commit barrier before listing photos or deleting Auth
   expect(photos.photos.size).toBe(0);
   expect(deleteUser).toHaveBeenCalledWith(owner.id, false);
 });
-it('enumerates nested orphan photos across pages before removal, preserving other owners', async () => {
+it('drains nested orphan photos across pages, preserving other owners', async () => {
   for (let i = 0; i < 205; ++i)
     photos.photos.set(`${owner.id}/visit/${String(i).padStart(3, '0')}.webp`, new Blob(['photo']));
   photos.photos.set(`${owner.id}/orphan.webp`, new Blob(['orphan']));
   photos.photos.set('other-user/visit/keep.webp', new Blob(['keep']));
   expect((await DELETE(request('DELETE', deletion))).status).toBe(200);
   expect([...photos.photos.keys()]).toEqual(['other-user/visit/keep.webp']);
-  expect(photos.bucket.list.mock.calls.map(([, options]) => options.offset)).toContain(200);
-  expect(photos.bucket.remove).toHaveBeenCalledTimes(3);
+  expect(photos.bucket.list.mock.calls.every(([, options]) => options.offset === 0)).toBe(true);
   expect(photos.bucket.list.mock.invocationCallOrder.at(-1)!).toBeLessThan(
-    photos.bucket.remove.mock.invocationCallOrder[0],
+    deleteUser.mock.invocationCallOrder[0],
   );
 });
+it.each(['files', 'folders'] as const)(
+  'does not skip shifted %s when another tab deletes between listing pages',
+  async (kind) => {
+    for (let i = 0; i < 205; ++i) {
+      const name = String(i).padStart(3, '0');
+      photos.photos.set(
+        `${owner.id}/${name}${kind === 'folders' ? '/photo' : ''}.webp`,
+        new Blob(['photo']),
+      );
+    }
+    photos.photos.set('other-user/keep.webp', new Blob(['keep']));
+    const list = photos.bucket.list.getMockImplementation()!;
+    photos.bucket.list.mockImplementationOnce(async (folder, options) => {
+      const result = await list(folder, options);
+      // The listed first entry disappears before the next page is requested.
+      photos.photos.delete(`${owner.id}/000${kind === 'folders' ? '/photo' : ''}.webp`);
+      return result;
+    });
+    deleteUser.mockImplementationOnce(async () => {
+      expect([...photos.photos.keys()]).toEqual(['other-user/keep.webp']);
+      return { error: null };
+    });
+    expect((await DELETE(request('DELETE', deletion))).status).toBe(200);
+    expect(deleteUser).toHaveBeenCalledWith(owner.id, false);
+  },
+);
 it('retains Auth and the fence after partial cleanup failure, then allows retry', async () => {
   for (let i = 0; i < 150; ++i) photos.photos.set(`${owner.id}/${i}.webp`, new Blob(['photo']));
   const remove = photos.bucket.remove.getMockImplementation()!;

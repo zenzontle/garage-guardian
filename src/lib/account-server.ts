@@ -139,30 +139,32 @@ export async function accountRequest(request: Request, deleting: boolean) {
 
 export async function removeAccountPhotos(admin: SupabaseClient, userId: string) {
   const bucket = admin.storage.from('visit-photos');
-  const paths: string[] = [];
   const folders = [userId];
-  // Enumerate before deleting so offsets never skip files as pages shrink.
+  // Writes are fenced. Drain the first page so concurrent deletes cannot shift
+  // surviving files or virtual folders past an offset. Recheck parents last.
   while (folders.length) {
-    const folder = folders.pop()!;
-    for (let offset = 0; ; offset += 100) {
-      const { data, error } = await bucket.list(folder, {
-        limit: 100,
-        offset,
-        sortBy: { column: 'name', order: 'asc' },
-      });
-      if (error || !data) throw new AccountError('accountDeletionFailed', 502);
-      for (const item of data) {
-        if (!item.name || item.name === '.' || item.name === '..' || /[/\\]/.test(item.name))
-          throw new AccountError('accountDeletionFailed', 502);
-        const path = `${folder}/${item.name}`;
-        if (item.id) paths.push(path);
-        else folders.push(path);
-      }
-      if (data.length < 100) break;
+    const folder = folders.at(-1)!;
+    const { data, error } = await bucket.list(folder, {
+      limit: 100,
+      offset: 0,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+    if (error || !data) throw new AccountError('accountDeletionFailed', 502);
+    if (data.length === 0) {
+      folders.pop();
+      continue;
     }
-  }
-  for (let start = 0; start < paths.length; start += 100) {
-    const { error } = await bucket.remove(paths.slice(start, start + 100));
-    if (error) throw new AccountError('accountDeletionFailed', 502);
+    const paths: string[] = [];
+    for (const item of data) {
+      if (!item.name || item.name === '.' || item.name === '..' || /[/\\]/.test(item.name))
+        throw new AccountError('accountDeletionFailed', 502);
+      const path = `${folder}/${item.name}`;
+      if (item.id) paths.push(path);
+      else folders.push(path);
+    }
+    if (paths.length) {
+      const { error } = await bucket.remove(paths);
+      if (error) throw new AccountError('accountDeletionFailed', 502);
+    }
   }
 }

@@ -347,20 +347,33 @@ it('clears recovery on cancellation and on a new session for the same account', 
   expect(hook.result.current.recovering).toBe(false);
 });
 
-it('invalidates an old recovery marker when an expired or reused callback carries an error', async () => {
-  const hook = await openGarage();
-  act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
-  hook.unmount();
-  window.history.replaceState(
-    null,
-    '',
-    '/auth/recovery#error=access_denied&error_code=otp_expired',
-  );
-  const reopened = await openGarage();
-  expect(reopened.result.current.recovering).toBe(false);
-  expect(window.location.hash).toBe('');
-  expect(sessionStorage.length).toBe(0);
-});
+it.each(['?', '#'])(
+  'keeps an existing recovery session restricted after a %s callback error',
+  async (separator) => {
+    const { LocalRepository } = await import('./repository');
+    const { registerSignup, pendingTransfer } = await import('./signup-transfer');
+    await new LocalRepository().saveCar(car);
+    await registerSignup(project, account(), true);
+    const hook = await openGarage();
+    act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
+    const marker = sessionStorage.getItem(`garage-guardian:recovery:${project}`);
+    hook.unmount();
+    window.history.replaceState(
+      null,
+      '',
+      `/auth/recovery${separator}error=access_denied&error_code=otp_expired`,
+    );
+    const reopened = await openGarage();
+    expect(reopened.result.current.recovering).toBe(true);
+    expect(reopened.result.current.repository).toBeNull();
+    expect(cloud.from).not.toHaveBeenCalled();
+    expect((await new LocalRepository().load()).cars).toEqual([car]);
+    expect((await pendingTransfer(project))?.userId).toBe(account().id);
+    expect(sessionStorage.getItem(`garage-guardian:recovery:${project}`)).toBe(marker);
+    expect(window.location.hash).toBe('');
+    expect(window.location.search).toBe('');
+  },
+);
 
 it('retries failed recovery revocation after reload without repeating the password update', async () => {
   const hook = await openGarage();

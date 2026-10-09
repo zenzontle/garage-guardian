@@ -1,13 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 
 const key = () => `garage-guardian:recovery:${process.env.NEXT_PUBLIC_SUPABASE_URL ?? ''}`;
-export function hasAuthCallbackError() {
-  const url = new URL(window.location.href);
-  const hash = new URLSearchParams(url.hash.slice(1));
-  return ['error', 'error_code', 'error_description'].some(
-    (name) => url.searchParams.has(name) || hash.has(name),
-  );
-}
 // Store only identity and session ID, never callback credentials or tokens.
 function binding(session: Session) {
   try {

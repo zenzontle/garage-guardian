@@ -15,7 +15,6 @@ import { recordDiagnostic } from './bug-reports/diagnostics';
 import {
   clearAuthCallback,
   clearRecovery,
-  hasAuthCallbackError,
   rememberRecovery,
   sameRecoverySession,
   storedRecovery,
@@ -55,7 +54,6 @@ export function useGarageSession() {
   const project = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 
   useEffect(() => {
-    if (hasAuthCallbackError()) clearRecovery();
     const sessionGeneration = generation;
     let active = true;
     let identity: string | null | undefined;
