@@ -6,12 +6,16 @@ import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../test/fake-supabase';
 import { car, schedule, visit } from '../test/fixtures';
 
-vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
+vi.mock('@supabase/supabase-js', async (importOriginal) => {
+  const { navigatorLock } = await importOriginal<typeof import('@supabase/supabase-js')>();
+  return { createClient: vi.fn(), navigatorLock };
+});
 const project = 'https://garage.supabase.co';
 let cloud: ReturnType<typeof fakeSupabase>;
 
 beforeEach(async () => {
   await clear();
+  localStorage.clear();
   sessionStorage.clear();
   window.history.replaceState(null, '', '/');
   vi.resetModules();
@@ -216,6 +220,9 @@ it('does not claim deletion or discard guest data after a failed/lost response',
   expect(hook.result.current.user?.id).toBe(account().id);
   expect(hook.result.current.accountNotice).toBeNull();
   expect(hook.result.current.accountBusy).toBe(false);
+  expect(
+    localStorage.getItem(`garage-guardian:deleted-transfer:v1:${project}:${account().id}`),
+  ).toBeNull();
 });
 
 it('clears retained sign-in credentials after confirmed deletion and a failed local sign-out', async () => {
@@ -255,8 +262,10 @@ it('withholds the deletion success notice if persisted sign-in cleanup fails', a
     vi.fn(async () => new Response('{}')),
   );
   cloud.auth.signOut.mockResolvedValueOnce({ error: new Error('Offline') });
-  vi.spyOn(Storage.prototype, 'removeItem').mockImplementationOnce(() => {
-    throw new Error('Storage unavailable');
+  const removeItem = Storage.prototype.removeItem;
+  vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(function (this: Storage, name) {
+    if (name === key) throw new Error('Storage unavailable');
+    removeItem.call(this, name);
   });
   await act(async () => {
     await expect(hook.result.current.deleteAccount('password', true)).rejects.toMatchObject({
@@ -267,7 +276,7 @@ it('withholds the deletion success notice if persisted sign-in cleanup fails', a
   expect(hook.result.current.accountBusy).toBe(false);
 });
 
-it('finishes confirmed deletion even when signup-transfer marker cleanup fails', async () => {
+it('retries a deleted account’s marker cleanup after reload without blocking new signup', async () => {
   const { LocalRepository } = await import('./repository');
   const local = new LocalRepository();
   await local.saveCar(car);
@@ -279,7 +288,15 @@ it('finishes confirmed deletion even when signup-transfer marker cleanup fails',
     .mockRejectedValueOnce(new Error('IndexedDB unavailable'));
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response('{}')),
+    vi.fn(async () => {
+      // Model a stale marker left by an older tab after deletion was requested.
+      const { set } = await import('idb-keyval');
+      await set(`garage-guardian:signup-transfer:v1:${project}`, {
+        userId: account().id,
+        status: 'pending',
+      });
+      return new Response('{}');
+    }),
   );
   await act(async () => hook.result.current.deleteAccount('password', true));
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
@@ -290,6 +307,165 @@ it('finishes confirmed deletion even when signup-transfer marker cleanup fails',
   expect(hook.result.current.accountNotice).toBe('deleted');
   expect(hook.result.current.accountBusy).toBe(false);
   cleanup.mockRestore();
+  hook.unmount();
+  vi.resetModules();
+  const reopened = await openGarage();
+  cloud.requireConfirmation();
+  await act(async () => {
+    expect(await reopened.result.current.signUp('new@example.com', 'password')).toBe(true);
+  });
+  expect(cloud.auth.signUp).toHaveBeenCalledTimes(1);
+  expect((await local.load()).cars).toEqual([car]);
+});
+
+function sharedTransferLock() {
+  let tail = Promise.resolve();
+  const request = vi.fn((_key: string, work: () => Promise<unknown>) => {
+    const pending = tail.then(work);
+    tail = pending.then(
+      () => undefined,
+      () => undefined,
+    );
+    return pending;
+  });
+  vi.stubGlobal('navigator', { locks: { request } });
+  return request;
+}
+
+it('holds the transfer lock across signup’s auth event and marker registration', async () => {
+  const { LocalRepository } = await import('./repository');
+  const { withSignupTransferLock, pendingTransfer } = await import('./signup-transfer');
+  await new LocalRepository().saveCar(car);
+  const signupTab = await openGarage();
+  const otherTab = await openGarage();
+  sharedTransferLock();
+  const signUp = cloud.auth.signUp.getMockImplementation()!;
+  let release!: () => void;
+  const competingDeletion = vi.fn(async () => {
+    expect((await pendingTransfer(project))?.userId).toBe(account().id);
+  });
+  let competingWork!: Promise<void>;
+  cloud.auth.signUp.mockImplementationOnce(async () => {
+    const result = await signUp(); // SIGNED_IN reaches both tabs before the response.
+    competingWork = withSignupTransferLock(project, competingDeletion);
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    return result;
+  });
+  let signingUp!: Promise<boolean>;
+  act(() => {
+    signingUp = signupTab.result.current.signUp('new@example.com', 'password');
+  });
+  await waitFor(() => expect(release).toBeTypeOf('function'));
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+  expect(competingDeletion).not.toHaveBeenCalled();
+  expect(otherTab.result.current.repository).toBeNull();
+  expect((await new LocalRepository().load()).cars).toEqual([car]);
+  await act(async () => {
+    release();
+    await signingUp;
+    await competingWork;
+  });
+  await waitFor(() => expect(otherTab.result.current.repository).not.toBeNull());
+  expect(otherTab.result.current.snapshot.cars).toEqual([car]);
+});
+
+it('waits for another tab’s signup registration and rejects deletion once its marker appears', async () => {
+  const { LocalRepository } = await import('./repository');
+  const { registerSignup } = await import('./signup-transfer');
+  await new LocalRepository().saveCar(car);
+  cloud.emit(account());
+  const hook = await openGarage();
+  const request = sharedTransferLock();
+  let release!: () => void;
+  const registration = request(`garage-guardian:signup-transfer:v1:${project}`, async () => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await registerSignup(project, account(), true);
+  });
+  await waitFor(() => expect(release).toBeTypeOf('function'));
+  const fetch = vi.fn(async () => new Response('{}'));
+  vi.stubGlobal('fetch', fetch);
+  let deleting!: Promise<void>;
+  act(() => {
+    deleting = hook.result.current.deleteAccount('password', true);
+  });
+  const rejected = expect(deleting).rejects.toMatchObject({ code: 'operationBusy' });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+  expect(fetch).not.toHaveBeenCalled();
+  await act(async () => {
+    release();
+    await registration;
+    await rejected;
+  });
+  expect(fetch).not.toHaveBeenCalled();
+  expect((await new LocalRepository().load()).cars).toEqual([car]);
+  expect(hook.result.current.accountBusy).toBe(false);
+});
+
+it('drains another tab’s verified transfer before deleting, preserving unrelated guest records and photos', async () => {
+  const { LocalRepository } = await import('./repository');
+  const { registerSignup } = await import('./signup-transfer');
+  const local = new LocalRepository();
+  await local.saveCar(car);
+  cloud.emit(account());
+  const hook = await openGarage();
+  sharedTransferLock();
+  await registerSignup(project, account(), true);
+  // A separate module queue models another tab; only Web Locks coordinate it.
+  vi.resetModules();
+  const { transferSignupData } = await import('./signup-transfer');
+  const { LocalRepository: OtherLocalRepository } = await import('./repository');
+  const clearTransferred = OtherLocalRepository.prototype.clearTransferred;
+  let release!: () => void;
+  let cleared = false;
+  vi.spyOn(OtherLocalRepository.prototype, 'clearTransferred').mockImplementationOnce(
+    async function (this: InstanceType<typeof OtherLocalRepository>, snapshot) {
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await clearTransferred.call(this, snapshot);
+      cleared = true;
+    },
+  );
+  const transferring = transferSignupData(cloud.client, project, account().id);
+  await waitFor(() => expect(release).toBeTypeOf('function'));
+  const guestCar = { ...car, id: '55555555-5555-4555-8555-555555555555' };
+  await local.saveCar(guestCar);
+  const photo = await local.uploadPhoto(visit.id, new File(['guest'], 'guest.webp'));
+  const guestVisit = { ...visit, carId: guestCar.id, photos: [photo] };
+  await local.saveVisit(guestVisit);
+  const fetch = vi.fn(async () => {
+    expect(cleared).toBe(true);
+    return new Response('{}');
+  });
+  vi.stubGlobal('fetch', fetch);
+  let deleting!: Promise<void>;
+  act(() => {
+    deleting = hook.result.current.deleteAccount('password', true);
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
+  expect(fetch).not.toHaveBeenCalled();
+  expect((await local.load()).cars).toContainEqual(car);
+  await act(async () => {
+    release();
+    await transferring;
+    await deleting;
+  });
+  await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
+  expect(fetch).toHaveBeenCalledTimes(1);
+  expect(hook.result.current.snapshot.cars).toEqual([guestCar]);
+  expect(hook.result.current.snapshot.visits).toEqual([guestVisit]);
+  expect(await local.readPhoto(photo)).toBeInstanceOf(Blob);
+  expect(hook.result.current.accountNotice).toBe('deleted');
 });
 
 it.each(['password', 'delete'] as const)(

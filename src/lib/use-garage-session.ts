@@ -9,7 +9,9 @@ import {
   clearAccountTransfer,
   pendingTransfer,
   registerSignup,
+  rememberDeletedAccountTransfer,
   transferSignupData,
+  withSignupTransferLock,
 } from './signup-transfer';
 import { recordDiagnostic } from './bug-reports/diagnostics';
 import {
@@ -296,7 +298,7 @@ export function useGarageSession() {
     if (!supabase) throw new AppError('cloudNotConfigured');
     if (signupWork.current) throw new AppError('signupBusy');
     const client = supabase;
-    const work = (async () => {
+    const work = withSignupTransferLock(project, async () => {
       const pending = await pendingTransfer(project);
       if (pending) throw new AppError('previousTransfer');
       const { data, error } = await client.auth.signUp({
@@ -308,7 +310,7 @@ export function useGarageSession() {
       if (data.user) await registerSignup(project, data.user, Boolean(data.session));
       if (data.session) transition.current(data.session.user, true);
       return !data.session;
-    })();
+    });
     signupWork.current = work;
     try {
       return await work;
@@ -483,17 +485,22 @@ export function useGarageSession() {
       deleting.current = true;
       try {
         await Promise.allSettled([...operations.current]);
-        if (currentUser.current?.id !== deletedUser) throw new AppError('sessionChanged');
-        await requestAccount('DELETE', { currentPassword, acknowledged: true });
-        await clearAccountTransfer(project, deletedUser).catch(() => {
-          // Auth deletion is confirmed; unavailable local storage must not
-          // prevent signing out and returning to the preserved guest garage.
+        await withSignupTransferLock(project, async () => {
+          const pending = await pendingTransfer(project);
+          if (currentUser.current?.id !== deletedUser) throw new AppError('sessionChanged');
+          if (pending?.userId === deletedUser) throw new AppError('operationBusy');
+          await requestAccount('DELETE', { currentPassword, acknowledged: true });
+          rememberDeletedAccountTransfer(project, deletedUser);
+          await clearAccountTransfer(project, deletedUser).catch(() => {
+            // The journal retries this cleanup on later transfer/signup checks.
+            // Confirmed Auth deletion must still return to the guest garage.
+          });
+          await clearDeletedAccountSession(supabase!, project, deletedUser);
+          clearRecovery();
+          recoverySession.current = null;
+          transition.current(null, true);
+          setAccountNotice('deleted');
         });
-        await clearDeletedAccountSession(supabase!, project, deletedUser);
-        clearRecovery();
-        recoverySession.current = null;
-        transition.current(null, true);
-        setAccountNotice('deleted');
       } finally {
         deleting.current = false;
       }

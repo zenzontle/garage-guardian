@@ -12,8 +12,34 @@ type Transfer = {
   snapshot?: Snapshot;
 };
 const transferKey = (project: string) => `garage-guardian:signup-transfer:v1:${project}`;
+const deletionPrefix = (project: string) => `garage-guardian:deleted-transfer:v1:${project}:`;
+const deletedTransfers = new Map<string, Set<string>>();
+
+// Record only confirmed Auth deletions, before best-effort IndexedDB cleanup.
+// Separate keys avoid overwriting another tab's cleanup retry.
+export function rememberDeletedAccountTransfer(project: string, userId: string) {
+  const users = deletedTransfers.get(project) ?? new Set<string>();
+  users.add(userId);
+  deletedTransfers.set(project, users);
+  try {
+    localStorage.setItem(`${deletionPrefix(project)}${userId}`, 'confirmed');
+  } catch {
+    // Keep an in-memory retry when browser storage is unavailable.
+  }
+}
 
 export async function pendingTransfer(project: string): Promise<Transfer | undefined> {
+  const users = new Set(deletedTransfers.get(project));
+  try {
+    const prefix = deletionPrefix(project);
+    for (let index = 0; index < localStorage.length; index++) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(prefix)) users.add(key.slice(prefix.length));
+    }
+  } catch {
+    // In-memory retries remain available when localStorage cannot be read.
+  }
+  for (const userId of users) await clearAccountTransfer(project, userId);
   return get<Transfer>(transferKey(project));
 }
 
@@ -21,6 +47,12 @@ export async function clearAccountTransfer(project: string, userId: string) {
   await update<Transfer | undefined>(transferKey(project), (previous) =>
     previous?.userId === userId ? undefined : previous,
   );
+  deletedTransfers.get(project)?.delete(userId);
+  try {
+    localStorage.removeItem(`${deletionPrefix(project)}${userId}`);
+  } catch {
+    // A remaining journal entry safely retries the same owner-scoped cleanup.
+  }
 }
 
 export async function registerSignup(project: string, user: User, hasSession: boolean) {
@@ -32,8 +64,27 @@ export async function registerSignup(project: string, user: User, hasSession: bo
   });
 }
 
-// Also serializes duplicate requests from React Strict Mode in this tab.
-const transfers = new Map<string, Promise<void>>();
+// Signup must acquire this before its auth event can reach another tab.
+// Deletion shares it with transfer verification and guest cleanup.
+const transfers = new Map<string, Promise<unknown>>();
+
+export async function withSignupTransferLock<T>(project: string, action: () => Promise<T>) {
+  const key = transferKey(project);
+  const previous = transfers.get(key);
+  const work = (async () => {
+    await previous?.catch(() => undefined);
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      return navigator.locks.request(key, action);
+    }
+    return action();
+  })();
+  transfers.set(key, work);
+  try {
+    return await work;
+  } finally {
+    if (transfers.get(key) === work) transfers.delete(key);
+  }
+}
 
 export async function transferSignupData(
   client: SupabaseClient,
@@ -41,24 +92,7 @@ export async function transferSignupData(
   userId: string,
   assertActive: () => void = () => {},
 ) {
-  const key = transferKey(project);
-  const previous = transfers.get(key);
-  if (previous) {
-    await previous.catch(() => undefined);
-    assertActive();
-    return transferSignupData(client, project, userId, assertActive);
-  }
-  const work = (async () => {
-    if (typeof navigator !== 'undefined' && navigator.locks) {
-      await navigator.locks.request(key, () => runTransfer(client, project, userId, assertActive));
-    } else await runTransfer(client, project, userId, assertActive);
-  })();
-  transfers.set(key, work);
-  try {
-    await work;
-  } finally {
-    if (transfers.get(key) === work) transfers.delete(key);
-  }
+  await withSignupTransferLock(project, () => runTransfer(client, project, userId, assertActive));
 }
 
 async function runTransfer(
