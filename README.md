@@ -72,7 +72,7 @@ Guests can use all garage features without signing in. **Create account** automa
 
 Ordinary **Sign in** does not import or delete guest data; it opens the account's cloud garage. Signing out restores any guest records that have never been transferred. A pending signup transfer resumes only for the account that created it and the same Supabase project. Use the same browser and site origin for signup and transfer; guest data cannot be recovered from another browser or device. Authenticated cloud failures do not fall back to local writes. CSV export remains available from **Service history**.
 
-Account recovery, confirmation resend, email/password changes, and permanent deletion are documented in [account management setup and verification](docs/account-management.md). Apply migration `0006_account_deletion_photo_writes.sql`, configure exact recovery/confirmation redirects and secure email-change confirmation, and set server-only `SUPABASE_SECRET_KEY` before releasing these features.
+Account recovery, confirmation resend, email/password changes, and permanent deletion are documented in [account management setup and verification](docs/account-management.md). Apply migrations `0006_account_deletion_photo_writes.sql` and `0007_account_deletion_barrier.sql` in order, configure exact recovery/confirmation redirects and secure email-change confirmation, and set server-only `SUPABASE_SECRET_KEY` before releasing these features.
 
 ## Optional make/model suggestions
 

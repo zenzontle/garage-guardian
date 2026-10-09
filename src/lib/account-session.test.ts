@@ -101,6 +101,19 @@ it('never clears a replacement account’s credentials', async () => {
   expect(auth.signOut).not.toHaveBeenCalled();
 });
 
+it('rejects a replacement that arrives after the initial session read', async () => {
+  const { client, auth } = storedClient();
+  auth.getSession.mockImplementationOnce(async () => {
+    localStorage.setItem(key, JSON.stringify({ user: account('replacement') }));
+    return { data: { session: { user: account() } }, error: null };
+  });
+  await expect(clearDeletedAccountSession(client, project, account().id)).rejects.toMatchObject({
+    code: 'sessionChanged',
+  });
+  expect(auth.signOut).not.toHaveBeenCalled();
+  expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe('replacement');
+});
+
 it('reports cleanup failure rather than completion when persisted storage cannot be cleared', async () => {
   const { client, auth } = storedClient();
   auth.signOut.mockResolvedValueOnce({ error: new Error('Offline') });
