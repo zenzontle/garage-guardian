@@ -13,13 +13,13 @@ import { usePathname } from 'next/navigation';
 import { getAllDue } from '@/lib/due';
 import { useGarageSession } from '@/lib/use-garage-session';
 import type { Car, ScheduleItem, Visit } from '@/lib/model';
-import { accountMode } from '@/lib/garage-routes';
 import { todayISO } from '@/lib/today-iso';
 
 type ModalState =
   | { kind: 'car'; item?: Car }
   | { kind: 'schedule'; item?: ScheduleItem; carId: string }
   | { kind: 'visit'; item?: Visit; carId?: string }
+  | { kind: 'account' }
   | null;
 
 function useGarageState() {
@@ -35,11 +35,13 @@ function useGarageState() {
   useEffect(() => {
     setModal(null);
     setMenuOpen(false);
-    if (!accountMode(pathname)) setAccountEmail('');
   }, [pathname]);
   useEffect(() => {
-    if (garage.loading) setModal(null);
-    if (garage.user) setNotice(false);
+    if (garage.loading) setModal((previous) => (previous?.kind === 'account' ? previous : null));
+    if (garage.user) {
+      setNotice(false);
+      setAccountEmail('');
+    }
   }, [garage.loading, garage.user]);
 
   const allDue = useMemo(

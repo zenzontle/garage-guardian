@@ -12,8 +12,7 @@ type Transfer = {
   snapshot?: Snapshot;
 };
 const transferKey = (project: string) => `garage-guardian:signup-transfer:v1:${project}`;
-
-export async function pendingTransfer(project: string): Promise<Transfer | undefined> {
+export function pendingTransfer(project: string): Promise<Transfer | undefined> {
   return get<Transfer>(transferKey(project));
 }
 
@@ -26,8 +25,27 @@ export async function registerSignup(project: string, user: User, hasSession: bo
   });
 }
 
-// Also serializes duplicate requests from React Strict Mode in this tab.
-const transfers = new Map<string, Promise<void>>();
+// Signup must acquire this before its auth event can reach another tab.
+// Transfer verification and guest cleanup share this lock.
+const transfers = new Map<string, Promise<unknown>>();
+
+export async function withSignupTransferLock<T>(project: string, action: () => Promise<T>) {
+  const key = transferKey(project);
+  const previous = transfers.get(key);
+  const work = (async () => {
+    await previous?.catch(() => undefined);
+    if (typeof navigator !== 'undefined' && navigator.locks) {
+      return navigator.locks.request(key, action);
+    }
+    return action();
+  })();
+  transfers.set(key, work);
+  try {
+    return await work;
+  } finally {
+    if (transfers.get(key) === work) transfers.delete(key);
+  }
+}
 
 export async function transferSignupData(
   client: SupabaseClient,
@@ -35,24 +53,7 @@ export async function transferSignupData(
   userId: string,
   assertActive: () => void = () => {},
 ) {
-  const key = transferKey(project);
-  const previous = transfers.get(key);
-  if (previous) {
-    await previous.catch(() => undefined);
-    assertActive();
-    return transferSignupData(client, project, userId, assertActive);
-  }
-  const work = (async () => {
-    if (typeof navigator !== 'undefined' && navigator.locks) {
-      await navigator.locks.request(key, () => runTransfer(client, project, userId, assertActive));
-    } else await runTransfer(client, project, userId, assertActive);
-  })();
-  transfers.set(key, work);
-  try {
-    await work;
-  } finally {
-    if (transfers.get(key) === work) transfers.delete(key);
-  }
+  await withSignupTransferLock(project, () => runTransfer(client, project, userId, assertActive));
 }
 
 async function runTransfer(
@@ -132,7 +133,7 @@ async function runTransfer(
       }
     }
     assertActive();
-    // Durable before deletion: a cleanup retry must not upload old records again.
+    // Durable before guest cleanup: a retry must not upload old records again.
     await set(transferKey(project), { ...transfer, status: 'uploaded' } satisfies Transfer);
   }
   assertActive();

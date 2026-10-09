@@ -12,8 +12,16 @@ export function fakeSupabase() {
   let user: User | null = null;
   let confirmation = false;
   let existingSignup = false;
+  let sessionVersion = 1;
   const listeners = new Set<(event: AuthChangeEvent, session: Session | null) => void>();
-  const session = () => (user ? ({ user } as Session) : null);
+  const session = () =>
+    user
+      ? ({
+          user,
+          access_token: `header.${btoa(JSON.stringify({ session_id: `${user.id}-${sessionVersion}` }))}.signature`,
+          refresh_token: 'test-refresh',
+        } as Session)
+      : null;
   const emit = (next: User | null, event: AuthChangeEvent = next ? 'SIGNED_IN' : 'SIGNED_OUT') => {
     user = next;
     for (const listener of listeners) listener(event, session());
@@ -114,7 +122,7 @@ export function fakeSupabase() {
     })),
     remove: vi.fn(async (paths: string[]) => {
       paths.forEach((path) => photos.delete(path));
-      return { error: null };
+      return { error: null as Error | null };
     }),
     createSignedUrl: vi.fn(async (path: string) => ({
       data: { signedUrl: `https://photos.example/${path}` },
@@ -122,6 +130,17 @@ export function fakeSupabase() {
     })),
   };
   const auth = {
+    lock: true,
+    initialize: vi.fn(async () => ({ error: null })),
+    _acquireLock: vi.fn(async <R>(_timeout: number, work: () => Promise<R>) => work()),
+    getUser: vi.fn(async () => ({ data: { user }, error: null })),
+    resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
+    resend: vi.fn(async () => ({ data: {}, error: null })),
+    updateUser: vi.fn(async (attributes: { email?: string; password?: string }) => {
+      if (user && attributes.email) user = { ...user, new_email: attributes.email };
+      if (user) emit(user, 'USER_UPDATED');
+      return { data: { user }, error: null };
+    }),
     getSession: vi.fn(async () => ({ data: { session: session() }, error: null })),
     onAuthStateChange: vi.fn(
       (listener: (event: AuthChangeEvent, session: Session | null) => void) => {
@@ -142,14 +161,23 @@ export function fakeSupabase() {
         error: null,
       };
     }),
-    signOut: vi.fn(async () => {
+    signOut: vi.fn<
+      (options?: { scope: 'local' | 'global' | 'others' }) => Promise<{ error: Error | null }>
+    >(async () => {
       emit(null);
-      return { error: null };
+      return { error: null as Error | null };
     }),
   };
+  Object.assign(auth, {
+    _useSession: async <R>(
+      work: (result: Awaited<ReturnType<typeof auth.getSession>>) => Promise<R>,
+    ) => work(await auth.getSession()),
+    _signOut: (options: { scope: 'local' }) => auth.signOut(options),
+    _updateUser: (attributes: { password: string }) => auth.updateUser(attributes),
+  });
   const storage = { from: vi.fn(() => bucket) };
   return {
-    client: { from, storage, auth } as unknown as SupabaseClient,
+    client: { from, storage, auth: { ...auth } } as unknown as SupabaseClient,
     auth,
     from,
     bucket,
@@ -157,6 +185,9 @@ export function fakeSupabase() {
     tables,
     photos,
     emit,
+    newSession: () => {
+      ++sessionVersion;
+    },
     requireConfirmation: () => {
       confirmation = true;
     },

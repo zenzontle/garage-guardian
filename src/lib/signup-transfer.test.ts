@@ -8,6 +8,7 @@ import { car, schedule, visit } from '../test/fixtures';
 const project = 'https://garage.supabase.co';
 beforeEach(async () => {
   await clear();
+  localStorage.clear();
 });
 
 async function seedLocal(withPhoto = true) {

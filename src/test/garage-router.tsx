@@ -113,6 +113,7 @@ export async function loadGarageTestApp() {
     import('@/components/history-screen'),
     import('@/components/reports-screen'),
     import('@/components/account-screen'),
+    import('@/components/account-recovery-screen'),
   ]);
   const screens = Object.assign({}, ...modules) as Screens;
   return createGarageTestApp(GarageApp, screens);

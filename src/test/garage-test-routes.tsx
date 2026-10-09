@@ -3,7 +3,8 @@ export type Screens = typeof import('@/components/dashboard-screen') &
   typeof import('@/components/cars-screen') &
   typeof import('@/components/history-screen') &
   typeof import('@/components/reports-screen') &
-  typeof import('@/components/account-screen');
+  typeof import('@/components/account-screen') &
+  typeof import('@/components/account-recovery-screen');
 
 export function TestRoutes({ screens, url }: { screens: Screens; url: string }) {
   const pathname = new URL(url, 'http://localhost').pathname;
@@ -13,6 +14,7 @@ export function TestRoutes({ screens, url }: { screens: Screens; url: string }) 
     return <screens.CarsScreen carId={decodeURIComponent(pathname.slice(6))} />;
   if (pathname === '/history') return <screens.HistoryScreen />;
   if (pathname === '/reports') return <screens.ReportsScreen />;
+  if (pathname === '/auth/recovery') return <screens.AccountRecoveryScreen />;
   if (pathname === '/signin' || pathname === '/signup')
     return (
       <screens.AccountScreen

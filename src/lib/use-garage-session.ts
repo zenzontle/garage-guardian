@@ -2,11 +2,30 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppError, failureOf, type AppFailure } from './app-error';
-import type { User } from '@supabase/supabase-js';
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { EMPTY_SNAPSHOT, type Snapshot } from './model';
-import { createRepository, supabase, type Repository } from './repository';
-import { pendingTransfer, registerSignup, transferSignupData } from './signup-transfer';
+import { createRepository, recoveryInitialization, supabase, type Repository } from './repository';
+import {
+  pendingTransfer,
+  registerSignup,
+  transferSignupData,
+  withSignupTransferLock,
+} from './signup-transfer';
 import { recordDiagnostic } from './bug-reports/diagnostics';
+import {
+  clearAuthCallback,
+  clearRecovery,
+  rememberRecovery,
+  sameRecoverySession,
+  storedRecovery,
+} from './account-recovery';
+import type { AccountPatch } from './account-contract';
+import {
+  assertPasswordSignOutSupport,
+  signOutPasswordSession,
+  updateRecoveryPassword,
+} from './account-session';
+import en from '../../messages/en.json';
 
 export type MutationResult = { refreshed: boolean };
 
@@ -19,6 +38,15 @@ export function useGarageSession() {
   const [error, setError] = useState<AppFailure | null>(null);
   const [refreshError, setRefreshError] = useState<AppFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const recoverySession = useRef<Session | null>(null);
+  const recoveryFinishing = useRef(false);
+  const [accountBusy, setAccountBusy] = useState(false);
+  const accountLock = useRef(false);
+  const transferBlocked = useRef(false);
+  const [accountNotice, setAccountNotice] = useState<'passwordChanged' | null>(null);
+  const [resendUntil, setResendUntil] = useState(0);
+  const resendDeadline = useRef(0);
   const generation = useRef(0);
   const operations = useRef(new Set<Promise<unknown>>());
   const signupWork = useRef<Promise<unknown> | null>(null);
@@ -34,7 +62,24 @@ export function useGarageSession() {
     let identity: string | null | undefined;
     const receive = (nextUser: User | null, force = false) => {
       const nextIdentity = nextUser?.id ?? null;
-      if (!active || (!force && identity === nextIdentity)) return;
+      if (!active) return;
+      if (nextUser) setAccountNotice(null);
+      if (recoverySession.current && nextUser?.id === recoverySession.current.user.id) {
+        currentUser.current = nextUser;
+        setUser(nextUser);
+        return;
+      }
+      if (recoverySession.current || (identity !== undefined && identity !== nextIdentity)) {
+        clearRecovery();
+        recoverySession.current = null;
+        recoveryFinishing.current = false;
+        setRecovering(false);
+      }
+      if (!force && identity === nextIdentity) {
+        currentUser.current = nextUser;
+        setUser(nextUser);
+        return;
+      }
       identity = nextIdentity;
       currentUser.current = nextUser;
       const version = ++sessionGeneration.current;
@@ -49,6 +94,7 @@ export function useGarageSession() {
       setRefreshing(false);
       setLoading(true);
       setTransferring(false);
+      transferBlocked.current = Boolean(nextUser);
 
       // The auth callback only schedules work; Supabase calls happen after it returns.
       setTimeout(() => {
@@ -62,6 +108,7 @@ export function useGarageSession() {
               const pending = await pendingTransfer(project);
               assertActive();
               setTransferring(pending?.userId === nextUser.id);
+              transferBlocked.current = pending?.userId === nextUser.id;
               if (pending?.userId === nextUser.id) failureContext = 'transfer';
               await transferSignupData(supabase, project, nextUser.id, assertActive);
               failureContext = 'load';
@@ -89,6 +136,7 @@ export function useGarageSession() {
             setSnapshot(data);
             setRepository(guarded);
             setTransferring(false);
+            transferBlocked.current = false;
           } catch (cause) {
             if (active && sessionGeneration.current === version)
               setError(failureOf(cause, failureContext));
@@ -103,17 +151,72 @@ export function useGarageSession() {
     if (!supabase) receive(null);
     else {
       const client = supabase;
-      const { data: listener } = client.auth.onAuthStateChange((_event, session) =>
-        receive(session?.user ?? null),
-      );
+      const startRecovery = (session: Session, finishing = false) => {
+        if (!active) return;
+        identity = session.user.id;
+        ++sessionGeneration.current;
+        currentUser.current = session.user;
+        recoverySession.current = session;
+        recoveryFinishing.current = finishing;
+        rememberRecovery(session, finishing);
+        setRecovering(true);
+        setUser(session.user);
+        setRepository(null);
+        setSnapshot(EMPTY_SNAPSHOT);
+        setLoading(false);
+        setTransferring(false);
+        setError(null);
+        setRefreshError(null);
+        setRefreshing(false);
+        clearAuthCallback();
+      };
+      let bootstrapped = false;
+      const ready = recoveryInitialization.then(() => {
+        bootstrapped = true;
+      });
+      const handleAuth = (event: AuthChangeEvent, session: Session | null) => {
+        if (!active) return;
+        const stored = session ? storedRecovery(session) : null;
+        const currentRecovery = recoverySession.current;
+        if (
+          session &&
+          (event === 'PASSWORD_RECOVERY' ||
+            stored ||
+            (currentRecovery && sameRecoverySession(currentRecovery, session)))
+        ) {
+          startRecovery(session, stored?.finishing ?? recoveryFinishing.current);
+        } else {
+          if (event === 'INITIAL_SESSION') clearAuthCallback();
+          if (currentRecovery) {
+            clearRecovery();
+            recoverySession.current = null;
+            recoveryFinishing.current = false;
+            setRecovering(false);
+          }
+          receive(session?.user ?? null, Boolean(currentRecovery));
+        }
+      };
+      const { data: listener } = client.auth.onAuthStateChange((event, session) => {
+        if (bootstrapped) handleAuth(event, session);
+        else void ready.then(() => handleAuth(event, session));
+      });
       const initialize = async () => {
         try {
+          await ready;
           const { data, error } = await client.auth.getSession();
           if (!active || identity !== undefined) return;
           if (error) throw error;
-          receive(data.session?.user ?? null);
+          const stored = data.session ? storedRecovery(data.session) : null;
+          if (data.session && stored) startRecovery(data.session, stored.finishing);
+          else {
+            clearRecovery();
+            receive(data.session?.user ?? null);
+          }
+          clearAuthCallback();
         } catch (cause) {
           if (active && identity === undefined) {
+            clearAuthCallback();
+            clearRecovery();
             setError(failureOf(cause, 'load'));
             setLoading(false);
           }
@@ -161,7 +264,8 @@ export function useGarageSession() {
 
   const run = useCallback(
     async (action: () => Promise<void>): Promise<MutationResult> => {
-      if (!repository || mutationBusy.current) throw new AppError('operationBusy');
+      if (!repository || mutationBusy.current || recoverySession.current)
+        throw new AppError('operationBusy');
       mutationBusy.current = true;
       const version = generation.current;
       setError(null);
@@ -203,7 +307,7 @@ export function useGarageSession() {
     if (!supabase) throw new AppError('cloudNotConfigured');
     if (signupWork.current) throw new AppError('signupBusy');
     const client = supabase;
-    const work = (async () => {
+    const work = withSignupTransferLock(project, async () => {
       const pending = await pendingTransfer(project);
       if (pending) throw new AppError('previousTransfer');
       const { data, error } = await client.auth.signUp({
@@ -215,7 +319,7 @@ export function useGarageSession() {
       if (data.user) await registerSignup(project, data.user, Boolean(data.session));
       if (data.session) transition.current(data.session.user, true);
       return !data.session;
-    })();
+    });
     signupWork.current = work;
     try {
       return await work;
@@ -226,16 +330,174 @@ export function useGarageSession() {
 
   async function signIn(email: string, password: string) {
     if (!supabase) throw new AppError('cloudNotConfigured');
+    const wasRecovering = Boolean(recoverySession.current);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    transition.current(data.user);
+    clearRecovery();
+    recoverySession.current = null;
+    setRecovering(false);
+    transition.current(data.user, wasRecovering);
   }
 
-  async function signOut() {
-    if (!supabase) return;
-    const { error } = await supabase.auth.signOut();
-    if (error) setError(failureOf(error, 'auth'));
-    else transition.current(null);
+  async function signOut(scope: 'global' | 'local' = 'global') {
+    if (!supabase) return true;
+    if (accountLock.current) return false;
+    try {
+      const { error } = await supabase.auth.signOut({ scope });
+      if (error) {
+        setError(failureOf(error, 'auth'));
+        return false;
+      }
+      transition.current(null);
+      return true;
+    } catch {
+      setError({ code: 'auth' });
+      return false;
+    }
+  }
+
+  async function requestRecovery(email: string) {
+    if (!supabase) throw new AppError('cloudNotConfigured');
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: new URL('/auth/recovery', window.location.origin).href,
+    });
+    if (error && !['user_not_found', 'email_not_found'].includes(error.code ?? ''))
+      throw new AppError(failureOf({ code: error.code }, 'auth').code);
+  }
+
+  async function resendConfirmation(email: string) {
+    if (!supabase) throw new AppError('cloudNotConfigured');
+    if (Date.now() < resendDeadline.current) throw new AppError('resendCooldown');
+    resendDeadline.current = Date.now() + 60_000;
+    setResendUntil(resendDeadline.current);
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: new URL('/', window.location.origin).href },
+    });
+    if (error && !['user_not_found', 'email_not_found'].includes(error.code ?? ''))
+      throw new AppError(failureOf({ code: error.code }, 'auth').code);
+  }
+
+  async function accountOperation(action: () => Promise<void>, recovery = false) {
+    if (!supabase) throw new AppError('cloudNotConfigured');
+    if (accountLock.current || (!recovery && (transferBlocked.current || recoverySession.current)))
+      throw new AppError('operationBusy');
+    accountLock.current = true;
+    setAccountBusy(true);
+    try {
+      await action();
+    } finally {
+      accountLock.current = false;
+      setAccountBusy(false);
+    }
+  }
+
+  async function requestAccount(input: AccountPatch) {
+    const version = generation.current;
+    const { data, error } = await supabase!.auth.getSession();
+    if (error || !data.session || data.session.user.id !== currentUser.current?.id)
+      throw new AppError('sessionExpired');
+    const response = await fetch('/api/account', {
+      method: 'PATCH',
+      cache: 'no-store',
+      headers: {
+        Authorization: `Bearer ${data.session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(input),
+    });
+    if (generation.current !== version) throw new AppError('sessionChanged');
+    if (!response.ok) {
+      const body = (await response.json()) as { error?: { code?: string } };
+      const code = body.error?.code;
+      throw new AppError(
+        code && Object.hasOwn(en.errors, code) ? (code as keyof typeof en.errors) : 'auth',
+      );
+    }
+    return data.session;
+  }
+
+  async function finishPasswordChange(session: Session, global: boolean) {
+    try {
+      await signOutPasswordSession(supabase!, session, global ? 'global' : 'local');
+    } catch (cause) {
+      setError(failureOf(cause, 'auth'));
+      throw cause;
+    }
+    if (currentUser.current && currentUser.current.id !== session.user.id)
+      throw new AppError('sessionChanged');
+    clearRecovery();
+    recoverySession.current = null;
+    recoveryFinishing.current = false;
+    setRecovering(false);
+    transition.current(null, true);
+    setAccountNotice('passwordChanged');
+  }
+
+  async function resetPassword(password: string, confirmation: string) {
+    if (!recoverySession.current) throw new AppError('recoveryInvalid');
+    const session = recoverySession.current;
+    if (password !== confirmation) throw new AppError('passwordMismatch');
+    if (password.length < 6) throw new AppError('weakPassword');
+    await accountOperation(async () => {
+      if (!recoveryFinishing.current) {
+        await updateRecoveryPassword(supabase!, session, password);
+        if (!recoverySession.current || !sameRecoverySession(session, recoverySession.current))
+          throw new AppError('sessionChanged');
+        recoveryFinishing.current = true;
+        rememberRecovery(recoverySession.current!, true);
+      }
+      await finishPasswordChange(session, true);
+    }, true);
+  }
+
+  async function cancelRecovery() {
+    const session = recoverySession.current;
+    if (!session) return;
+    await accountOperation(async () => {
+      await signOutPasswordSession(supabase!, session, 'local');
+      if (recoverySession.current && sameRecoverySession(session, recoverySession.current)) {
+        clearRecovery();
+        recoverySession.current = null;
+        recoveryFinishing.current = false;
+        setRecovering(false);
+        transition.current(null, true);
+      }
+    }, true);
+  }
+
+  async function changeEmail(currentPassword: string, newEmail: string) {
+    await accountOperation(async () => {
+      const userId = currentUser.current?.id;
+      await requestAccount({ kind: 'email', currentPassword, newEmail });
+      const { data, error } = await supabase!.auth.getUser();
+      if (error) throw new AppError('auth');
+      if (currentUser.current?.id !== userId) throw new AppError('sessionChanged');
+      if (data.user?.id === userId) {
+        currentUser.current = data.user;
+        setUser(data.user);
+      }
+    });
+  }
+
+  async function changePassword(
+    currentPassword: string,
+    newPassword: string,
+    confirmation: string,
+  ) {
+    if (newPassword !== confirmation) throw new AppError('passwordMismatch');
+    if (newPassword.length < 6) throw new AppError('weakPassword');
+    await accountOperation(async () => {
+      // Fail before the server changes the password if safe local cleanup is unavailable.
+      assertPasswordSignOutSupport(supabase!);
+      const session = await requestAccount({
+        kind: 'password',
+        currentPassword,
+        newPassword,
+      });
+      await finishPasswordChange(session, false);
+    });
   }
 
   return {
@@ -254,6 +516,17 @@ export function useGarageSession() {
     signUp,
     signIn,
     signOut,
+    recovering,
+    accountBusy,
+    accountNotice,
+    setAccountNotice,
+    resendUntil,
+    requestRecovery,
+    resendConfirmation,
+    resetPassword,
+    cancelRecovery,
+    changeEmail,
+    changePassword,
     retry: () => retry.current(),
   };
 }
