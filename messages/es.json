@@ -40,6 +40,7 @@
     "resendCooldown": "Espera 60 segundos antes de solicitar otro correo de confirmación.",
     "deletionAcknowledgment": "Acepta la pérdida permanente de tu garaje en la nube antes de eliminar tu cuenta.",
     "accountDeletionUnavailable": "La eliminación de cuentas no está configurada. Inténtalo más tarde.",
+    "accountDeletionLockUnavailable": "No se pueden eliminar cuentas en este navegador. Usa uno que permita coordinar el trabajo entre pestañas.",
     "accountDeletionFailed": "No se pudo confirmar la eliminación. Es posible que algunas fotos ya se hayan eliminado y las cargas siguen en pausa. Reintenta la eliminación; si tu sesión caducó, inicia sesión para comprobar tu cuenta.",
     "sessionRevocation": "Tu contraseña se actualizó, pero no se pudieron revocar las sesiones. Reintenta para terminar o inicia sesión con la nueva contraseña.",
     "accountSessionCleanup": "Es posible que la solicitud se haya completado, pero no se pudo cerrar la sesión temporal de verificación. Comprueba tu cuenta antes de reintentar.",

@@ -14,6 +14,7 @@ const project = 'https://garage.supabase.co';
 let cloud: ReturnType<typeof fakeSupabase>;
 
 beforeEach(async () => {
+  sharedTransferLock();
   await clear();
   localStorage.clear();
   sessionStorage.clear();
@@ -204,6 +205,41 @@ it('waits for existing work during deletion, pauses new writes, and preserves gu
   expect(hook.result.current.snapshot.cars).toEqual([car]);
   expect((await local.readPhoto(photo)).size).toBe(5);
 });
+
+it.each([{}, undefined])(
+  'refuses deletion without cross-tab locks (%j)',
+  async (navigatorValue) => {
+    const { LocalRepository } = await import('./repository');
+    const local = new LocalRepository();
+    await local.saveCar(car);
+    const photo = await local.uploadPhoto(
+      visit.id,
+      new File(['guest'], 'guest.webp', { type: 'image/webp' }),
+    );
+    await local.saveVisit({ ...visit, photos: [photo] });
+    const guest = await local.load();
+    cloud.emit(account());
+    const hook = await openGarage();
+    const repository = hook.result.current.repository!;
+    vi.stubGlobal('navigator', navigatorValue);
+    const fetch = vi.fn(async () => new Response('{}', { status: 200 }));
+    vi.stubGlobal('fetch', fetch);
+    await act(async () => {
+      await expect(hook.result.current.deleteAccount('password', true)).rejects.toMatchObject({
+        code: 'accountDeletionLockUnavailable',
+      });
+    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(cloud.auth.signOut).not.toHaveBeenCalled();
+    expect(hook.result.current.user?.id).toBe(account().id);
+    expect(hook.result.current.repository).toBe(repository);
+    expect(hook.result.current.accountNotice).toBeNull();
+    expect(hook.result.current.accountBusy).toBe(false);
+    expect(await local.load()).toEqual(guest);
+    expect((await local.readPhoto(photo)).size).toBe(5);
+    await act(async () => hook.result.current.run(() => repository.saveCar(car)));
+  },
+);
 
 it('does not claim deletion or discard guest data after a failed/lost response', async () => {
   cloud.emit(account());

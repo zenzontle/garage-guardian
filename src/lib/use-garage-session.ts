@@ -498,6 +498,9 @@ export function useGarageSession() {
     await accountOperation(async () => {
       const deletedUser = currentUser.current?.id;
       if (!deletedUser) throw new AppError('sessionExpired');
+      // The transfer fallback queue cannot serialize work from another tab.
+      if (typeof navigator === 'undefined' || !navigator.locks)
+        throw new AppError('accountDeletionLockUnavailable');
       deleting.current = true;
       try {
         await Promise.allSettled([...operations.current]);

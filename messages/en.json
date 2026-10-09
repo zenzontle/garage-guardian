@@ -40,6 +40,7 @@
     "resendCooldown": "Wait 60 seconds before requesting another confirmation email.",
     "deletionAcknowledgment": "Acknowledge permanent loss of your cloud garage before deleting your account.",
     "accountDeletionUnavailable": "Account deletion is not configured. Please try again later.",
+    "accountDeletionLockUnavailable": "Account deletion is unavailable in this browser. Use a browser that supports coordinating work across tabs.",
     "accountDeletionFailed": "Account deletion could not be confirmed. Some photos may already be removed and photo uploads remain paused. Retry deletion; if your session expired, sign in to check your account.",
     "sessionRevocation": "Your password was updated, but sessions could not be revoked. Retry to finish, or sign in with your new password.",
     "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying.",
