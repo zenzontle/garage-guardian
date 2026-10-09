@@ -38,13 +38,8 @@
     "samePassword": "Choose a password different from your current password.",
     "recoveryInvalid": "This recovery link is expired, invalid, or already used. Request another email.",
     "resendCooldown": "Wait 60 seconds before requesting another confirmation email.",
-    "deletionAcknowledgment": "Acknowledge permanent loss of your cloud garage before deleting your account.",
-    "accountDeletionUnavailable": "Account deletion is not configured. Please try again later.",
-    "accountDeletionLockUnavailable": "Account deletion is unavailable in this browser. Use a browser that supports coordinating work across tabs.",
-    "accountDeletionFailed": "Account deletion could not be confirmed. Some photos may already be removed and photo uploads remain paused. Retry deletion; if your session expired, sign in to check your account.",
     "sessionRevocation": "Your password was updated, but sessions could not be revoked. Retry to finish, or sign in with your new password.",
-    "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying.",
-    "accountDeletionSessionCleanup": "Your account was deleted, but this browser could not clear its sign-in data. Use Sign out to retry."
+    "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying."
   },
   "shared": {
     "language": "Language",
@@ -128,10 +123,6 @@
     "changePassword": "Change password",
     "newPassword": "New password",
     "confirmPassword": "Confirm new password",
-    "deleteAccount": "Delete account permanently",
-    "deleteExplanation": "Deletion permanently removes your cloud cars, schedules, service history, photos, and reminder-delivery records. Guest data in this browser stays. Public GitHub bug reports and provider backups are not removed.",
-    "deletePartial": "If deletion fails, some photos may already be removed. Photo uploads pause until you retry deletion.",
-    "deleteAcknowledgment": "I understand that my account and cloud garage will be permanently lost.",
     "forgotPassword": "Forgot password?",
     "recoveryTitle": "Recover your password",
     "recoveryDescription": "Enter your email to request a password recovery link.",
@@ -146,8 +137,7 @@
     "emailSent": "If this address is eligible, an email with instructions will arrive shortly.",
     "cooldown": "You can resend in {seconds} seconds.",
     "passwordChanged": "Your password was changed. Sign in with your new password. Refresh sessions have been revoked; existing access tokens may remain valid until they expire.",
-    "deleted": "Your account and cloud garage were deleted. Your guest garage is preserved.",
-    "transferBlocked": "Finish your signup transfer before changing or deleting your account.",
+    "transferBlocked": "Finish your signup transfer before changing your account.",
     "requestAnother": "Request another recovery email"
   },
   "dashboard": {

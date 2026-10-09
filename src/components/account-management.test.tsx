@@ -106,7 +106,7 @@ describe.each([
     await user.type(within(form).getByLabelText(copy.account.confirmPassword), 'mismatch');
     await user.click(within(form).getByRole('button', { name: copy.account.changePassword }));
     expect((await within(form).findByRole('alert')).textContent).toBe(copy.errors.passwordMismatch);
-    const last = within(dialog).getByRole('button', { name: copy.account.deleteAccount });
+    const last = within(dialog).getByRole('button', { name: copy.account.changePassword });
     last.focus();
     await user.tab();
     expect(document.activeElement).toBe(within(dialog).getByRole('combobox'));

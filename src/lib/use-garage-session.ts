@@ -6,10 +6,8 @@ import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js';
 import { EMPTY_SNAPSHOT, type Snapshot } from './model';
 import { createRepository, recoveryInitialization, supabase, type Repository } from './repository';
 import {
-  clearAccountTransfer,
   pendingTransfer,
   registerSignup,
-  rememberDeletedAccountTransfer,
   transferSignupData,
   withSignupTransferLock,
 } from './signup-transfer';
@@ -21,12 +19,8 @@ import {
   sameRecoverySession,
   storedRecovery,
 } from './account-recovery';
-import type { AccountDelete, AccountPatch } from './account-contract';
-import {
-  clearDeletedAccountSession,
-  signOutPasswordSession,
-  updateRecoveryPassword,
-} from './account-session';
+import type { AccountPatch } from './account-contract';
+import { signOutPasswordSession, updateRecoveryPassword } from './account-session';
 import en from '../../messages/en.json';
 
 export type MutationResult = { refreshed: boolean };
@@ -45,9 +39,8 @@ export function useGarageSession() {
   const recoveryFinishing = useRef(false);
   const [accountBusy, setAccountBusy] = useState(false);
   const accountLock = useRef(false);
-  const deleting = useRef(false);
   const transferBlocked = useRef(false);
-  const [accountNotice, setAccountNotice] = useState<'passwordChanged' | 'deleted' | null>(null);
+  const [accountNotice, setAccountNotice] = useState<'passwordChanged' | null>(null);
   const [resendUntil, setResendUntil] = useState(0);
   const resendDeadline = useRef(0);
   const generation = useRef(0);
@@ -125,8 +118,6 @@ export function useGarageSession() {
                 return (...args: unknown[]) => {
                   const work = (async () => {
                     assertActive();
-                    if (deleting.current && property !== 'load' && property !== 'photoUrl')
-                      throw new AppError('operationBusy');
                     const method = target[property] as (...args: unknown[]) => Promise<unknown>;
                     const result = await method.apply(target, args);
                     assertActive();
@@ -269,7 +260,7 @@ export function useGarageSession() {
 
   const run = useCallback(
     async (action: () => Promise<void>): Promise<MutationResult> => {
-      if (!repository || mutationBusy.current || deleting.current || recoverySession.current)
+      if (!repository || mutationBusy.current || recoverySession.current)
         throw new AppError('operationBusy');
       mutationBusy.current = true;
       const version = generation.current;
@@ -296,7 +287,7 @@ export function useGarageSession() {
   );
 
   const refresh = useCallback(async (): Promise<void> => {
-    if (!repository || mutationBusy.current || deleting.current) return;
+    if (!repository || mutationBusy.current) return;
     mutationBusy.current = true;
     const work = reloadSnapshot(generation.current);
     operations.current.add(work);
@@ -398,13 +389,13 @@ export function useGarageSession() {
     }
   }
 
-  async function requestAccount(method: 'PATCH' | 'DELETE', input: AccountPatch | AccountDelete) {
+  async function requestAccount(input: AccountPatch) {
     const version = generation.current;
     const { data, error } = await supabase!.auth.getSession();
     if (error || !data.session || data.session.user.id !== currentUser.current?.id)
       throw new AppError('sessionExpired');
     const response = await fetch('/api/account', {
-      method,
+      method: 'PATCH',
       cache: 'no-store',
       headers: {
         Authorization: `Bearer ${data.session.access_token}`,
@@ -475,7 +466,7 @@ export function useGarageSession() {
   async function changeEmail(currentPassword: string, newEmail: string) {
     await accountOperation(async () => {
       const userId = currentUser.current?.id;
-      await requestAccount('PATCH', { kind: 'email', currentPassword, newEmail });
+      await requestAccount({ kind: 'email', currentPassword, newEmail });
       const { data, error } = await supabase!.auth.getUser();
       if (error) throw new AppError('auth');
       if (currentUser.current?.id !== userId) throw new AppError('sessionChanged');
@@ -494,45 +485,12 @@ export function useGarageSession() {
     if (newPassword !== confirmation) throw new AppError('passwordMismatch');
     if (newPassword.length < 6) throw new AppError('weakPassword');
     await accountOperation(async () => {
-      const session = await requestAccount('PATCH', {
+      const session = await requestAccount({
         kind: 'password',
         currentPassword,
         newPassword,
       });
       await finishPasswordChange(session, false);
-    });
-  }
-
-  async function deleteAccount(currentPassword: string, acknowledged: boolean) {
-    if (!acknowledged) throw new AppError('deletionAcknowledgment');
-    await accountOperation(async () => {
-      const deletedUser = currentUser.current?.id;
-      if (!deletedUser) throw new AppError('sessionExpired');
-      // The transfer fallback queue cannot serialize work from another tab.
-      if (typeof navigator === 'undefined' || !navigator.locks)
-        throw new AppError('accountDeletionLockUnavailable');
-      deleting.current = true;
-      try {
-        await Promise.allSettled([...operations.current]);
-        await withSignupTransferLock(project, async () => {
-          const pending = await pendingTransfer(project);
-          if (currentUser.current?.id !== deletedUser) throw new AppError('sessionChanged');
-          if (pending?.userId === deletedUser) throw new AppError('operationBusy');
-          await requestAccount('DELETE', { currentPassword, acknowledged: true });
-          rememberDeletedAccountTransfer(project, deletedUser);
-          await clearAccountTransfer(project, deletedUser).catch(() => {
-            // The journal retries this cleanup on later transfer/signup checks.
-            // Confirmed Auth deletion must still return to the guest garage.
-          });
-          await clearDeletedAccountSession(supabase!, project, deletedUser);
-          clearRecovery();
-          recoverySession.current = null;
-          transition.current(null, true);
-          setAccountNotice('deleted');
-        });
-      } finally {
-        deleting.current = false;
-      }
     });
   }
 
@@ -563,7 +521,6 @@ export function useGarageSession() {
     cancelRecovery,
     changeEmail,
     changePassword,
-    deleteAccount,
     retry: () => retry.current(),
   };
 }

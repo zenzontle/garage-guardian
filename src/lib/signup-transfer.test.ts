@@ -28,53 +28,6 @@ async function seedLocal(withPhoto = true) {
 }
 
 describe('signup transfer', () => {
-  it('retries confirmed deletion cleanup after reload before an uploaded marker can erase guest data', async () => {
-    vi.resetModules();
-    const beforeReload = await import('./signup-transfer');
-    const { local, snapshot, photo } = await seedLocal();
-    localStorage.setItem('locale', 'es');
-    await set(`garage-guardian:signup-transfer:v1:${project}`, {
-      userId: account().id,
-      status: 'uploaded',
-      snapshot,
-    });
-    beforeReload.rememberDeletedAccountTransfer(project, account().id);
-    vi.resetModules();
-    const reloaded = await import('./signup-transfer');
-    const cloud = fakeSupabase();
-    cloud.emit(account());
-    await reloaded.transferSignupData(cloud.client, project, account().id);
-    expect(await reloaded.pendingTransfer(project)).toBeUndefined();
-    expect(await local.load()).toEqual(snapshot);
-    expect(await local.readPhoto(photo)).toBeInstanceOf(Blob);
-    expect(localStorage.getItem('locale')).toBe('es');
-    expect(
-      localStorage.getItem(`garage-guardian:deleted-transfer:v1:${project}:${account().id}`),
-    ).toBeNull();
-    expect(cloud.from).not.toHaveBeenCalled();
-  });
-
-  it('cleans only confirmed deleted owners in this project and retains another account’s marker', async () => {
-    vi.resetModules();
-    const beforeReload = await import('./signup-transfer');
-    const otherProject = 'https://other.supabase.co';
-    await registerSignup(project, account('another'), true);
-    await registerSignup(otherProject, account(), true);
-    beforeReload.rememberDeletedAccountTransfer(project, account().id);
-    beforeReload.rememberDeletedAccountTransfer(project, account('also-deleted').id);
-    beforeReload.rememberDeletedAccountTransfer(otherProject, account().id);
-    vi.resetModules();
-    const reloaded = await import('./signup-transfer');
-    expect((await reloaded.pendingTransfer(project))?.userId).toBe('another');
-    expect(
-      (await get<{ userId: string }>(`garage-guardian:signup-transfer:v1:${otherProject}`))?.userId,
-    ).toBe(account().id);
-    expect(
-      localStorage.getItem(`garage-guardian:deleted-transfer:v1:${otherProject}:${account().id}`),
-    ).toBe('confirmed');
-    expect(await reloaded.pendingTransfer(otherProject)).toBeUndefined();
-  });
-
   it.each(['pending', 'uploading', 'uploaded'])(
     'resumes a legacy %s transfer and cleans up equivalent guest records',
     async (status) => {

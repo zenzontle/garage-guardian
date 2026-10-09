@@ -11,8 +11,4 @@ export const accountPatchSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
 ]);
-export const accountDeleteSchema = z
-  .object({ currentPassword, acknowledged: z.literal(true) })
-  .strict();
 export type AccountPatch = z.infer<typeof accountPatchSchema>;
-export type AccountDelete = z.infer<typeof accountDeleteSchema>;

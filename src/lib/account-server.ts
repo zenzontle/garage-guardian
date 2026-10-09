@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { accountDeleteSchema, accountPatchSchema } from '@/lib/account-contract';
+import { accountPatchSchema } from '@/lib/account-contract';
 import type { ErrorCode } from '@/lib/app-error';
 
 const authOptions = {
@@ -50,10 +50,9 @@ async function bodyOf(request: Request) {
   }
 }
 
-export async function accountRequest(request: Request, deleting: boolean) {
+export async function accountRequest(request: Request) {
   let verification: SupabaseClient | undefined;
   let verified = false;
-  let deleted = false;
   const result = await (async () => {
     try {
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -64,9 +63,7 @@ export async function accountRequest(request: Request, deleting: boolean) {
       const identity = createClient(url, key, authOptions);
       const { data: caller, error: identityError } = await identity.auth.getUser(token);
       if (identityError || !caller.user?.email) throw new AccountError('sessionExpired', 401);
-      const parsed = (deleting ? accountDeleteSchema : accountPatchSchema).safeParse(
-        await bodyOf(request),
-      );
+      const parsed = accountPatchSchema.safeParse(await bodyOf(request));
       if (!parsed.success) throw new AccountError('accountInput');
       const input = parsed.data;
       verification = createClient(url, key, authOptions);
@@ -82,45 +79,23 @@ export async function accountRequest(request: Request, deleting: boolean) {
       }
       if (!data.user || data.user.id !== caller.user.id || !data.session)
         throw new AccountError('sessionExpired', 403);
-      if ('kind' in input) {
-        const { error: updateError } = await verification.auth.updateUser(
-          input.kind === 'email' ? { email: input.newEmail } : { password: input.newPassword },
-        );
-        // A prior request may have changed the password before revocation failed.
-        // Reauthentication proves the requested password is already in effect.
-        const passwordAlreadyChanged =
-          input.kind === 'password' &&
-          input.currentPassword === input.newPassword &&
-          updateError?.code === 'same_password';
-        if (updateError && !passwordAlreadyChanged) providerError(updateError);
-        if (input.kind === 'password') {
-          const { error: revokeError } = await verification.auth.signOut({ scope: 'global' });
-          if (revokeError) throw new AccountError('sessionRevocation', 502);
-        }
-        return response({
-          status: input.kind === 'email' ? 'confirmationRequired' : 'passwordChanged',
-        });
+      const { error: updateError } = await verification.auth.updateUser(
+        input.kind === 'email' ? { email: input.newEmail } : { password: input.newPassword },
+      );
+      // A prior request may have changed the password before revocation failed.
+      // Reauthentication proves the requested password is already in effect.
+      const passwordAlreadyChanged =
+        input.kind === 'password' &&
+        input.currentPassword === input.newPassword &&
+        updateError?.code === 'same_password';
+      if (updateError && !passwordAlreadyChanged) providerError(updateError);
+      if (input.kind === 'password') {
+        const { error: revokeError } = await verification.auth.signOut({ scope: 'global' });
+        if (revokeError) throw new AccountError('sessionRevocation', 502);
       }
-      const secret = process.env.SUPABASE_SECRET_KEY;
-      if (!secret) throw new AccountError('accountDeletionUnavailable', 503);
-      const admin = createClient(url, secret, authOptions);
-      const userId = caller.user.id;
-      // Wait for photo metadata transactions, then fence all later commits.
-      const { error: lockError } = await admin
-        .from('account_deletion_locks')
-        .upsert({ user_id: userId });
-      if (lockError) throw new AccountError('accountDeletionFailed', 502);
-      try {
-        await removeAccountPhotos(admin, userId);
-        const { error: deleteError } = await admin.auth.admin.deleteUser(userId, false);
-        if (deleteError) throw new AccountError('accountDeletionFailed', 502);
-        deleted = true;
-      } catch {
-        // A failed/lost response may already have deleted Auth. Never claim success here.
-        // Keep the fence until a retry succeeds, including when this process is interrupted.
-        throw new AccountError('accountDeletionFailed', 502);
-      }
-      return response({ status: 'deleted' });
+      return response({
+        status: input.kind === 'email' ? 'confirmationRequired' : 'passwordChanged',
+      });
     } catch (cause) {
       const error = cause instanceof AccountError ? cause : new AccountError('auth', 502);
       return response({ error: { code: error.code } }, error.status);
@@ -129,42 +104,10 @@ export async function accountRequest(request: Request, deleting: boolean) {
   if (verification && verified) {
     try {
       const { error } = await verification.auth.signOut({ scope: 'local' });
-      if (error && !deleted) return response({ error: { code: 'accountSessionCleanup' } }, 502);
+      if (error) return response({ error: { code: 'accountSessionCleanup' } }, 502);
     } catch {
-      if (!deleted) return response({ error: { code: 'accountSessionCleanup' } }, 502);
+      return response({ error: { code: 'accountSessionCleanup' } }, 502);
     }
   }
   return result;
-}
-
-export async function removeAccountPhotos(admin: SupabaseClient, userId: string) {
-  const bucket = admin.storage.from('visit-photos');
-  const folders = [userId];
-  // Writes are fenced. Drain the first page so concurrent deletes cannot shift
-  // surviving files or virtual folders past an offset. Recheck parents last.
-  while (folders.length) {
-    const folder = folders.at(-1)!;
-    const { data, error } = await bucket.list(folder, {
-      limit: 100,
-      offset: 0,
-      sortBy: { column: 'name', order: 'asc' },
-    });
-    if (error || !data) throw new AccountError('accountDeletionFailed', 502);
-    if (data.length === 0) {
-      folders.pop();
-      continue;
-    }
-    const paths: string[] = [];
-    for (const item of data) {
-      if (!item.name || item.name === '.' || item.name === '..' || /[/\\]/.test(item.name))
-        throw new AccountError('accountDeletionFailed', 502);
-      const path = `${folder}/${item.name}`;
-      if (item.id) paths.push(path);
-      else folders.push(path);
-    }
-    if (paths.length) {
-      const { error } = await bucket.remove(paths);
-      if (error) throw new AccountError('accountDeletionFailed', 502);
-    }
-  }
 }

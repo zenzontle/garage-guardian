@@ -20,7 +20,7 @@ export function AccountSettingsDialog() {
       <div className="modal-body form-stack">
         <p>{t('account.currentEmail', { email: garage.user.email ?? '' })}</p>
         {garage.transferring && <p role="status">{t('account.transferBlocked')}</p>}
-        {(['email', 'password', 'delete'] as const).map((kind) => (
+        {(['email', 'password'] as const).map((kind) => (
           <AccountSettingsForm
             key={kind}
             kind={kind}

@@ -38,13 +38,8 @@
     "samePassword": "Elige una contraseña diferente a la actual.",
     "recoveryInvalid": "Este enlace de recuperación caducó, no es válido o ya se usó. Solicita otro correo.",
     "resendCooldown": "Espera 60 segundos antes de solicitar otro correo de confirmación.",
-    "deletionAcknowledgment": "Acepta la pérdida permanente de tu garaje en la nube antes de eliminar tu cuenta.",
-    "accountDeletionUnavailable": "La eliminación de cuentas no está configurada. Inténtalo más tarde.",
-    "accountDeletionLockUnavailable": "No se pueden eliminar cuentas en este navegador. Usa uno que permita coordinar el trabajo entre pestañas.",
-    "accountDeletionFailed": "No se pudo confirmar la eliminación. Es posible que algunas fotos ya se hayan eliminado y las cargas siguen en pausa. Reintenta la eliminación; si tu sesión caducó, inicia sesión para comprobar tu cuenta.",
     "sessionRevocation": "Tu contraseña se actualizó, pero no se pudieron revocar las sesiones. Reintenta para terminar o inicia sesión con la nueva contraseña.",
-    "accountSessionCleanup": "Es posible que la solicitud se haya completado, pero no se pudo cerrar la sesión temporal de verificación. Comprueba tu cuenta antes de reintentar.",
-    "accountDeletionSessionCleanup": "Tu cuenta se eliminó, pero este navegador no pudo borrar sus datos de inicio de sesión. Usa Cerrar sesión para reintentar."
+    "accountSessionCleanup": "Es posible que la solicitud se haya completado, pero no se pudo cerrar la sesión temporal de verificación. Comprueba tu cuenta antes de reintentar."
   },
   "shared": {
     "language": "Idioma",
@@ -128,10 +123,6 @@
     "changePassword": "Cambiar contraseña",
     "newPassword": "Nueva contraseña",
     "confirmPassword": "Confirmar nueva contraseña",
-    "deleteAccount": "Eliminar cuenta permanentemente",
-    "deleteExplanation": "La eliminación borra permanentemente tus autos, programas, historial de servicios, fotos y registros de envío de recordatorios en la nube. Los datos de invitado de este navegador se conservan. No se eliminan los reportes públicos de GitHub ni las copias de seguridad del proveedor.",
-    "deletePartial": "Si la eliminación falla, es posible que algunas fotos ya se hayan eliminado. Las cargas de fotos se pausan hasta que reintentes la eliminación.",
-    "deleteAcknowledgment": "Entiendo que perderé permanentemente mi cuenta y mi garaje en la nube.",
     "forgotPassword": "¿Olvidaste tu contraseña?",
     "recoveryTitle": "Recupera tu contraseña",
     "recoveryDescription": "Ingresa tu correo para solicitar un enlace de recuperación de contraseña.",
@@ -146,8 +137,7 @@
     "emailSent": "Si esta dirección cumple los requisitos, pronto llegará un correo con instrucciones.",
     "cooldown": "Puedes reenviar en {seconds} segundos.",
     "passwordChanged": "Tu contraseña cambió. Inicia sesión con la nueva contraseña. Las sesiones de renovación se revocaron; los tokens de acceso existentes pueden seguir siendo válidos hasta que caduquen.",
-    "deleted": "Tu cuenta y tu garaje en la nube se eliminaron. Tu garaje de invitado se conserva.",
-    "transferBlocked": "Termina la transferencia de tu registro antes de cambiar o eliminar tu cuenta.",
+    "transferBlocked": "Termina la transferencia de registro antes de cambiar tu cuenta.",
     "requestAnother": "Solicitar otro correo de recuperación"
   },
   "dashboard": {

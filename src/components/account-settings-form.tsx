@@ -11,7 +11,7 @@ export function AccountSettingsForm({
   kind,
   disabled,
 }: {
-  kind: 'email' | 'password' | 'delete';
+  kind: 'email' | 'password';
   disabled: boolean;
 }) {
   const t = useTranslations();
@@ -21,11 +21,9 @@ export function AccountSettingsForm({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState<AppFailure | null>(null);
   const [pendingEmail, setPendingEmail] = useState('');
-  const title =
-    kind === 'email' ? 'changeEmail' : kind === 'password' ? 'changePassword' : 'deleteAccount';
+  const title = kind === 'email' ? 'changeEmail' : 'changePassword';
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -33,13 +31,9 @@ export function AccountSettingsForm({
       if (kind === 'email') {
         await garage.changeEmail(currentPassword, email.trim());
         setPendingEmail(email.trim());
-      } else if (kind === 'password') {
+      } else {
         await garage.changePassword(currentPassword, password, confirmation);
         router.replace('/signin');
-      } else {
-        await garage.deleteAccount(currentPassword, acknowledged);
-        garage.setModal(null);
-        router.replace('/');
       }
       setCurrentPassword('');
       setPassword('');
@@ -64,12 +58,6 @@ export function AccountSettingsForm({
       )}
       {kind === 'email' && pending && pending !== garage.user?.email && (
         <p role="status">{t('account.pendingEmail', { email: pending })}</p>
-      )}
-      {kind === 'delete' && (
-        <>
-          <p>{t('account.deleteExplanation')}</p>
-          <p>{t('account.deletePartial')}</p>
-        </>
       )}
       <fieldset className="account-fields" disabled={disabled}>
         <label>
@@ -104,18 +92,7 @@ export function AccountSettingsForm({
             onConfirmation={setConfirmation}
           />
         )}
-        {kind === 'delete' && (
-          <label className="checkbox-line">
-            <input
-              type="checkbox"
-              required
-              checked={acknowledged}
-              onChange={(event) => setAcknowledged(event.target.checked)}
-            />
-            {t('account.deleteAcknowledgment')}
-          </label>
-        )}
-        <button className={`button ${kind === 'delete' ? 'danger' : 'primary'}`}>
+        <button className="button primary">
           {t(garage.accountBusy ? 'account.wait' : `account.${title}`)}
         </button>
       </fieldset>

@@ -110,21 +110,6 @@ export function fakeSupabase() {
     return builder;
   });
   const bucket = {
-    list: vi.fn(async (folder: string, options: { limit: number; offset: number }) => {
-      const entries = new Map<string, { name: string; id: string | null }>();
-      for (const path of photos.keys()) {
-        if (!path.startsWith(`${folder}/`)) continue;
-        const rest = path.slice(folder.length + 1);
-        const name = rest.split('/')[0];
-        entries.set(name, { name, id: rest.includes('/') ? null : path });
-      }
-      return {
-        data: [...entries.values()]
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .slice(options.offset, options.offset + options.limit),
-        error: null as Error | null,
-      };
-    }),
     upload: vi.fn(async (path: string, blob: Blob) => {
       if (!user || !path.startsWith(`${user.id}/`))
         return { error: new Error('Photo owner policy denied write') };
@@ -189,10 +174,6 @@ export function fakeSupabase() {
     ) => work(await auth.getSession()),
     _signOut: (options: { scope: 'local' }) => auth.signOut(options),
     _updateUser: (attributes: { password: string }) => auth.updateUser(attributes),
-    _removeSession: async () => {
-      const { error } = await auth.signOut({ scope: 'local' });
-      if (error) throw error;
-    },
   });
   const storage = { from: vi.fn(() => bucket) };
   return {

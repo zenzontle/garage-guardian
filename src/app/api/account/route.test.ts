@@ -1,9 +1,8 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { fakeSupabase, account } from '@/test/fake-supabase';
-import { DELETE, PATCH } from './route';
-import { removeAccountPhotos } from '@/lib/account-server';
+import { createClient } from '@supabase/supabase-js';
+import { account } from '@/test/fake-supabase';
+import { PATCH } from './route';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 const owner = account();
@@ -11,16 +10,11 @@ const identity = { auth: { getUser: vi.fn() } };
 const verification = {
   auth: { signInWithPassword: vi.fn(), updateUser: vi.fn(), signOut: vi.fn() },
 };
-let photos: ReturnType<typeof fakeSupabase>;
-const lock = vi.fn();
-const deleteUser = vi.fn();
-let admin: SupabaseClient;
 
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://project.supabase.co');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'public-key');
-  vi.stubEnv('SUPABASE_SECRET_KEY', 'server-secret');
   identity.auth.getUser.mockResolvedValue({ data: { user: owner }, error: null });
   verification.auth.signInWithPassword.mockResolvedValue({
     data: { user: owner, session: { access_token: 'verification-token' } },
@@ -28,19 +22,9 @@ beforeEach(() => {
   });
   verification.auth.updateUser.mockResolvedValue({ data: { user: owner }, error: null });
   verification.auth.signOut.mockResolvedValue({ error: null });
-  photos = fakeSupabase();
-  lock.mockResolvedValue({ error: null });
-  deleteUser.mockResolvedValue({ error: null });
-  admin = {
-    storage: photos.client.storage,
-    from: vi.fn(() => ({ upsert: lock })),
-    auth: { admin: { deleteUser } },
-  } as unknown as SupabaseClient;
   vi.mocked(createClient).mockImplementation(
-    (_url, key) =>
-      (key === 'server-secret'
-        ? admin
-        : { auth: { ...identity.auth, ...verification.auth } }) as unknown as ReturnType<
+    () =>
+      ({ auth: { ...identity.auth, ...verification.auth } }) as unknown as ReturnType<
         typeof createClient
       >,
   );
@@ -54,7 +38,6 @@ function request(method: string, body: unknown, token = 'caller-token') {
 }
 const password = { kind: 'password', currentPassword: 'current-secret', newPassword: 'new-secret' };
 const email = { kind: 'email', currentPassword: 'current-secret', newEmail: 'next@example.com' };
-const deletion = { currentPassword: 'current-secret', acknowledged: true };
 async function expectError(result: Response, code: string, status?: number) {
   expect(await result.json()).toEqual({ error: { code } });
   if (status) expect(result.status).toBe(status);
@@ -64,16 +47,14 @@ async function expectError(result: Response, code: string, status?: number) {
 it('requires a bearer token and rejects an expired identity before password verification', async () => {
   await expectError(await PATCH(request('PATCH', password, '')), 'sessionExpired', 401);
   identity.auth.getUser.mockResolvedValueOnce({ data: { user: null }, error: { code: 'bad_jwt' } });
-  await expectError(await DELETE(request('DELETE', deletion)), 'sessionExpired', 401);
+  await expectError(await PATCH(request('PATCH', password)), 'sessionExpired', 401);
   expect(verification.auth.signInWithPassword).not.toHaveBeenCalled();
 });
 describe.each([
-  ['email', email],
-  ['password', password],
-  ['deletion', deletion],
-] as const)('%s authorization', (kind, input) => {
-  const invoke = (body: unknown) =>
-    kind === 'deletion' ? DELETE(request('DELETE', body)) : PATCH(request('PATCH', body));
+  { name: 'email', input: email },
+  { name: 'password', input: password },
+])('$name authorization', ({ input }) => {
+  const invoke = (body: unknown) => PATCH(request('PATCH', body));
   it('rejects incorrect current passwords without any account mutation', async () => {
     verification.auth.signInWithPassword.mockResolvedValueOnce({
       data: { user: null, session: null },
@@ -81,8 +62,6 @@ describe.each([
     });
     await expectError(await invoke(input), 'currentPasswordIncorrect', 403);
     expect(verification.auth.updateUser).not.toHaveBeenCalled();
-    expect(deleteUser).not.toHaveBeenCalled();
-    expect(lock).not.toHaveBeenCalled();
   });
   it('rejects mismatched reauthenticated identities and ends their temporary session', async () => {
     verification.auth.signInWithPassword.mockResolvedValueOnce({
@@ -91,7 +70,6 @@ describe.each([
     });
     await expectError(await invoke(input), 'sessionExpired', 403);
     expect(verification.auth.updateUser).not.toHaveBeenCalled();
-    expect(deleteUser).not.toHaveBeenCalled();
     expect(verification.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
   });
   it('rejects browser-supplied target IDs', async () => {
@@ -164,13 +142,9 @@ it.each(['weak_password', 'over_request_rate_limit', 'over_email_send_rate_limit
     expect(verification.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
   },
 );
-it('rejects malformed, oversized, weak, and unacknowledged requests', async () => {
+it('rejects malformed, oversized, and weak requests', async () => {
   await expectError(
     await PATCH(request('PATCH', { ...password, newPassword: 'short' })),
-    'accountInput',
-  );
-  await expectError(
-    await DELETE(request('DELETE', { ...deletion, acknowledged: false })),
     'accountInput',
   );
   await expectError(
@@ -178,107 +152,6 @@ it('rejects malformed, oversized, weak, and unacknowledged requests', async () =
     'accountInput',
   );
 });
-it('hard deletes an account with no photos only after installing the write fence', async () => {
-  expect((await DELETE(request('DELETE', deletion))).status).toBe(200);
-  expect(lock).toHaveBeenCalledWith({ user_id: owner.id });
-  expect(deleteUser).toHaveBeenCalledWith(owner.id, false);
-  expect(lock.mock.invocationCallOrder[0]).toBeLessThan(deleteUser.mock.invocationCallOrder[0]);
-});
-it('waits for the metadata commit barrier before listing photos or deleting Auth', async () => {
-  let release!: () => void;
-  lock.mockImplementationOnce(
-    () =>
-      new Promise((resolve) => {
-        release = () => resolve({ error: null });
-      }),
-  );
-  const pending = DELETE(request('DELETE', deletion));
-  await vi.waitFor(() => expect(lock).toHaveBeenCalled());
-  expect(photos.bucket.list).not.toHaveBeenCalled();
-  expect(deleteUser).not.toHaveBeenCalled();
-  photos.photos.set(`${owner.id}/late-upload.webp`, new Blob(['late']));
-  release();
-  expect((await pending).status).toBe(200);
-  expect(photos.photos.size).toBe(0);
-  expect(deleteUser).toHaveBeenCalledWith(owner.id, false);
-});
-it('drains nested orphan photos across pages, preserving other owners', async () => {
-  for (let i = 0; i < 205; ++i)
-    photos.photos.set(`${owner.id}/visit/${String(i).padStart(3, '0')}.webp`, new Blob(['photo']));
-  photos.photos.set(`${owner.id}/orphan.webp`, new Blob(['orphan']));
-  photos.photos.set('other-user/visit/keep.webp', new Blob(['keep']));
-  expect((await DELETE(request('DELETE', deletion))).status).toBe(200);
-  expect([...photos.photos.keys()]).toEqual(['other-user/visit/keep.webp']);
-  expect(photos.bucket.list.mock.calls.every(([, options]) => options.offset === 0)).toBe(true);
-  expect(photos.bucket.list.mock.invocationCallOrder.at(-1)!).toBeLessThan(
-    deleteUser.mock.invocationCallOrder[0],
-  );
-});
-it.each(['files', 'folders'] as const)(
-  'does not skip shifted %s when another tab deletes between listing pages',
-  async (kind) => {
-    for (let i = 0; i < 205; ++i) {
-      const name = String(i).padStart(3, '0');
-      photos.photos.set(
-        `${owner.id}/${name}${kind === 'folders' ? '/photo' : ''}.webp`,
-        new Blob(['photo']),
-      );
-    }
-    photos.photos.set('other-user/keep.webp', new Blob(['keep']));
-    const list = photos.bucket.list.getMockImplementation()!;
-    photos.bucket.list.mockImplementationOnce(async (folder, options) => {
-      const result = await list(folder, options);
-      // The listed first entry disappears before the next page is requested.
-      photos.photos.delete(`${owner.id}/000${kind === 'folders' ? '/photo' : ''}.webp`);
-      return result;
-    });
-    deleteUser.mockImplementationOnce(async () => {
-      expect([...photos.photos.keys()]).toEqual(['other-user/keep.webp']);
-      return { error: null };
-    });
-    expect((await DELETE(request('DELETE', deletion))).status).toBe(200);
-    expect(deleteUser).toHaveBeenCalledWith(owner.id, false);
-  },
-);
-it('retains Auth and the fence after partial cleanup failure, then allows retry', async () => {
-  for (let i = 0; i < 150; ++i) photos.photos.set(`${owner.id}/${i}.webp`, new Blob(['photo']));
-  const remove = photos.bucket.remove.getMockImplementation()!;
-  photos.bucket.remove
-    .mockImplementationOnce(remove)
-    .mockResolvedValueOnce({ error: new Error('Storage offline') });
-  await expectError(await DELETE(request('DELETE', deletion)), 'accountDeletionFailed', 502);
-  expect(photos.photos.size).toBe(50);
-  expect(deleteUser).not.toHaveBeenCalled();
-  await removeAccountPhotos(admin, owner.id);
-  expect(photos.photos.size).toBe(0);
-});
-it('never reports success on Auth failure or a lost deletion response', async () => {
-  deleteUser.mockRejectedValueOnce(new Error('Lost response'));
-  await expectError(await DELETE(request('DELETE', deletion)), 'accountDeletionFailed', 502);
-});
-it('does not start cleanup without the server secret or a successful fence', async () => {
-  vi.stubEnv('SUPABASE_SECRET_KEY', '');
-  await expectError(await DELETE(request('DELETE', deletion)), 'accountDeletionUnavailable', 503);
-  expect(photos.bucket.list).not.toHaveBeenCalled();
-});
-
-it('retains Auth after listing/fence failures and rejects malformed storage paths', async () => {
-  lock.mockResolvedValueOnce({ error: new Error('Database unavailable') });
-  await expectError(await DELETE(request('DELETE', deletion)), 'accountDeletionFailed');
-  expect(photos.bucket.list).not.toHaveBeenCalled();
-  photos.bucket.list.mockResolvedValueOnce({ data: [], error: new Error('Storage unavailable') });
-  await expectError(await DELETE(request('DELETE', deletion)), 'accountDeletionFailed');
-  expect(deleteUser).not.toHaveBeenCalled();
-  photos.bucket.list.mockResolvedValueOnce({
-    data: [{ name: '../victim.webp', id: 'id' }],
-    error: null,
-  });
-  await expect(removeAccountPhotos(admin, owner.id)).rejects.toMatchObject({
-    code: 'accountDeletionFailed',
-  });
-  expect(photos.bucket.remove).not.toHaveBeenCalled();
-});
-
 it('reports temporary-session cleanup failure and password revocation failure without false success', async () => {
   verification.auth.signOut.mockResolvedValueOnce({ error: new Error('Offline') });
   await expectError(await PATCH(request('PATCH', email)), 'accountSessionCleanup', 502);

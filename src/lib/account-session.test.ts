@@ -7,7 +7,6 @@ import {
 } from '@supabase/supabase-js';
 import {
   accountAuthStorageKey,
-  clearDeletedAccountSession,
   serializeAccountSignIns,
   signOutPasswordSession,
   updateRecoveryPassword,
@@ -15,7 +14,6 @@ import {
 import { account } from '../test/fake-supabase';
 
 const project = 'https://account-session.supabase.co';
-const key = accountAuthStorageKey(project);
 beforeEach(() => localStorage.clear());
 
 function storedClient(projectUrl = project) {
@@ -50,10 +48,6 @@ function storedClient(projectUrl = project) {
     ) => work(await auth.getSession()),
     _signOut: (options: { scope: 'local' }) => auth.signOut(options),
     _updateUser: vi.fn(async () => ({ data: { user: account() }, error: null })),
-    _removeSession: async () => {
-      const { error } = await auth.signOut({ scope: 'local' });
-      if (error) throw error;
-    },
   });
   return { auth, key, client: { auth } as unknown as SupabaseClient };
 }
@@ -65,97 +59,20 @@ it('preserves the SDK’s existing storage key and can load its persisted sessio
     auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
     global: {
       fetch: vi.fn(
-        async () => new Response(JSON.stringify({ message: 'User deleted' }), { status: 404 }),
+        async () => new Response(JSON.stringify({ message: 'Session expired' }), { status: 404 }),
       ),
     },
   });
   expect((await existing.auth.getSession()).data.session?.user.id).toBe(account().id);
-  await clearDeletedAccountSession(existing, existingProject, account().id);
+  await signOutPasswordSession(existing, (await existing.auth.getSession()).data.session!, 'local');
   expect(localStorage.getItem(key)).toBeNull();
   expect((await existing.auth.getSession()).data.session).toBeNull();
   await existing.auth.stopAutoRefresh();
 });
 
-it.each(['returned', 'thrown'] as const)(
-  'clears retained credentials after a %s sign-out error and survives SDK reload',
-  async (kind) => {
-    const sessionProject = project.replace('account-session', `${kind}-account-session`);
-    const { client, auth, key } = storedClient(sessionProject);
-    if (kind === 'returned') auth.signOut.mockResolvedValueOnce({ error: new Error('Offline') });
-    else auth.signOut.mockRejectedValueOnce(new Error('Offline'));
-    localStorage.setItem(`${key}-user`, JSON.stringify({ user: account() }));
-    localStorage.setItem('garage-guardian:locale', 'es');
-    localStorage.setItem('unrelated-project-auth', 'keep');
-    await clearDeletedAccountSession(client, sessionProject, account().id);
-    expect(localStorage.getItem(key)).toBeNull();
-    expect(localStorage.getItem(`${key}-user`)).toBeNull();
-    expect(localStorage.getItem('garage-guardian:locale')).toBe('es');
-    expect(localStorage.getItem('unrelated-project-auth')).toBe('keep');
-    expect(auth.signOut.mock.calls).toEqual([[{ scope: 'local' }], [{ scope: 'local' }]]);
-    // Use the real SDK's default storage key to verify a fresh client stays signed out.
-    const fetch = vi.fn();
-    const reopened = createClient(sessionProject, 'test-key', {
-      auth: { autoRefreshToken: false, detectSessionInUrl: false },
-      global: { fetch },
-    });
-    expect((await reopened.auth.getSession()).data.session).toBeNull();
-    expect(fetch).not.toHaveBeenCalled();
-    await reopened.auth.stopAutoRefresh();
-  },
-);
-
-it('accepts an error response when the SDK has already cleared the session', async () => {
-  const { client, auth } = storedClient();
-  auth.signOut.mockImplementationOnce(async () => {
-    localStorage.removeItem(key);
-    return { error: new Error('Lost logout response') };
-  });
-  await clearDeletedAccountSession(client, project, account().id);
-  expect(auth.signOut).toHaveBeenCalledTimes(1);
-});
-
-it('never clears a replacement account’s credentials', async () => {
-  const { client, auth } = storedClient();
-  localStorage.setItem(key, JSON.stringify({ user: account('replacement') }));
-  auth.signOut.mockImplementationOnce(async () => {
-    localStorage.removeItem(key);
-    return { error: null };
-  });
-  await expect(clearDeletedAccountSession(client, project, account().id)).rejects.toMatchObject({
-    code: 'sessionChanged',
-  });
-  expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe('replacement');
-  expect(auth.signOut).not.toHaveBeenCalled();
-});
-
-it('rejects a replacement that arrives after the initial session read', async () => {
-  const { client, auth } = storedClient();
-  auth.getSession.mockImplementationOnce(async () => {
-    localStorage.setItem(key, JSON.stringify({ user: account('replacement') }));
-    return { data: { session: { user: account() } }, error: null };
-  });
-  await expect(clearDeletedAccountSession(client, project, account().id)).rejects.toMatchObject({
-    code: 'sessionChanged',
-  });
-  expect(auth.signOut).not.toHaveBeenCalled();
-  expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe('replacement');
-});
-
-it('reports cleanup failure rather than completion when persisted storage cannot be cleared', async () => {
-  const { client, auth } = storedClient();
-  auth.signOut.mockResolvedValueOnce({ error: new Error('Offline') });
-  vi.spyOn(Storage.prototype, 'removeItem').mockImplementationOnce(() => {
-    throw new Error('Storage unavailable');
-  });
-  await expect(clearDeletedAccountSession(client, project, account().id)).rejects.toMatchObject({
-    code: 'accountDeletionSessionCleanup',
-  });
-  expect(localStorage.getItem(key)).not.toBeNull();
-});
-
 it.each(
   (['signInWithPassword', 'signUp'] as const).flatMap((method) =>
-    (['deletion', 'local', 'global', 'reset'] as const).map((scope) => ({ method, scope })),
+    (['local', 'global', 'reset'] as const).map((scope) => ({ method, scope })),
   ),
 )(
   'preserves a replacement account when $scope cleanup waits for another client’s $method lock',
@@ -189,7 +106,7 @@ it.each(
       return navigatorLock(name, timeout, work);
     };
     const logoutFetch = vi.fn();
-    const deleted = createClient(sessionProject, 'test-key', {
+    const boundClient = createClient(sessionProject, 'test-key', {
       auth: { autoRefreshToken: false, detectSessionInUrl: false, lock },
       global: { fetch: logoutFetch },
     });
@@ -199,8 +116,8 @@ it.each(
         global: { fetch },
       }),
     );
-    await Promise.all([deleted.auth.initialize(), otherTab.auth.initialize()]);
-    const originalSession = (await deleted.auth.getSession()).data.session!;
+    await Promise.all([boundClient.auth.initialize(), otherTab.auth.initialize()]);
+    const originalSession = (await boundClient.auth.getSession()).data.session!;
     const signIn = otherTab.auth[method]({
       email: 'replacement@example.com',
       password: 'password',
@@ -209,10 +126,8 @@ it.each(
     requested.mockClear();
     const cleanup =
       scope === 'reset'
-        ? updateRecoveryPassword(deleted, originalSession, 'new-password')
-        : scope === 'deletion'
-          ? clearDeletedAccountSession(deleted, sessionProject, account().id)
-          : signOutPasswordSession(deleted, originalSession, scope);
+        ? updateRecoveryPassword(boundClient, originalSession, 'new-password')
+        : signOutPasswordSession(boundClient, originalSession, scope);
     const rejected = expect(cleanup).rejects.toMatchObject({ code: 'sessionChanged' });
     await vi.waitFor(() => expect(requested).toHaveBeenCalled());
     expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe(account().id);
@@ -222,7 +137,7 @@ it.each(
     expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe('replacement');
     expect((await otherTab.auth.getSession()).data.session?.user.id).toBe('replacement');
     expect(logoutFetch).not.toHaveBeenCalled();
-    await Promise.all([deleted.auth.stopAutoRefresh(), otherTab.auth.stopAutoRefresh()]);
+    await Promise.all([boundClient.auth.stopAutoRefresh(), otherTab.auth.stopAutoRefresh()]);
   },
 );
 
@@ -275,7 +190,7 @@ it('holds the shared lock until local removal finishes before another client can
   };
   let release!: () => void;
   let removing = false;
-  const deleted = createClient(sessionProject, 'test-key', {
+  const boundClient = createClient(sessionProject, 'test-key', {
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: false,
@@ -303,8 +218,12 @@ it('holds the shared lock until local removal finishes before another client can
       global: { fetch },
     }),
   );
-  await Promise.all([deleted.auth.initialize(), otherTab.auth.initialize()]);
-  const cleanup = clearDeletedAccountSession(deleted, sessionProject, account().id);
+  await Promise.all([boundClient.auth.initialize(), otherTab.auth.initialize()]);
+  const cleanup = signOutPasswordSession(
+    boundClient,
+    (await boundClient.auth.getSession()).data.session!,
+    'local',
+  );
   await vi.waitFor(() => expect(removing).toBe(true));
   const signIn = otherTab.auth.signInWithPassword({
     email: 'replacement@example.com',
@@ -316,10 +235,10 @@ it('holds the shared lock until local removal finishes before another client can
   await cleanup;
   await signIn;
   expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe('replacement');
-  await Promise.all([deleted.auth.stopAutoRefresh(), otherTab.auth.stopAutoRefresh()]);
+  await Promise.all([boundClient.auth.stopAutoRefresh(), otherTab.auth.stopAutoRefresh()]);
 });
 
-it.each(['deletion', 'local', 'global', 'reset'] as const)(
+it.each(['local', 'global', 'reset'] as const)(
   'fails closed for %s cleanup when no shared auth lock is configured',
   async (scope) => {
     const sessionProject = 'https://no-lock.supabase.co';
@@ -334,16 +253,9 @@ it.each(['deletion', 'local', 'global', 'reset'] as const)(
     await expect(
       scope === 'reset'
         ? updateRecoveryPassword(client, session, 'new-password')
-        : scope === 'deletion'
-          ? clearDeletedAccountSession(client, sessionProject, account().id)
-          : signOutPasswordSession(client, session, scope),
+        : signOutPasswordSession(client, session, scope),
     ).rejects.toMatchObject({
-      code:
-        scope === 'deletion'
-          ? 'accountDeletionSessionCleanup'
-          : scope === 'global'
-            ? 'sessionRevocation'
-            : 'auth',
+      code: scope === 'global' ? 'sessionRevocation' : 'auth',
     });
     expect(localStorage.getItem(key)).not.toBeNull();
     expect(fetch).not.toHaveBeenCalled();
