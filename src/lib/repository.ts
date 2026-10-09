@@ -2,6 +2,7 @@
 
 import { del, get, set, update } from 'idb-keyval';
 import { AppError } from './app-error';
+import { accountAuthStorageKey } from './account-session';
 import { recordDiagnostic } from './bug-reports/diagnostics';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
@@ -358,6 +359,7 @@ export const supabase = isCloudConfigured
   ? createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      { auth: { storageKey: accountAuthStorageKey(process.env.NEXT_PUBLIC_SUPABASE_URL!) } },
     )
   : null;
 

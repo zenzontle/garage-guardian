@@ -124,6 +124,35 @@ it('revokes refresh sessions after updating the password and cleans up on provid
     [{ scope: 'local' }],
   ]);
 });
+it('finishes revocation when a retry verifies the already-updated password', async () => {
+  verification.auth.signOut.mockResolvedValueOnce({ error: new Error('Revocation offline') });
+  await expectError(await PATCH(request('PATCH', password)), 'sessionRevocation', 502);
+  verification.auth.updateUser.mockResolvedValueOnce({ error: { code: 'same_password' } });
+  const result = await PATCH(
+    request('PATCH', { ...password, currentPassword: password.newPassword }),
+  );
+  expect(result.status).toBe(200);
+  expect(await result.json()).toEqual({ status: 'passwordChanged' });
+  expect(verification.auth.signInWithPassword).toHaveBeenLastCalledWith({
+    email: owner.email,
+    password: password.newPassword,
+  });
+  expect(verification.auth.signOut.mock.calls).toEqual([
+    [{ scope: 'global' }],
+    [{ scope: 'local' }],
+    [{ scope: 'global' }],
+    [{ scope: 'local' }],
+  ]);
+});
+it('does not bypass update errors unless the verified password is the requested password', async () => {
+  verification.auth.updateUser.mockResolvedValue({ error: { code: 'same_password' } });
+  await expectError(await PATCH(request('PATCH', password)), 'samePassword');
+  await expectError(await PATCH(request('PATCH', email)), 'samePassword');
+  expect(verification.auth.signOut.mock.calls).toEqual([
+    [{ scope: 'local' }],
+    [{ scope: 'local' }],
+  ]);
+});
 it.each(['weak_password', 'over_request_rate_limit', 'over_email_send_rate_limit'])(
   'translates %s and closes the verification session',
   async (code) => {
@@ -154,6 +183,24 @@ it('hard deletes an account with no photos only after installing the write fence
   expect(lock).toHaveBeenCalledWith({ user_id: owner.id });
   expect(deleteUser).toHaveBeenCalledWith(owner.id, false);
   expect(lock.mock.invocationCallOrder[0]).toBeLessThan(deleteUser.mock.invocationCallOrder[0]);
+});
+it('waits for the metadata commit barrier before listing photos or deleting Auth', async () => {
+  let release!: () => void;
+  lock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve({ error: null });
+      }),
+  );
+  const pending = DELETE(request('DELETE', deletion));
+  await vi.waitFor(() => expect(lock).toHaveBeenCalled());
+  expect(photos.bucket.list).not.toHaveBeenCalled();
+  expect(deleteUser).not.toHaveBeenCalled();
+  photos.photos.set(`${owner.id}/late-upload.webp`, new Blob(['late']));
+  release();
+  expect((await pending).status).toBe(200);
+  expect(photos.photos.size).toBe(0);
+  expect(deleteUser).toHaveBeenCalledWith(owner.id, false);
 });
 it('enumerates nested orphan photos across pages before removal, preserving other owners', async () => {
   for (let i = 0; i < 205; ++i)

@@ -42,7 +42,8 @@
     "accountDeletionUnavailable": "Account deletion is not configured. Please try again later.",
     "accountDeletionFailed": "Account deletion could not be confirmed. Some photos may already be removed and photo uploads remain paused. Retry deletion; if your session expired, sign in to check your account.",
     "sessionRevocation": "Your password was updated, but sessions could not be revoked. Retry to finish, or sign in with your new password.",
-    "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying."
+    "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying.",
+    "accountDeletionSessionCleanup": "Your account was deleted, but this browser could not clear its sign-in data. Use Sign out to retry."
   },
   "shared": {
     "language": "Language",

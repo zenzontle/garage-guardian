@@ -1,4 +1,4 @@
--- Run after migrations 0001-0006 on a test project. No fixture data survives.
+-- Run after migrations 0001-0007 on a test project. No fixture data survives.
 begin;
 insert into auth.users (id, email) values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'account-policy-test@example.invalid'),
@@ -23,7 +23,32 @@ do $$ begin
 end $$;
 
 reset role;
-insert into public.account_deletion_locks (user_id) values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+do $$ begin
+  if has_table_privilege('authenticated', 'public.account_deletion_locks', 'insert,update')
+    or has_table_privilege('anon', 'public.account_deletion_locks', 'insert,update')
+    or not has_table_privilege('service_role', 'public.account_deletion_locks', 'insert')
+    or not has_table_privilege('service_role', 'public.account_deletion_locks', 'update')
+  then raise exception 'Deletion barrier permissions are incorrect'; end if;
+end $$;
+set local role service_role;
+insert into public.account_deletion_locks (user_id) values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+on conflict (user_id) do update set user_id = excluded.user_id;
+-- Retrying an existing fence is idempotent.
+insert into public.account_deletion_locks (user_id) values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+on conflict (user_id) do update set user_id = excluded.user_id;
+reset role;
+-- Storage completion uses elevated privileges. RLS bypass must not bypass the
+-- final metadata commit guard, for either new uploads or overwrites.
+do $$ begin
+  begin
+    insert into storage.objects (bucket_id, name) values ('visit-photos', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/late-completion.webp');
+    raise exception 'Elevated late upload unexpectedly succeeded';
+  exception when insufficient_privilege then null; end;
+  begin
+    update storage.objects set metadata = '{"late":true}' where bucket_id = 'visit-photos' and name = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/allowed.webp';
+    raise exception 'Elevated late overwrite unexpectedly succeeded';
+  exception when insufficient_privilege then null; end;
+end $$;
 set local role authenticated;
 do $$ begin
   if public.account_can_write_photos() then raise exception 'Deletion fence did not block writes'; end if;
@@ -59,4 +84,11 @@ do $$ begin
   exception when insufficient_privilege then null; end;
 end $$;
 reset role;
+do $$ begin
+  begin
+    insert into storage.objects (bucket_id, name) values ('visit-photos', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/elevated-stale.webp');
+    raise exception 'Elevated upload for deleted Auth identity unexpectedly succeeded';
+  exception when insufficient_privilege then null; end;
+  insert into storage.objects (bucket_id, name) values ('visit-photos', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/still-allowed.webp');
+end $$;
 rollback;

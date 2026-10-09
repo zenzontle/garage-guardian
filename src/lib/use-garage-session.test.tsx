@@ -218,6 +218,55 @@ it('does not claim deletion or discard guest data after a failed/lost response',
   expect(hook.result.current.accountBusy).toBe(false);
 });
 
+it('clears retained sign-in credentials after confirmed deletion and a failed local sign-out', async () => {
+  const { accountAuthStorageKey } = await import('./account-session');
+  const key = accountAuthStorageKey(project);
+  const { LocalRepository } = await import('./repository');
+  await new LocalRepository().saveCar(car);
+  cloud.emit(account());
+  const hook = await openGarage();
+  const session = (await cloud.auth.getSession()).data.session;
+  localStorage.setItem(key, JSON.stringify(session));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}')),
+  );
+  cloud.auth.signOut.mockResolvedValueOnce({ error: new Error('Offline') });
+  await act(async () => hook.result.current.deleteAccount('password', true));
+  await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
+  expect(localStorage.getItem(key)).toBeNull();
+  expect(hook.result.current.user).toBeNull();
+  expect(hook.result.current.accountNotice).toBe('deleted');
+  expect(hook.result.current.snapshot.cars).toEqual([car]);
+  hook.unmount();
+  const reopened = await openGarage();
+  expect(reopened.result.current.user).toBeNull();
+  expect(reopened.result.current.snapshot.cars).toEqual([car]);
+});
+
+it('withholds the deletion success notice if persisted sign-in cleanup fails', async () => {
+  const { accountAuthStorageKey } = await import('./account-session');
+  const key = accountAuthStorageKey(project);
+  cloud.emit(account());
+  const hook = await openGarage();
+  localStorage.setItem(key, JSON.stringify((await cloud.auth.getSession()).data.session));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}')),
+  );
+  cloud.auth.signOut.mockResolvedValueOnce({ error: new Error('Offline') });
+  vi.spyOn(Storage.prototype, 'removeItem').mockImplementationOnce(() => {
+    throw new Error('Storage unavailable');
+  });
+  await act(async () => {
+    await expect(hook.result.current.deleteAccount('password', true)).rejects.toMatchObject({
+      code: 'accountDeletionSessionCleanup',
+    });
+  });
+  expect(hook.result.current.accountNotice).toBeNull();
+  expect(hook.result.current.accountBusy).toBe(false);
+});
+
 it('finishes confirmed deletion even when signup-transfer marker cleanup fails', async () => {
   const { LocalRepository } = await import('./repository');
   const local = new LocalRepository();

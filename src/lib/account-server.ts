@@ -86,7 +86,13 @@ export async function accountRequest(request: Request, deleting: boolean) {
         const { error: updateError } = await verification.auth.updateUser(
           input.kind === 'email' ? { email: input.newEmail } : { password: input.newPassword },
         );
-        if (updateError) providerError(updateError);
+        // A prior request may have changed the password before revocation failed.
+        // Reauthentication proves the requested password is already in effect.
+        const passwordAlreadyChanged =
+          input.kind === 'password' &&
+          input.currentPassword === input.newPassword &&
+          updateError?.code === 'same_password';
+        if (updateError && !passwordAlreadyChanged) providerError(updateError);
         if (input.kind === 'password') {
           const { error: revokeError } = await verification.auth.signOut({ scope: 'global' });
           if (revokeError) throw new AccountError('sessionRevocation', 502);
@@ -99,7 +105,7 @@ export async function accountRequest(request: Request, deleting: boolean) {
       if (!secret) throw new AccountError('accountDeletionUnavailable', 503);
       const admin = createClient(url, secret, authOptions);
       const userId = caller.user.id;
-      // Durable fence also blocks uploads from other tabs while cleanup is running.
+      // Wait for photo metadata transactions, then fence all later commits.
       const { error: lockError } = await admin
         .from('account_deletion_locks')
         .upsert({ user_id: userId });

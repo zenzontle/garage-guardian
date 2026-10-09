@@ -21,6 +21,7 @@ import {
   storedRecovery,
 } from './account-recovery';
 import type { AccountDelete, AccountPatch } from './account-contract';
+import { clearDeletedAccountSession } from './account-session';
 import en from '../../messages/en.json';
 
 export type MutationResult = { refreshed: boolean };
@@ -490,8 +491,7 @@ export function useGarageSession() {
           // Auth deletion is confirmed; unavailable local storage must not
           // prevent signing out and returning to the preserved guest garage.
         });
-        // Local scope clears persisted browser credentials even after Auth was deleted.
-        await supabase!.auth.signOut({ scope: 'local' });
+        await clearDeletedAccountSession(supabase!, project, deletedUser);
         clearRecovery();
         recoverySession.current = null;
         transition.current(null, true);
