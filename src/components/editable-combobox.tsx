@@ -56,7 +56,8 @@ export function EditableCombobox({
           aria-expanded={expanded}
           aria-controls={expanded ? `${id}-list` : undefined}
           aria-activedescendant={activeIndex >= 0 ? `${id}-option-${activeIndex}` : undefined}
-          aria-describedby={failed || loading ? `${id}-help` : undefined}
+          aria-describedby={failed ? `${id}-help` : undefined}
+          aria-busy={loading || undefined}
           autoComplete="off"
           value={value}
           placeholder={placeholder}
@@ -129,9 +130,9 @@ export function EditableCombobox({
           </ul>
         )}
       </div>
-      {(failed || loading) && (
+      {failed && (
         <span id={`${id}-help`} className="combobox-help" role="status">
-          {failed ? t('autocomplete.unavailable') : t('autocomplete.loading')}
+          {t('autocomplete.unavailable')}
         </span>
       )}
       {failed && (

@@ -72,8 +72,10 @@ export function ScheduleModal({
           </label>
           <div className="form-grid">
             <label>
-              {t('schedule.firstDistance', { unit: t(`units.${distanceUnit}`) })}{' '}
-              <span className="optional">{t('shared.optional')}</span>
+              <span className="field-label">
+                {t('schedule.firstDistance', { unit: t(`units.${distanceUnit}`) })}{' '}
+                <span className="optional">{t('shared.optional')}</span>
+              </span>
               <input
                 type="number"
                 min="0"
@@ -84,8 +86,9 @@ export function ScheduleModal({
               />
             </label>
             <label>
-              {t('schedule.firstDate')}
-              <span className="optional">{t('shared.optional')}</span>
+              <span className="field-label">
+                {t('schedule.firstDate')} <span className="optional">{t('shared.optional')}</span>
+              </span>
               <input
                 type="date"
                 value={firstDueDate}
@@ -95,8 +98,10 @@ export function ScheduleModal({
           </div>
           <div className="form-grid">
             <label>
-              {t('schedule.repeatDistance', { unit: t(`units.${distanceUnit}`) })}{' '}
-              <span className="optional">{t('shared.optional')}</span>
+              <span className="field-label">
+                {t('schedule.repeatDistance', { unit: t(`units.${distanceUnit}`) })}{' '}
+                <span className="optional">{t('shared.optional')}</span>
+              </span>
               <input
                 type="number"
                 min="1"
@@ -107,8 +112,10 @@ export function ScheduleModal({
               />
             </label>
             <label>
-              {t('schedule.repeatMonths')}
-              <span className="optional">{t('shared.optional')}</span>
+              <span className="field-label">
+                {t('schedule.repeatMonths')}{' '}
+                <span className="optional">{t('shared.optional')}</span>
+              </span>
               <input
                 type="number"
                 min="1"
@@ -121,8 +128,9 @@ export function ScheduleModal({
           </div>
           <p className="field-help">{t('schedule.hint')}</p>
           <label>
-            {t('schedule.source')}
-            <span className="optional">{t('shared.optional')}</span>
+            <span className="field-label">
+              {t('schedule.source')} <span className="optional">{t('shared.optional')}</span>
+            </span>
             <input
               value={sourceNote}
               onChange={(e) => setSourceNote(e.target.value)}

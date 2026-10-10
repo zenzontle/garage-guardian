@@ -85,7 +85,9 @@ describe('editable combobox', () => {
       user = userEvent.setup();
     const view = render(<Harness loading />);
     const input = screen.getByRole('combobox');
-    expect(screen.getByRole('status').textContent).toContain('Loading');
+    expect(screen.queryByRole('status')).toBeNull();
+    expect(input.getAttribute('aria-busy')).toBe('true');
+    expect(input.hasAttribute('aria-describedby')).toBe(false);
     await user.click(input);
     await user.click(screen.getByRole('option', { name: 'Toyota' }));
     expect((input as HTMLInputElement).value).toBe('Toyota');
@@ -98,6 +100,7 @@ describe('editable combobox', () => {
     ]);
     expect((input as HTMLInputElement).value).toBe('Honda');
     view.rerender(<Harness failed entries={[]} retry={retry} />);
+    expect(input.hasAttribute('aria-busy')).toBe(false);
     expect(screen.getByRole('status').textContent).toContain('unavailable');
     fireEvent.change(input, { target: { value: 'Custom' } });
     await user.click(screen.getByRole('button', { name: 'Retry make suggestions' }));

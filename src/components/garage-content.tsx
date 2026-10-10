@@ -125,7 +125,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
                 </button>
               </>
             )}
-            {user && <div className="recovery-actions">{accountActions}</div>}
+            {!loading && user && <div className="recovery-actions">{accountActions}</div>}
           </div>
         </div>
       </>
@@ -204,6 +204,12 @@ export function GarageContent({ children }: { children: ReactNode }) {
               </div>
             )}
             {children}
+            <footer className="app-footer">
+              <span>© 2026 Jorge Hernandez</span>
+              <a className="text-link" href="https://github.com/zenzontle/garage-guardian">
+                GitHub
+              </a>
+            </footer>
           </main>
         </div>
 
