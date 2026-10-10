@@ -92,10 +92,22 @@ describe.each([
     localStorage.setItem('garage-guardian:locale', locale);
     testRouter.reset('/');
     cloud.emit(account());
-    cloud.execute.mockResolvedValueOnce({ data: null, error: new Error('Cloud offline') });
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    cloud.execute.mockImplementationOnce(async () => {
+      await pending;
+      return { data: null, error: new Error('Cloud offline') };
+    });
     const App = await loadGarageTestApp();
     const user = userEvent.setup();
     render(<App />);
+    await screen.findByRole('status');
+    await waitFor(() => expect(cloud.execute).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: copy.account.settings })).toBeNull();
+    expect(screen.queryByRole('button', { name: copy.account.signOut })).toBeNull();
+    await act(async () => release());
     const trigger = await screen.findByRole('button', { name: copy.account.settings });
     await screen.findByRole('alert');
     await user.click(trigger);

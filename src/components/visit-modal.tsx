@@ -230,8 +230,9 @@ export function VisitModal({
             </label>
           </div>
           <label>
-            {t('shared.provider')}
-            <span className="optional">{t('shared.optional')}</span>
+            <span className="field-label">
+              {t('shared.provider')} <span className="optional">{t('shared.optional')}</span>
+            </span>
             <input
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
@@ -312,8 +313,9 @@ export function VisitModal({
             ))}
           </div>
           <label>
-            {t('shared.notes')}
-            <span className="optional">{t('shared.optional')}</span>
+            <span className="field-label">
+              {t('shared.notes')} <span className="optional">{t('shared.optional')}</span>
+            </span>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -324,8 +326,9 @@ export function VisitModal({
           </label>
           <div className="photo-picker">
             <label>
-              {t('shared.photos')}
-              <span className="optional">{t('visit.photoLimit')}</span>
+              <span className="field-label">
+                {t('shared.photos')} <span className="optional">{t('visit.photoLimit')}</span>
+              </span>
               <input
                 ref={photoInput}
                 className="sr-only"

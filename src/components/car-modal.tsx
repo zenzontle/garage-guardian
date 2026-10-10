@@ -186,13 +186,14 @@ export function CarModal({
               onChange={(e) => setOdometer(e.target.value)}
               min="0"
               step="1"
-              placeholder="48250"
               required
             />
           </label>
           <div className="form-grid">
             <label>
-              VIN <span className="optional">{t('shared.optional')}</span>
+              <span className="field-label">
+                VIN <span className="optional">{t('shared.optional')}</span>
+              </span>
               <input
                 value={vin}
                 onChange={(e) => setVin(e.target.value)}
@@ -201,8 +202,10 @@ export function CarModal({
               />
             </label>
             <label>
-              {t('car.licensePlate')}
-              <span className="optional">{t('shared.optional')}</span>
+              <span className="field-label">
+                {t('car.licensePlate')}
+                <span className="optional">{t('shared.optional')}</span>
+              </span>
               <input
                 value={plate}
                 onChange={(e) => setPlate(e.target.value)}
