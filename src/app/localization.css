@@ -6,7 +6,7 @@
   min-height: 2.75rem;
   max-width: 130px;
   padding: 7px 9px;
-  border: 1px solid #63776b;
+  border: 1px solid var(--control-border);
   border-radius: 8px;
   color: var(--text);
   background: var(--surface);
