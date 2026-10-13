@@ -5,6 +5,8 @@ import { AppError } from './app-error';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { LocalRepository, SupabaseRepository, sameRecord } from './repository';
 import { normalizeSnapshot, type Snapshot } from './model';
+import { initializeSnapshotSchedules } from './schedule-defaults';
+import { todayISO } from './today-iso';
 
 type Transfer = {
   userId: string;
@@ -79,7 +81,10 @@ async function runTransfer(
 
   if (transfer.status !== 'uploaded') {
     // Normalize old pending snapshots for verification; keep the cleanup original frozen.
-    const expected = normalizeSnapshot(structuredClone(snapshot));
+    const expected = initializeSnapshotSchedules(
+      normalizeSnapshot(structuredClone(snapshot)),
+      todayISO(),
+    );
     // Each await is a cancellation boundary: never continue under another session.
     for (const car of expected.cars) {
       assertActive();

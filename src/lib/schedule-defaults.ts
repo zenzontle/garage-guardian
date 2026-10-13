@@ -52,6 +52,7 @@ export async function initializeCloudSchedules(
       .update({ first_due_miles: item.firstDueMiles, first_due_date: item.firstDueDate })
       .eq('user_id', userId)
       .eq('id', item.id)
+      .eq('is_active', true)
       .is('first_due_miles', null)
       .is('first_due_date', null);
     query =

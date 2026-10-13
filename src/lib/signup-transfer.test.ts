@@ -4,6 +4,8 @@ import { LocalRepository, SupabaseRepository } from './repository';
 import { pendingTransfer, registerSignup, transferSignupData } from './signup-transfer';
 import { account, fakeSupabase } from '../test/fake-supabase';
 import { car, schedule, visit } from '../test/fixtures';
+import { addMonths } from './due';
+import { todayISO } from './today-iso';
 
 const project = 'https://garage.supabase.co';
 beforeEach(async () => {
@@ -28,6 +30,49 @@ async function seedLocal(withPhoto = true) {
 }
 
 describe('signup transfer', () => {
+  it.each([false, true])(
+    'resumes interval-only schedules from a frozen legacy upload (interrupted: %s)',
+    async (interrupted) => {
+      const { local, snapshot: saved } = await seedLocal();
+      const snapshot = {
+        ...saved,
+        cars: [{ ...car, odometer: 69000 }],
+        schedules: [{ ...schedule, firstDueMiles: null, firstDueDate: null }],
+        visits: [{ ...saved.visits[0], odometer: 71000 }],
+      };
+      await set('garage-guardian:local:v1', snapshot);
+      await set(`garage-guardian:signup-transfer:v1:${project}`, {
+        userId: account().id,
+        status: 'uploading',
+        snapshot,
+      });
+      const cloud = fakeSupabase();
+      cloud.emit(account());
+      if (interrupted) {
+        cloud.bucket.upload.mockResolvedValueOnce({ error: new Error('Upload interrupted') });
+        await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
+          'Upload interrupted',
+        );
+        expect((await pendingTransfer(project))?.snapshot).toEqual(snapshot);
+        expect(await get('garage-guardian:local:v1')).toEqual(snapshot);
+      }
+
+      await transferSignupData(cloud.client, project, account().id);
+
+      const transferred = await new SupabaseRepository(cloud.client, account().id).load();
+      expect(transferred.schedules).toEqual([
+        {
+          ...schedule,
+          firstDueMiles: 75000,
+          firstDueDate: addMonths(todayISO(), 6),
+        },
+      ]);
+      expect(transferred.visits[0].odometer).toBe(71000);
+      expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+      expect(await pendingTransfer(project)).toBeUndefined();
+    },
+  );
+
   it.each(['pending', 'uploading', 'uploaded'])(
     'resumes a legacy %s transfer and cleans up equivalent guest records',
     async (status) => {

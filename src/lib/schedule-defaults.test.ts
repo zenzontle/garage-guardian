@@ -99,6 +99,7 @@ describe('cloud initialization safeguards', () => {
       user_id: account().id,
       interval_miles: schedule.intervalMiles,
       interval_months: schedule.intervalMonths,
+      is_active: true,
       first_due_miles: null as number | null,
       first_due_date: null as string | null,
     };
@@ -107,20 +108,25 @@ describe('cloud initialization safeguards', () => {
   }
   const snapshot = { cars: [{ ...car, odometer: 69000 }], schedules: [intervalOnly], visits: [] };
 
-  it.each([{ first_due_miles: 75000, first_due_date: '2028-01-01' }, { interval_miles: 10000 }])(
-    'does not overwrite a concurrent edit %j',
-    async (edit) => {
-      const { cloud, row, db } = setup();
-      const execute = cloud.execute.getMockImplementation()!;
-      cloud.execute.mockImplementationOnce(async (...args) => {
-        Object.assign(row, edit);
-        return execute(...args);
-      });
-      const initialized = await initializeCloudSchedules(db, account().id, snapshot, '2026-10-13');
-      expect(row).toMatchObject(edit);
-      expect(initialized.schedules[0]).toBe(intervalOnly);
-    },
-  );
+  it.each([
+    { first_due_miles: 75000, first_due_date: '2028-01-01' },
+    { interval_miles: 10000 },
+    { is_active: false },
+  ])('does not overwrite a concurrent edit %j', async (edit) => {
+    const { cloud, row, db } = setup();
+    const execute = cloud.execute.getMockImplementation()!;
+    cloud.execute.mockImplementationOnce(async (...args) => {
+      Object.assign(row, edit);
+      return execute(...args);
+    });
+    const initialized = await initializeCloudSchedules(db, account().id, snapshot, '2026-10-13');
+    expect(row).toMatchObject(edit);
+    if (!('first_due_miles' in edit)) {
+      expect(row.first_due_miles).toBeNull();
+      expect(row.first_due_date).toBeNull();
+    }
+    expect(initialized.schedules[0]).toBe(intervalOnly);
+  });
 
   it('cannot initialize another owner’s task', async () => {
     const { row, db } = setup();
