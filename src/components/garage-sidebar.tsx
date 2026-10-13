@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { workspacePaths } from '@/lib/garage-routes';
 import { useTranslations } from 'next-intl';
 import { CarFront } from 'lucide-react';
-import { isCloudConfigured } from '@/lib/repository';
 import { GarageLogo } from './garage-logo';
 import { navigation, type Page } from './garage-navigation';
 import { useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
@@ -15,14 +14,12 @@ export function GarageSidebar({
   onNavigate,
   menuTrigger,
   carCount,
-  user,
 }: {
   page: Page;
   menuOpen: boolean;
   onNavigate: () => void;
   menuTrigger: RefObject<HTMLButtonElement | null>;
   carCount: number;
-  user: { email?: string } | null;
 }) {
   const t = useTranslations();
   const sidebar = useRef<HTMLElement>(null);
@@ -105,15 +102,6 @@ export function GarageSidebar({
             <strong>{t('app.vehicleCount', { count: carCount })}</strong>
             <small>{t('app.inGarage')}</small>
           </div>
-        </div>
-        <div className="account-line">
-          <span className="avatar">{user?.email ? user.email[0].toUpperCase() : 'G'}</span>
-          <span className="account-text">
-            <strong>
-              {user?.email || (isCloudConfigured ? t('app.guest') : t('app.prototype'))}
-            </strong>
-            {!user && <small>{t('app.localStorage')}</small>}
-          </span>
         </div>
       </div>
     </aside>

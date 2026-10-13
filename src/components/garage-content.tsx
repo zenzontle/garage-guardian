@@ -103,7 +103,9 @@ export function GarageContent({ children }: { children: ReactNode }) {
   if (garage.recovering) return <AccountRecoveryScreen />;
   if (pathname === '/auth/recovery') return <>{children}</>;
   const settings =
-    modal?.kind === 'account' && user ? <AccountSettingsDialog key={`account:${user.id}`} /> : null;
+    modal?.kind === 'account' && user ? (
+      <AccountSettingsDialog key={`account:${user.id}`} section={modal.section} />
+    ) : null;
   if (loading || !repository)
     return (
       <>
@@ -142,7 +144,6 @@ export function GarageContent({ children }: { children: ReactNode }) {
           onNavigate={closeMenu}
           menuTrigger={menuTrigger}
           carCount={snapshot.cars.length}
-          user={user}
         />
 
         <div className="main-wrap">
@@ -153,7 +154,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
             onMenuToggle={() => setMenuOpen(!menuOpen)}
           />
           <main className="content">
-            {isCloudConfigured && (
+            {isCloudConfigured && !user && (
               <div className="storage-account">
                 {!user && <span>{t('app.guestStorage')}</span>}
                 {accountActions}

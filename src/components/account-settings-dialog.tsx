@@ -7,7 +7,7 @@ import { AccountSettingsForm } from './account-settings-form';
 import { useGarage } from './garage-provider';
 import { NotificationPreferencesForm } from './notification-preferences-form';
 
-export function AccountSettingsDialog() {
+export function AccountSettingsDialog({ section }: { section?: 'security' }) {
   const t = useTranslations();
   const garage = useGarage();
   const notificationsHeadingId = useId();
@@ -16,7 +16,7 @@ export function AccountSettingsDialog() {
   if (!garage.user) return null;
   return (
     <Modal
-      title={t('account.settings')}
+      title={t(section === 'security' ? 'account.security' : 'account.settings')}
       busy={garage.accountBusy || notificationBusy}
       onClose={() => {
         if (!garage.accountBusy && !notificationBusy) garage.setModal(null);
@@ -25,18 +25,20 @@ export function AccountSettingsDialog() {
       <div className="modal-body form-stack">
         <p>{t('account.currentEmail', { email: garage.user.email ?? '' })}</p>
         {garage.transferring && <p role="status">{t('account.transferBlocked')}</p>}
-        <section
-          className="form-stack account-section account-settings-section"
-          aria-labelledby={notificationsHeadingId}
-        >
-          <h3 id={notificationsHeadingId}>{t('account.notifications')}</h3>
-          <NotificationPreferencesForm
-            userId={garage.user.id}
-            onBusyChange={setNotificationBusy}
-            disabled={garage.accountBusy || garage.transferring || garage.loading}
-            headingLevel={4}
-          />
-        </section>
+        {section !== 'security' && (
+          <section
+            className="form-stack account-section account-settings-section"
+            aria-labelledby={notificationsHeadingId}
+          >
+            <h3 id={notificationsHeadingId}>{t('account.notifications')}</h3>
+            <NotificationPreferencesForm
+              userId={garage.user.id}
+              onBusyChange={setNotificationBusy}
+              disabled={garage.accountBusy || garage.transferring || garage.loading}
+              headingLevel={4}
+            />
+          </section>
+        )}
         <section
           className="form-stack account-section account-settings-section"
           aria-labelledby={securityHeadingId}

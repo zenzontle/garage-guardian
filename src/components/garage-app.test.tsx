@@ -231,7 +231,7 @@ describe.each([
         expect(cloud.from.mock.calls.every(([table]) => table.startsWith('vehicle_'))).toBe(true);
       else expect(cloud.from).not.toHaveBeenCalled();
       if (configured) expect(screen.getByText('Guest — stored in this browser')).toBeDefined();
-      else expect(screen.getByText('Local prototype')).toBeDefined();
+      else expect(screen.getByRole('button', { name: 'Open account menu' }).textContent).toBe('G');
     }
     app.unmount();
     testRouter.reset();
@@ -720,6 +720,7 @@ it('hides language selection during a transfer, allows it in recovery, and retai
   await user.click(screen.getByRole('button', { name: 'Reintentar' }));
   await screen.findByRole('heading', { name: 'Tu garaje de un vistazo' });
   expect((await createRepository(account().id).load()).cars).toEqual([car]);
+  await user.click(screen.getByRole('button', { name: 'Abrir menú de cuenta' }));
   await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }));
   await screen.findByRole('link', { name: 'Crear cuenta' });
   expect(screen.getByRole('combobox', { name: 'Idioma' })).toHaveProperty('value', 'es');
