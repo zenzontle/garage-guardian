@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Bell, LogOut, Shield, UserRound } from 'lucide-react';
+import { Bell, LogOut, Shield, UserRound, UserRoundPlus } from 'lucide-react';
 import { isCloudConfigured } from '@/lib/repository';
+import { accountPath } from '@/lib/garage-routes';
 import { useGarage } from './garage-provider';
 import { Modal } from './modal';
 
@@ -70,18 +71,29 @@ export function GarageProfile() {
                 {t('account.security')}
               </button>
             )}
-            <button
-              type="button"
-              className="profile-option profile-signout"
-              disabled={!garage.user || garage.accountBusy}
-              onClick={() => {
-                close();
-                void garage.signOut();
-              }}
-            >
-              <LogOut size={19} aria-hidden="true" />
-              {t('account.signOut')}
-            </button>
+            {garage.user ? (
+              <button
+                type="button"
+                className="profile-option profile-signout"
+                disabled={garage.accountBusy}
+                onClick={() => {
+                  close();
+                  void garage.signOut();
+                }}
+              >
+                <LogOut size={19} aria-hidden="true" />
+                {t('account.signOut')}
+              </button>
+            ) : isCloudConfigured ? (
+              <Link
+                className="profile-option"
+                href={accountPath('signup', pathname)}
+                onClick={close}
+              >
+                <UserRoundPlus size={19} aria-hidden="true" />
+                {t('account.create')}
+              </Link>
+            ) : null}
           </nav>
         </Modal>
       )}

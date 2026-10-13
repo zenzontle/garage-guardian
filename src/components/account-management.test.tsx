@@ -108,9 +108,10 @@ describe.each([
     expect(trigger.textContent).toBe('G');
     await user.click(trigger);
     const drawer = screen.getByRole('dialog', { name: copy.account.settings });
+    expect(within(drawer).queryByRole('button', { name: copy.account.signOut })).toBeNull();
     expect(
-      within(drawer).getByRole('button', { name: copy.account.signOut }).hasAttribute('disabled'),
-    ).toBe(true);
+      within(drawer).getByRole('link', { name: copy.account.create }).getAttribute('href'),
+    ).toBe('/signup?returnTo=%2Fhistory');
     expect(
       within(drawer).getByRole('link', { name: copy.account.security }).getAttribute('href'),
     ).toBe('/settings/security');
@@ -125,6 +126,30 @@ describe.each([
     await user.click(links[links.length - 1]);
     expect(testRouter.url).toBe('/signin?returnTo=%2Fsettings%2Faccount');
     await screen.findByRole('heading', { name: copy.account.welcome });
+  });
+
+  it('opens registration from the guest drawer and returns to account settings after signup', async () => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    testRouter.reset('/settings/account');
+    const App = await loadGarageTestApp();
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('button', { name: copy.account.openMenu }));
+    const drawer = screen.getByRole('dialog', { name: copy.account.settings });
+    expect(within(drawer).queryByRole('button', { name: copy.account.signOut })).toBeNull();
+    await user.click(within(drawer).getByRole('link', { name: copy.account.create }));
+    expect(testRouter.url).toBe('/signup?returnTo=%2Fsettings%2Faccount');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.type(await screen.findByLabelText(copy.account.email), 'new@example.com');
+    await user.type(screen.getByLabelText(copy.account.password), 'password');
+    await user.click(screen.getByRole('button', { name: copy.account.create }));
+    await waitFor(() => expect(testRouter.url).toBe('/settings/account'));
+    await user.click(await screen.findByRole('button', { name: copy.account.openMenu }));
+    const signedInDrawer = screen.getByRole('dialog', { name: copy.account.settings });
+    expect(within(signedInDrawer).queryByRole('link', { name: copy.account.create })).toBeNull();
+    expect(
+      within(signedInDrawer).getByRole('button', { name: copy.account.signOut }),
+    ).toBeDefined();
   });
 
   it('shows only the current email on the account page and restores pages with browser history', async () => {
