@@ -15,7 +15,7 @@ export function NotificationPreferencesForm({
   userId: string;
   disabled?: boolean;
   onBusyChange?: (busy: boolean) => void;
-  headingLevel?: 2 | 3;
+  headingLevel?: 2 | 3 | 4;
 }) {
   const t = useTranslations();
   const locale = useLocale();
@@ -26,7 +26,7 @@ export function NotificationPreferencesForm({
   const [reload, setReload] = useState(0);
   const controller = useRef<AbortController | null>(null);
   const initialLanguage = useRef(locale);
-  const Heading = headingLevel === 2 ? 'h2' : 'h3';
+  const Heading = headingLevel === 2 ? 'h2' : headingLevel === 4 ? 'h4' : 'h3';
 
   useEffect(() => {
     const abort = new AbortController();
