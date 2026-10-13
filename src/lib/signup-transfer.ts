@@ -149,7 +149,11 @@ async function runTransfer(
     await set(transferKey(project), { ...transfer, status: 'uploaded' } satisfies Transfer);
   }
   assertActive();
-  await local.clearTransferred(snapshot);
+  // Match defaults from frozen inputs without changing the original local photo references.
+  const initializedSchedules = transfer.baselineDate
+    ? initializeSnapshotSchedules(snapshot, transfer.baselineDate).schedules
+    : [];
+  await local.clearTransferred(snapshot, initializedSchedules);
   assertActive();
   await del(transferKey(project));
 }

@@ -31,6 +31,59 @@ async function seedLocal(withPhoto = true) {
 }
 
 describe('signup transfer', () => {
+  it.each(['none', 'metadata', 'due point'] as const)(
+    'cleans up initialized guest schedules after retry (guest edit: %s)',
+    async (edit) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+      const { local, snapshot: saved, photo } = await seedLocal();
+      const snapshot = {
+        ...saved,
+        schedules: [{ ...schedule, firstDueMiles: null, firstDueDate: null }],
+      };
+      await set('garage-guardian:local:v1', snapshot);
+      await set(`garage-guardian:signup-transfer:v1:${project}`, {
+        userId: account().id,
+        status: 'uploading',
+        snapshot,
+      });
+      const cloud = fakeSupabase();
+      cloud.emit(account());
+      cloud.bucket.upload.mockResolvedValueOnce({ error: new Error('Upload interrupted') });
+      await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
+        'Upload interrupted',
+      );
+
+      cloud.emit(null);
+      const guest = await local.load();
+      expect(guest.schedules[0]).toMatchObject({ firstDueMiles: 5000, firstDueDate: '2027-04-13' });
+      expect((await pendingTransfer(project))?.snapshot).toEqual(snapshot);
+      const edited = {
+        ...guest.schedules[0],
+        ...(edit === 'metadata' ? { sourceNote: 'New guest notes' } : {}),
+        ...(edit === 'due point' ? { firstDueDate: '2028-01-01' } : {}),
+      };
+      if (edit !== 'none') await local.saveSchedule(edited);
+
+      vi.resetModules();
+      const reloaded = await import('./signup-transfer');
+      cloud.emit(account());
+      await reloaded.transferSignupData(cloud.client, project, account().id);
+
+      expect(await local.load()).toEqual({
+        cars: edit === 'none' ? [] : [car],
+        schedules: edit === 'none' ? [] : [edited],
+        visits: [],
+      });
+      expect(await get(`photo:${photo.path}`)).toBeUndefined();
+      expect(cloud.tables.get('schedule_items')!.get(schedule.id)).toMatchObject({
+        source_note: schedule.sourceNote,
+        first_due_date: '2027-04-13',
+      });
+      expect(await pendingTransfer(project)).toBeUndefined();
+    },
+  );
+
   it('keeps legacy transfer due dates fixed across failed uploads and later-day reload retries', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));

@@ -119,8 +119,9 @@ export class LocalRepository implements Repository {
     if (!file) throw new AppError('photoMissing', { name: photo.name });
     return file;
   }
-  async clearTransferred(transferred: Snapshot) {
+  async clearTransferred(transferred: Snapshot, initializedSchedules: ScheduleItem[] = []) {
     transferred = normalizeSnapshot(transferred);
+    const cleanupSchedules = [...transferred.schedules, ...initializedSchedules];
     // Preserve anything edited in another tab or after signing out during a transfer.
     await this.write((current) => {
       const changed = <T extends { id: string }>(item: T, originals: T[]) =>
@@ -130,7 +131,7 @@ export class LocalRepository implements Repository {
         current.visits.flatMap((visit) => visit.items.map((item) => item.scheduleItemId)),
       );
       current.schedules = current.schedules.filter(
-        (item) => changed(item, transferred.schedules) || neededSchedules.has(item.id),
+        (item) => changed(item, cleanupSchedules) || neededSchedules.has(item.id),
       );
       const neededCars = new Set(
         [...current.schedules, ...current.visits].map((item) => item.carId),
