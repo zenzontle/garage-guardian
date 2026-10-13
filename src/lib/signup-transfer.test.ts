@@ -31,6 +31,56 @@ async function seedLocal(withPhoto = true) {
 }
 
 describe('signup transfer', () => {
+  it.each(['none', 'metadata', 'due point', 'new task'] as const)(
+    'cleans up legacy uploaded defaults across days without removing guest changes (%s)',
+    async (edit) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+      const { local, snapshot: saved, photo } = await seedLocal();
+      const intervalOnly = { ...schedule, firstDueMiles: null, firstDueDate: null };
+      const snapshot = { ...saved, schedules: [intervalOnly] };
+      await set(`garage-guardian:signup-transfer:v1:${project}`, {
+        userId: account().id,
+        status: 'uploaded',
+        snapshot,
+      });
+      await set('garage-guardian:local:v1', {
+        ...snapshot,
+        schedules:
+          edit === 'new task'
+            ? [intervalOnly, { ...intervalOnly, id: '55555555-5555-4555-8555-555555555555' }]
+            : [intervalOnly],
+      });
+      const guest = await local.load();
+      expect(guest.schedules[0].firstDueDate).toBe('2027-04-13');
+      const edited = {
+        ...guest.schedules[0],
+        ...(edit === 'metadata' ? { sourceNote: 'New guest notes' } : {}),
+        // This date also matches a naive initialization using the later retry date.
+        ...(edit === 'due point' ? { firstDueDate: '2027-04-20' } : {}),
+      };
+      if (edit === 'metadata' || edit === 'due point') await local.saveSchedule(edited);
+
+      vi.setSystemTime(new Date('2026-10-20T19:00:00Z'));
+      vi.resetModules();
+      const reloaded = await import('./signup-transfer');
+      const cloud = fakeSupabase();
+      cloud.emit(account());
+      await reloaded.transferSignupData(cloud.client, project, account().id);
+
+      expect(await local.load()).toEqual({
+        cars: edit === 'none' ? [] : [car],
+        schedules: edit === 'none' ? [] : edit === 'new task' ? [guest.schedules[1]] : [edited],
+        visits: [],
+      });
+      expect(await get(`photo:${photo.path}`)).toBeUndefined();
+      expect(cloud.from).not.toHaveBeenCalled();
+      expect(cloud.rpc).not.toHaveBeenCalled();
+      expect(cloud.bucket.upload).not.toHaveBeenCalled();
+      expect(await pendingTransfer(project)).toBeUndefined();
+    },
+  );
+
   it.each(['none', 'metadata', 'due point'] as const)(
     'cleans up initialized guest schedules after retry (guest edit: %s)',
     async (edit) => {

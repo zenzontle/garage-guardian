@@ -39,22 +39,33 @@ export type Repository = {
 
 const SNAPSHOT_KEY = 'garage-guardian:local:v1';
 const clone = <T>(value: T): T => structuredClone(value);
+// Keep load-time initialization provenance private and atomic with the guest records.
+type LocalSnapshot = Snapshot & { automaticSchedules?: ScheduleItem[] };
+
+function snapshotData(snapshot: Snapshot): Snapshot {
+  return { cars: snapshot.cars, schedules: snapshot.schedules, visits: snapshot.visits };
+}
 
 export class LocalRepository implements Repository {
   async load(): Promise<Snapshot> {
     const snapshot = normalizeSnapshot(
-      clone((await get<Snapshot>(SNAPSHOT_KEY)) ?? EMPTY_SNAPSHOT),
+      clone(snapshotData((await get<LocalSnapshot>(SNAPSHOT_KEY)) ?? EMPTY_SNAPSHOT)),
     );
     const today = todayISO();
     if (initializeSnapshotSchedules(snapshot, today) === snapshot) return snapshot;
     let initialized = snapshot;
     await mutateLocalSnapshot((current) => {
-      current.schedules = initializeSnapshotSchedules(current, today).schedules;
-      initialized = clone(current);
+      const schedules = initializeSnapshotSchedules(current, today).schedules;
+      current.automaticSchedules = [
+        ...(current.automaticSchedules ?? []),
+        ...schedules.filter((item, index) => item !== current.schedules[index]),
+      ];
+      current.schedules = schedules;
+      initialized = clone(snapshotData(current));
     });
     return initialized;
   }
-  private async write(update: (snapshot: Snapshot) => void) {
+  private async write(update: (snapshot: LocalSnapshot) => void) {
     await mutateLocalSnapshot(update);
   }
   async saveCar(car: Car) {
@@ -121,9 +132,18 @@ export class LocalRepository implements Repository {
   }
   async clearTransferred(transferred: Snapshot, initializedSchedules: ScheduleItem[] = []) {
     transferred = normalizeSnapshot(transferred);
-    const cleanupSchedules = [...transferred.schedules, ...initializedSchedules];
     // Preserve anything edited in another tab or after signing out during a transfer.
     await this.write((current) => {
+      const automaticallyInitialized = (current.automaticSchedules ?? []).filter((item) =>
+        transferred.schedules.some((original) =>
+          sameRecord({ ...item, firstDueMiles: null, firstDueDate: null }, original),
+        ),
+      );
+      const cleanupSchedules = [
+        ...transferred.schedules,
+        ...initializedSchedules,
+        ...automaticallyInitialized,
+      ];
       const changed = <T extends { id: string }>(item: T, originals: T[]) =>
         !originals.some((original) => original.id === item.id && sameRecord(item, original));
       current.visits = current.visits.filter((item) => changed(item, transferred.visits));
@@ -154,10 +174,17 @@ export class LocalRepository implements Repository {
   }
 }
 
-async function mutateLocalSnapshot(mutate: (snapshot: Snapshot) => void) {
-  await update<Snapshot>(SNAPSHOT_KEY, (saved) => {
-    const snapshot = normalizeSnapshot(clone(saved ?? EMPTY_SNAPSHOT));
+async function mutateLocalSnapshot(mutate: (snapshot: LocalSnapshot) => void) {
+  await update<LocalSnapshot>(SNAPSHOT_KEY, (saved) => {
+    const snapshot: LocalSnapshot = normalizeSnapshot(clone(saved ?? EMPTY_SNAPSHOT));
     mutate(snapshot);
+    if (snapshot.automaticSchedules) {
+      const schedules = new Map(snapshot.schedules.map((item) => [item.id, item]));
+      snapshot.automaticSchedules = snapshot.automaticSchedules.filter((automatic) =>
+        sameRecord(schedules.get(automatic.id), automatic),
+      );
+      if (!snapshot.automaticSchedules.length) delete snapshot.automaticSchedules;
+    }
     return snapshot;
   });
 }
