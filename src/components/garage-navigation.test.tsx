@@ -70,6 +70,37 @@ it('does not offer an email opt-in for a local-only garage', async () => {
   expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
 });
 
+it.each([
+  ['en', en],
+  ['es', es],
+] as const)(
+  'keeps local-only account and security menu entries disabled in %s',
+  async (locale, copy) => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    const App = await loadGarageTestApp();
+    render(<App />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: copy.account.openMenu }));
+    const drawer = screen.getByRole('dialog', { name: copy.account.settings });
+    for (const name of [copy.account.settings, copy.account.security]) {
+      expect(within(drawer).queryByRole('link', { name })).toBeNull();
+      const option = within(drawer).getByRole('button', { name }) as HTMLButtonElement;
+      expect(option.disabled).toBe(true);
+      await user.click(option);
+      expect(testRouter.url).toBe('/');
+    }
+    within(drawer).getByRole('button', { name: copy.shared.close }).focus();
+    await user.tab();
+    expect(document.activeElement).toBe(
+      within(drawer).getByRole('link', { name: copy.account.notifications }),
+    );
+    await user.tab();
+    expect(document.activeElement).toBe(
+      within(drawer).getByRole('button', { name: copy.shared.close }),
+    );
+  },
+);
+
 it.each(['account', 'security'] as const)(
   'returns to %s settings after signing in from a direct visit',
   async (section) => {

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Bell, LogOut, Shield, UserRound } from 'lucide-react';
+import { isCloudConfigured } from '@/lib/repository';
 import { useGarage } from './garage-provider';
 import { Modal } from './modal';
 
@@ -43,18 +44,32 @@ export function GarageProfile() {
           onClose={close}
         >
           <nav className="modal-body profile-options" aria-label={t('account.settings')}>
-            <Link className="profile-option" href="/settings/account" onClick={close}>
-              <UserRound size={19} aria-hidden="true" />
-              {t('account.settings')}
-            </Link>
+            {isCloudConfigured ? (
+              <Link className="profile-option" href="/settings/account" onClick={close}>
+                <UserRound size={19} aria-hidden="true" />
+                {t('account.settings')}
+              </Link>
+            ) : (
+              <button type="button" className="profile-option" disabled>
+                <UserRound size={19} aria-hidden="true" />
+                {t('account.settings')}
+              </button>
+            )}
             <Link className="profile-option" href="/settings/notifications" onClick={close}>
               <Bell size={19} aria-hidden="true" />
               {t('account.notifications')}
             </Link>
-            <Link className="profile-option" href="/settings/security" onClick={close}>
-              <Shield size={19} aria-hidden="true" />
-              {t('account.security')}
-            </Link>
+            {isCloudConfigured ? (
+              <Link className="profile-option" href="/settings/security" onClick={close}>
+                <Shield size={19} aria-hidden="true" />
+                {t('account.security')}
+              </Link>
+            ) : (
+              <button type="button" className="profile-option" disabled>
+                <Shield size={19} aria-hidden="true" />
+                {t('account.security')}
+              </button>
+            )}
             <button
               type="button"
               className="profile-option profile-signout"
