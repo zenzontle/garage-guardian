@@ -117,6 +117,7 @@
     "existingAccount": "¿Ya tienes cuenta? Inicia sesión",
     "createLink": "Crear una cuenta",
     "settings": "Cuenta",
+    "openMenu": "Abrir menú de cuenta",
     "notifications": "Notificaciones",
     "security": "Seguridad",
     "currentEmail": "Correo actual: {email}",

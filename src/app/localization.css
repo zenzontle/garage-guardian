@@ -36,8 +36,7 @@
   white-space: normal;
 }
 .sidebar-summary strong,
-.sidebar-summary small,
-.account-line small {
+.sidebar-summary small {
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -68,6 +67,9 @@
     letter-spacing: 0;
     font-size: 0.875rem;
     min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .breadcrumbs span {
     margin: 0 4px;
@@ -87,6 +89,10 @@
   }
 }
 @media (max-width: 430px) {
+  .breadcrumbs-home,
+  .breadcrumbs-divider {
+    display: none;
+  }
   .report-stat-grid {
     grid-template-columns: 1fr;
   }

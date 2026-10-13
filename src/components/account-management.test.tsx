@@ -30,6 +30,98 @@ describe.each([
   ['en', en],
   ['es', es],
 ] as const)('%s account workflows', (locale, copy) => {
+  it('opens the profile drawer, traps focus, and connects security, notifications and sign-out', async () => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    testRouter.reset('/');
+    cloud.emit(account());
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ preferences: null }) }),
+    );
+    const App = await loadGarageTestApp();
+    const user = userEvent.setup();
+    render(<App />);
+    const trigger = await screen.findByRole('button', { name: copy.account.openMenu });
+    expect(trigger.textContent).toBe(account().email![0].toUpperCase());
+    expect(trigger.closest('header')).not.toBeNull();
+    expect(screen.queryByText(account().email!)).toBeNull();
+    expect(document.querySelector('.account-line')).toBeNull();
+    expect(document.querySelector('.storage-account')).toBeNull();
+    expect(screen.queryByRole('button', { name: copy.account.settings })).toBeNull();
+    expect(screen.queryByRole('button', { name: copy.account.signOut })).toBeNull();
+    trigger.focus();
+    await user.keyboard('{Enter}');
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    const drawer = screen.getByRole('dialog', { name: copy.account.settings });
+    const close = within(drawer).getByRole('button', { name: copy.shared.close });
+    expect(document.activeElement).toBe(close);
+    for (const control of [
+      within(drawer).getByRole('button', { name: copy.account.settings }),
+      within(drawer).getByRole('link', { name: copy.account.notifications }),
+      within(drawer).getByRole('button', { name: copy.account.security }),
+      within(drawer).getByRole('button', { name: copy.account.signOut }),
+      close,
+    ]) {
+      await user.tab();
+      expect(document.activeElement).toBe(control);
+    }
+    await user.tab({ shift: true });
+    expect(document.activeElement).toBe(
+      within(drawer).getByRole('button', { name: copy.account.signOut }),
+    );
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    expect(document.body.style.overflow).toBe('');
+
+    await user.click(trigger);
+    await user.click(screen.getByRole('button', { name: copy.account.security }));
+    const security = screen.getByRole('dialog', { name: copy.account.security });
+    expect(within(security).getByRole('form', { name: copy.account.changeEmail })).toBeDefined();
+    expect(within(security).getByRole('form', { name: copy.account.changePassword })).toBeDefined();
+    expect(within(security).queryByRole('region', { name: copy.account.notifications })).toBeNull();
+    await user.keyboard('{Escape}');
+    expect(document.activeElement).toBe(trigger);
+
+    await user.click(trigger);
+    await user.click(screen.getByRole('link', { name: copy.account.notifications }));
+    expect(testRouter.url).toBe('/settings/notifications');
+    await screen.findByRole('heading', { name: copy.notifications.pageTitle });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(screen.getByRole('button', { name: copy.account.openMenu }));
+    await user.click(screen.getByRole('button', { name: copy.account.signOut }));
+    await waitFor(() => expect(cloud.auth.signOut).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: copy.account.openMenu }).textContent).toBe('G'),
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('shows a guest initial and offers sign-in through the drawer', async () => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    testRouter.reset('/history');
+    const App = await loadGarageTestApp();
+    const user = userEvent.setup();
+    render(<App />);
+    const trigger = await screen.findByRole('button', { name: copy.account.openMenu });
+    expect(trigger.textContent).toBe('G');
+    await user.click(trigger);
+    const drawer = screen.getByRole('dialog', { name: copy.account.settings });
+    expect(
+      within(drawer).getByRole('button', { name: copy.account.signOut }).hasAttribute('disabled'),
+    ).toBe(true);
+    expect(
+      within(drawer).getByRole('link', { name: copy.account.security }).getAttribute('href'),
+    ).toBe('/signin?returnTo=%2Fhistory');
+    fireEvent.mouseDown(drawer.parentElement!);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    await user.click(trigger);
+    await user.click(screen.getByRole('link', { name: copy.account.settings }));
+    expect(testRouter.url).toBe('/signin?returnTo=%2Fhistory');
+    await screen.findByRole('heading', { name: copy.account.welcome });
+  });
+
   it('groups settings with nested headings and tabs through notifications before security', async () => {
     localStorage.setItem('garage-guardian:locale', locale);
     testRouter.reset('/');
@@ -41,8 +133,9 @@ describe.each([
     const App = await loadGarageTestApp();
     const user = userEvent.setup();
     render(<App />);
-    const trigger = await screen.findByRole('button', { name: copy.account.settings });
+    const trigger = await screen.findByRole('button', { name: copy.account.openMenu });
     await user.click(trigger);
+    await user.click(screen.getByRole('button', { name: copy.account.settings }));
     const dialog = screen.getByRole('dialog', { name: copy.account.settings });
     const notifications = within(dialog).getByRole('region', { name: copy.account.notifications });
     const security = within(dialog).getByRole('region', { name: copy.account.security });
@@ -284,7 +377,8 @@ it('disables all account forms during an in-flight request and retains drafts on
   const user = userEvent.setup();
   render(<App />);
   await screen.findByRole('heading', { name: en.dashboard.title });
-  await user.click(await screen.findByRole('button', { name: en.account.settings }));
+  await user.click(await screen.findByRole('button', { name: en.account.openMenu }));
+  await user.click(screen.getByRole('button', { name: en.account.settings }));
   const form = screen.getByRole('form', { name: en.account.changeEmail });
   let fail!: () => void;
   vi.stubGlobal(

@@ -7,6 +7,7 @@ import { useDisplay } from '@/i18n/use-display';
 import { todayISO } from '@/lib/today-iso';
 import type { Page } from './garage-navigation';
 import type { RefObject } from 'react';
+import { GarageProfile } from './garage-profile';
 
 export function GarageTopbar({
   page,
@@ -44,19 +45,20 @@ export function GarageTopbar({
         <Menu size={22} aria-hidden="true" />
       </button>
       <span className="breadcrumbs">
-        {t('app.yourGarage')}
-        <span>/</span>{' '}
+        <span className="breadcrumbs-home">{t('app.yourGarage')}</span>
+        <span className="breadcrumbs-divider">/</span>{' '}
         <strong>
           {t(page === 'notifications' ? 'notifications.pageTitle' : `navigation.${page}`)}
         </strong>
       </span>
-      <span className="topbar-right">
+      <div className="topbar-right">
         <LocaleSelector />
         <span className="today-pill">
           <CalendarDays size={15} />
           {displayDate(todayISO())}
         </span>
-      </span>
+        <GarageProfile />
+      </div>
     </header>
   );
 }

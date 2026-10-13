@@ -19,7 +19,7 @@ type ModalState =
   | { kind: 'car'; item?: Car }
   | { kind: 'schedule'; item?: ScheduleItem; carId: string }
   | { kind: 'visit'; item?: Visit; carId?: string }
-  | { kind: 'account' }
+  | { kind: 'account'; section?: 'security' }
   | null;
 
 function useGarageState() {

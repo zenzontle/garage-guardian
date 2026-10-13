@@ -117,6 +117,7 @@
     "existingAccount": "Already have an account? Sign in",
     "createLink": "Create an account",
     "settings": "Account",
+    "openMenu": "Open account menu",
     "notifications": "Notifications",
     "security": "Security",
     "currentEmail": "Current email: {email}",

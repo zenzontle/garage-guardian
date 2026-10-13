@@ -432,6 +432,7 @@ it('signs in to the original screen, retains it on sign-out, and offers sign-in 
   act(() => testRouter.back());
   expect(testRouter.url).toBe('/cars/private');
   expect(screen.queryByLabelText('Password')).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Open account menu' }));
   await user.click(screen.getByRole('button', { name: 'Sign out' }));
   await screen.findByText('Vehicle unavailable');
   expect(testRouter.url).toBe('/cars/private');
