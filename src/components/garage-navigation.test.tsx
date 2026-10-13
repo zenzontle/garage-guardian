@@ -82,6 +82,8 @@ it.each([
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: copy.account.openMenu }));
     const drawer = screen.getByRole('dialog', { name: copy.account.settings });
+    expect(within(drawer).queryByRole('button', { name: copy.account.signOut })).toBeNull();
+    expect(within(drawer).queryByRole('link', { name: copy.account.create })).toBeNull();
     for (const name of [copy.account.settings, copy.account.security]) {
       expect(within(drawer).queryByRole('link', { name })).toBeNull();
       const option = within(drawer).getByRole('button', { name }) as HTMLButtonElement;
