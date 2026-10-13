@@ -98,6 +98,36 @@ describe('due calculations', () => {
     expect(latestOdometer(car, [visit])).toBe(20_050);
   });
 
+  it.each(['miles', 'kilometers'] as const)(
+    'preserves the latest known service reading in %s when newer visits omit it',
+    (distanceUnit) => {
+      const vehicle = { ...car, distanceUnit, odometer: 7_000 };
+      const task = { ...schedule, firstDueMiles: 5_000 };
+      const known = { ...visit, odometer: 5_000 };
+      const older = { ...visit, id: 'older', date: '2026-08-01', odometer: 1_000 };
+      const unknown = { ...visit, id: 'unknown', date: '2026-10-01', odometer: null };
+      const newest = { ...unknown, id: 'newest', date: '2026-10-05' };
+      const result = getDueItem(task, vehicle, [unknown, older, newest, known], '2026-10-09');
+
+      expect(result.dueMiles).toBe(10_000);
+      expect(result.milesRemaining).toBe(3_000);
+      expect(result.status).toBe('later');
+      expect(result.dueDate).toBe('2027-04-05');
+      expect(result.lastDone).toBe(newest);
+    },
+  );
+
+  it('accepts a zero service reading and excludes visits for other cars or tasks', () => {
+    const known = { ...visit, odometer: 0 };
+    const unknown = { ...visit, id: 'unknown', date: '2026-10-01', odometer: null };
+    const otherCar = { ...visit, id: 'other-car', date: '2026-09-30', carId: 'car-2' };
+    const otherTask = { ...visit, id: 'other-task', date: '2026-09-30', items: [] };
+    const result = getDueItem(schedule, car, [otherCar, unknown, otherTask, known], '2026-10-09');
+
+    expect(result.dueMiles).toBe(5_000);
+    expect(result.lastDone).toBe(unknown);
+  });
+
   it('does not retain an old date after a mileage-only task is done', () => {
     const result = getDueItem({ ...schedule, intervalMonths: null }, car, [visit], '2026-11-20');
     expect(result.dueDate).toBeNull();

@@ -71,9 +71,10 @@ export function getDueItem(
       ? addMonths(lastDone.date, schedule.intervalMonths)
       : null
     : schedule.firstDueDate;
+  const lastDoneOdometer = completed.find((visit) => visit.odometer !== null)?.odometer ?? null;
   const dueMiles = lastDone
-    ? schedule.intervalMiles !== null && lastDone.odometer !== null
-      ? lastDone.odometer + schedule.intervalMiles
+    ? schedule.intervalMiles !== null && lastDoneOdometer !== null
+      ? lastDoneOdometer + schedule.intervalMiles
       : schedule.intervalMiles !== null
         ? schedule.firstDueMiles
         : null
