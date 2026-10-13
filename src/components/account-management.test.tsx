@@ -56,9 +56,9 @@ describe.each([
     const close = within(drawer).getByRole('button', { name: copy.shared.close });
     expect(document.activeElement).toBe(close);
     for (const control of [
-      within(drawer).getByRole('button', { name: copy.account.settings }),
+      within(drawer).getByRole('link', { name: copy.account.settings }),
       within(drawer).getByRole('link', { name: copy.account.notifications }),
-      within(drawer).getByRole('button', { name: copy.account.security }),
+      within(drawer).getByRole('link', { name: copy.account.security }),
       within(drawer).getByRole('button', { name: copy.account.signOut }),
       close,
     ]) {
@@ -75,13 +75,14 @@ describe.each([
     expect(document.body.style.overflow).toBe('');
 
     await user.click(trigger);
-    await user.click(screen.getByRole('button', { name: copy.account.security }));
-    const security = screen.getByRole('dialog', { name: copy.account.security });
+    await user.click(screen.getByRole('link', { name: copy.account.security }));
+    expect(testRouter.url).toBe('/settings/security');
+    await screen.findByRole('heading', { name: copy.account.security });
+    const security = screen.getByRole('main');
     expect(within(security).getByRole('form', { name: copy.account.changeEmail })).toBeDefined();
     expect(within(security).getByRole('form', { name: copy.account.changePassword })).toBeDefined();
     expect(within(security).queryByRole('region', { name: copy.account.notifications })).toBeNull();
-    await user.keyboard('{Escape}');
-    expect(document.activeElement).toBe(trigger);
+    expect(screen.queryByRole('dialog')).toBeNull();
 
     await user.click(trigger);
     await user.click(screen.getByRole('link', { name: copy.account.notifications }));
@@ -97,7 +98,7 @@ describe.each([
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('shows a guest initial and offers sign-in through the drawer', async () => {
+  it('shows a guest initial and offers sign-in from the account page', async () => {
     localStorage.setItem('garage-guardian:locale', locale);
     testRouter.reset('/history');
     const App = await loadGarageTestApp();
@@ -112,87 +113,74 @@ describe.each([
     ).toBe(true);
     expect(
       within(drawer).getByRole('link', { name: copy.account.security }).getAttribute('href'),
-    ).toBe('/signin?returnTo=%2Fhistory');
+    ).toBe('/settings/security');
     fireEvent.mouseDown(drawer.parentElement!);
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(trigger);
     await user.click(trigger);
     await user.click(screen.getByRole('link', { name: copy.account.settings }));
-    expect(testRouter.url).toBe('/signin?returnTo=%2Fhistory');
+    expect(testRouter.url).toBe('/settings/account');
+    await screen.findByRole('heading', { name: copy.account.settings });
+    const links = screen.getAllByRole('link', { name: copy.account.signIn });
+    await user.click(links[links.length - 1]);
+    expect(testRouter.url).toBe('/signin?returnTo=%2Fsettings%2Faccount');
     await screen.findByRole('heading', { name: copy.account.welcome });
   });
 
-  it('groups settings with nested headings and tabs through notifications before security', async () => {
+  it('shows only the current email on the account page and restores pages with browser history', async () => {
     localStorage.setItem('garage-guardian:locale', locale);
     testRouter.reset('/');
     cloud.emit(account());
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ preferences: null }) }),
-    );
     const App = await loadGarageTestApp();
     const user = userEvent.setup();
     render(<App />);
     const trigger = await screen.findByRole('button', { name: copy.account.openMenu });
     await user.click(trigger);
-    await user.click(screen.getByRole('button', { name: copy.account.settings }));
-    const dialog = screen.getByRole('dialog', { name: copy.account.settings });
-    const notifications = within(dialog).getByRole('region', { name: copy.account.notifications });
-    const security = within(dialog).getByRole('region', { name: copy.account.security });
+    await user.click(screen.getByRole('link', { name: copy.account.settings }));
+    expect(testRouter.url).toBe('/settings/account');
+    await screen.findByRole('heading', { name: copy.account.settings });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    const main = screen.getByRole('main');
     expect(
-      within(dialog)
+      within(main).getByText(copy.account.currentEmail.replace('{email}', account().email!)),
+    ).toBeDefined();
+    expect(within(main).queryByRole('form')).toBeNull();
+    expect(within(main).queryByRole('checkbox')).toBeNull();
+    for (const nav of screen.getAllByRole('navigation')) {
+      expect(within(nav).queryAllByRole('link', { current: 'page' })).toHaveLength(0);
+    }
+    await user.click(trigger);
+    await user.click(screen.getByRole('link', { name: copy.account.security }));
+    await screen.findByRole('heading', { name: copy.account.security });
+    expect(
+      within(main)
         .getAllByRole('heading')
         .map((heading) => [heading.tagName, heading.textContent]),
     ).toEqual([
-      ['H2', copy.account.settings],
-      ['H3', copy.account.notifications],
-      ['H4', copy.notifications.title],
-      ['H3', copy.account.security],
-      ['H4', copy.account.changeEmail],
-      ['H4', copy.account.changePassword],
+      ['H1', copy.account.security],
+      ['H2', copy.account.changeEmail],
+      ['H2', copy.account.changePassword],
     ]);
-    const currentEmail = within(dialog).getByText(
-      copy.account.currentEmail.replace('{email}', account().email!),
-    );
-    expect(currentEmail.parentElement).toBe(notifications.parentElement);
-    expect(
-      currentEmail.compareDocumentPosition(notifications) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
-    expect(within(notifications).getAllByRole('form')).toHaveLength(1);
-    expect(
-      within(security)
-        .getAllByRole('form')
-        .map((form) => form.getAttribute('aria-label')),
-    ).toEqual([copy.account.changeEmail, copy.account.changePassword]);
-    const checkbox = await within(notifications).findByRole('checkbox');
-    const close = within(dialog).getByRole('button', { name: copy.shared.close });
-    close.focus();
-    const email = within(security).getByRole('form', { name: copy.account.changeEmail });
-    const password = within(security).getByRole('form', { name: copy.account.changePassword });
+    const email = within(main).getByRole('form', { name: copy.account.changeEmail });
+    const password = within(main).getByRole('form', { name: copy.account.changePassword });
+    within(email).getByLabelText(copy.account.currentPassword).focus();
     for (const control of [
-      checkbox,
-      within(notifications).getByLabelText(copy.notifications.weekday),
-      within(notifications).getByLabelText(copy.notifications.language),
-      within(notifications).getByRole('button', { name: copy.notifications.save }),
-      within(email).getByLabelText(copy.account.currentPassword),
       within(email).getByLabelText(copy.account.newEmail),
       within(email).getByRole('button', { name: copy.account.changeEmail }),
       within(password).getByLabelText(copy.account.currentPassword),
       within(password).getByLabelText(copy.account.newPassword),
       within(password).getByLabelText(copy.account.confirmPassword),
       within(password).getByRole('button', { name: copy.account.changePassword }),
-      close,
     ]) {
       await user.tab();
       expect(document.activeElement).toBe(control);
     }
-    await user.tab({ shift: true });
-    expect(document.activeElement).toBe(
-      within(password).getByRole('button', { name: copy.account.changePassword }),
-    );
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(document.activeElement).toBe(trigger);
+    act(() => testRouter.back());
+    await screen.findByRole('heading', { name: copy.account.settings });
+    expect(screen.queryByRole('form')).toBeNull();
+    act(() => testRouter.forward());
+    await screen.findByRole('heading', { name: copy.account.security });
+    expect(screen.getAllByRole('form')).toHaveLength(2);
   });
   it('preserves entered email through recovery/resend, announces generic copy, and enforces cooldown', async () => {
     localStorage.setItem('garage-guardian:locale', locale);
@@ -378,7 +366,8 @@ it('disables all account forms during an in-flight request and retains drafts on
   render(<App />);
   await screen.findByRole('heading', { name: en.dashboard.title });
   await user.click(await screen.findByRole('button', { name: en.account.openMenu }));
-  await user.click(screen.getByRole('button', { name: en.account.settings }));
+  await user.click(screen.getByRole('link', { name: en.account.security }));
+  await screen.findByRole('heading', { name: en.account.security });
   const form = screen.getByRole('form', { name: en.account.changeEmail });
   let fail!: () => void;
   vi.stubGlobal(
@@ -398,7 +387,9 @@ it('disables all account forms during an in-flight request and retains drafts on
   });
   await user.click(within(form).getByRole('button', { name: en.account.changeEmail }));
   await waitFor(() =>
-    expect(screen.getByRole('button', { name: 'Close' }).hasAttribute('disabled')).toBe(true),
+    expect(screen.getAllByRole('group').every((field) => field.hasAttribute('disabled'))).toBe(
+      true,
+    ),
   );
   expect(screen.getAllByRole('group').every((field) => field.hasAttribute('disabled'))).toBe(true);
   await act(async () => fail());

@@ -5,7 +5,8 @@ export const workspacePaths = {
   reports: '/reports',
 } as const;
 
-export type WorkspaceScreen = keyof typeof workspacePaths | 'notifications';
+export type WorkspaceScreen =
+  keyof typeof workspacePaths | 'notifications' | 'account' | 'security';
 export type AccountMode = 'signin' | 'signup';
 
 export function carPath(id: string) {
@@ -13,6 +14,8 @@ export function carPath(id: string) {
 }
 
 export function workspaceScreen(pathname: string): WorkspaceScreen {
+  if (pathname === '/settings/account') return 'account';
+  if (pathname === '/settings/security') return 'security';
   if (pathname === '/settings/notifications') return 'notifications';
   if (pathname === '/cars' || pathname.startsWith('/cars/')) return 'cars';
   if (pathname === '/history') return 'history';
@@ -28,7 +31,8 @@ export function accountMode(pathname: string): AccountMode | null {
 
 export function validatedReturnTo(value: string | null): string {
   if (!value || /[?#\\\s]/.test(value)) return '/';
-  if (value === '/settings/notifications') return value;
+  if (['/settings/notifications', '/settings/account', '/settings/security'].includes(value))
+    return value;
   if (Object.values(workspacePaths).some((path) => path === value)) return value;
   const match = /^\/cars\/([^/]+)$/.exec(value);
   if (!match) return '/';
@@ -55,6 +59,8 @@ export const reportPaths = [
   '/history',
   '/reports',
   '/settings/notifications',
+  '/settings/account',
+  '/settings/security',
   '/signin',
   '/signup',
 ] as const;

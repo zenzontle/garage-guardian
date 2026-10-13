@@ -11,18 +11,21 @@ import { contextSchema } from './bug-reports/shared';
 import { report } from './bug-reports/fixtures.test-helper';
 
 describe('garage URLs', () => {
-  it('classifies notification settings consistently for navigation and bug reports', () => {
-    const pathname = '/settings/notifications';
-    expect(workspaceScreen(pathname)).toBe('notifications');
-    expect(reportPath(pathname)).toBe(pathname);
-    expect(
-      contextSchema.safeParse({
-        ...report().context,
-        pathname: reportPath(pathname),
-        screen: workspaceScreen(pathname),
-      }).success,
-    ).toBe(true);
-  });
+  it.each(['notifications', 'account', 'security'] as const)(
+    'classifies %s settings consistently for navigation and bug reports',
+    (section) => {
+      const pathname = `/settings/${section}`;
+      expect(workspaceScreen(pathname)).toBe(section);
+      expect(reportPath(pathname)).toBe(pathname);
+      expect(
+        contextSchema.safeParse({
+          ...report().context,
+          pathname: reportPath(pathname),
+          screen: workspaceScreen(pathname),
+        }).success,
+      ).toBe(true);
+    },
+  );
   it.each([
     '/',
     '/cars',
@@ -31,6 +34,8 @@ describe('garage URLs', () => {
     '/cars/stable-id',
     '/cars/%C3%B1',
     '/settings/notifications',
+    '/settings/account',
+    '/settings/security',
   ])('accepts workspace destination %s', (path) => {
     expect(validatedReturnTo(path)).toBe(path);
     expect(

@@ -70,6 +70,34 @@ it('does not offer an email opt-in for a local-only garage', async () => {
   expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
 });
 
+it.each(['account', 'security'] as const)(
+  'returns to %s settings after signing in from a direct visit',
+  async (section) => {
+    configureCloud();
+    testRouter.reset(`/settings/${section}`);
+    const App = await loadGarageTestApp();
+    render(<App />);
+    const user = userEvent.setup();
+    const title = section === 'account' ? en.account.settings : en.account.security;
+    await screen.findByRole('heading', { name: title });
+    expect(screen.queryByRole('form')).toBeNull();
+    const links = screen.getAllByRole('link', { name: en.account.signIn });
+    await user.click(links[links.length - 1]);
+    expect(testRouter.url).toBe(`/signin?returnTo=%2Fsettings%2F${section}`);
+    await user.type(await screen.findByLabelText(en.account.email), 'owner@example.com');
+    await user.type(screen.getByLabelText(en.account.password), 'password');
+    await user.click(screen.getByRole('button', { name: en.account.signIn }));
+    const currentEmail = en.account.currentEmail.replace('{email}', account().email!);
+    await screen.findByText(currentEmail);
+    expect(testRouter.url).toBe(`/settings/${section}`);
+    expect(screen.queryAllByRole('form')).toHaveLength(section === 'account' ? 0 : 2);
+    await user.click(screen.getByRole('button', { name: en.account.openMenu }));
+    await user.click(screen.getByRole('button', { name: en.account.signOut }));
+    await waitFor(() => expect(screen.queryByText(currentEmail)).toBeNull());
+    expect(screen.queryByRole('form')).toBeNull();
+  },
+);
+
 it.each([
   ['en', en],
   ['es', es],
