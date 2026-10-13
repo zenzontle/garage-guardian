@@ -30,6 +30,77 @@ describe.each([
   ['en', en],
   ['es', es],
 ] as const)('%s account workflows', (locale, copy) => {
+  it('groups settings with nested headings and tabs through notifications before security', async () => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    testRouter.reset('/');
+    cloud.emit(account());
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ preferences: null }) }),
+    );
+    const App = await loadGarageTestApp();
+    const user = userEvent.setup();
+    render(<App />);
+    const trigger = await screen.findByRole('button', { name: copy.account.settings });
+    await user.click(trigger);
+    const dialog = screen.getByRole('dialog', { name: copy.account.settings });
+    const notifications = within(dialog).getByRole('region', { name: copy.account.notifications });
+    const security = within(dialog).getByRole('region', { name: copy.account.security });
+    expect(
+      within(dialog)
+        .getAllByRole('heading')
+        .map((heading) => [heading.tagName, heading.textContent]),
+    ).toEqual([
+      ['H2', copy.account.settings],
+      ['H3', copy.account.notifications],
+      ['H4', copy.notifications.title],
+      ['H3', copy.account.security],
+      ['H4', copy.account.changeEmail],
+      ['H4', copy.account.changePassword],
+    ]);
+    const currentEmail = within(dialog).getByText(
+      copy.account.currentEmail.replace('{email}', account().email!),
+    );
+    expect(currentEmail.parentElement).toBe(notifications.parentElement);
+    expect(
+      currentEmail.compareDocumentPosition(notifications) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(within(notifications).getAllByRole('form')).toHaveLength(1);
+    expect(
+      within(security)
+        .getAllByRole('form')
+        .map((form) => form.getAttribute('aria-label')),
+    ).toEqual([copy.account.changeEmail, copy.account.changePassword]);
+    const checkbox = await within(notifications).findByRole('checkbox');
+    const close = within(dialog).getByRole('button', { name: copy.shared.close });
+    close.focus();
+    const email = within(security).getByRole('form', { name: copy.account.changeEmail });
+    const password = within(security).getByRole('form', { name: copy.account.changePassword });
+    for (const control of [
+      checkbox,
+      within(notifications).getByLabelText(copy.notifications.weekday),
+      within(notifications).getByLabelText(copy.notifications.language),
+      within(notifications).getByRole('button', { name: copy.notifications.save }),
+      within(email).getByLabelText(copy.account.currentPassword),
+      within(email).getByLabelText(copy.account.newEmail),
+      within(email).getByRole('button', { name: copy.account.changeEmail }),
+      within(password).getByLabelText(copy.account.currentPassword),
+      within(password).getByLabelText(copy.account.newPassword),
+      within(password).getByLabelText(copy.account.confirmPassword),
+      within(password).getByRole('button', { name: copy.account.changePassword }),
+      close,
+    ]) {
+      await user.tab();
+      expect(document.activeElement).toBe(control);
+    }
+    await user.tab({ shift: true });
+    expect(document.activeElement).toBe(
+      within(password).getByRole('button', { name: copy.account.changePassword }),
+    );
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
   it('preserves entered email through recovery/resend, announces generic copy, and enforces cooldown', async () => {
     localStorage.setItem('garage-guardian:locale', locale);
     const App = await loadGarageTestApp();

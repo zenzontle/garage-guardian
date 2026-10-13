@@ -117,6 +117,8 @@
     "existingAccount": "¿Ya tienes cuenta? Inicia sesión",
     "createLink": "Crear una cuenta",
     "settings": "Cuenta",
+    "notifications": "Notificaciones",
+    "security": "Seguridad",
     "currentEmail": "Correo actual: {email}",
     "pendingEmail": "Correo pendiente: {email}. Sigue las instrucciones de confirmación enviadas a tus direcciones actual y nueva. Tu correo actual sigue activo hasta completar la confirmación.",
     "changeEmail": "Cambiar correo",

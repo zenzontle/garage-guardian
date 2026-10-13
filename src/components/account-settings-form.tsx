@@ -10,9 +10,11 @@ import { useGarage } from './garage-provider';
 export function AccountSettingsForm({
   kind,
   disabled,
+  headingLevel = 3,
 }: {
   kind: 'email' | 'password';
   disabled: boolean;
+  headingLevel?: 3 | 4;
 }) {
   const t = useTranslations();
   const garage = useGarage();
@@ -24,6 +26,7 @@ export function AccountSettingsForm({
   const [error, setError] = useState<AppFailure | null>(null);
   const [pendingEmail, setPendingEmail] = useState('');
   const title = kind === 'email' ? 'changeEmail' : 'changePassword';
+  const Heading = headingLevel === 4 ? 'h4' : 'h3';
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -50,7 +53,7 @@ export function AccountSettingsForm({
       aria-label={t(`account.${title}`)}
       aria-busy={garage.accountBusy}
     >
-      <h3>{t(`account.${title}`)}</h3>
+      <Heading>{t(`account.${title}`)}</Heading>
       {error && (
         <p className="error-banner" role="alert">
           {t(`errors.${error.code}`, error.values)}
