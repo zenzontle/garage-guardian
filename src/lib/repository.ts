@@ -212,6 +212,11 @@ const scheduleToRow = (item: ScheduleItem, userId: string) => ({
   is_active: item.isActive,
   created_at: item.createdAt,
 });
+export type SaveScheduleWithDefaultsArgs = {
+  p_user_id: string;
+  p_item: ReturnType<typeof scheduleToRow>;
+  p_today: string;
+};
 const visitToRow = (visit: Visit, userId: string) => ({
   id: visit.id,
   user_id: userId,
@@ -313,13 +318,18 @@ export class SupabaseRepository implements Repository {
   }
   async saveSchedule(item: ScheduleItem) {
     if (
+      item.isActive &&
       item.firstDueDate === null &&
       item.firstDueMiles === null &&
       (item.intervalMiles !== null || item.intervalMonths !== null)
     ) {
-      const snapshot = await this.load();
-      const car = snapshot.cars.find((car) => car.id === item.carId);
-      if (car) item = initializeSchedule(item, car, snapshot.visits, todayISO());
+      const { error } = await this.client.rpc('save_schedule_with_defaults', {
+        p_user_id: this.userId,
+        p_item: scheduleToRow(item, this.userId),
+        p_today: todayISO(),
+      } satisfies SaveScheduleWithDefaultsArgs);
+      if (error) throw error;
+      return;
     }
     const { error } = await this.client
       .from('schedule_items')

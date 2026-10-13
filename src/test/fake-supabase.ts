@@ -1,6 +1,7 @@
 import { vi } from 'vitest';
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
 import type { InitializeScheduleDefaultsArgs } from '@/lib/schedule-defaults';
+import type { SaveScheduleWithDefaultsArgs } from '@/lib/repository';
 import { scheduleDefaultsRpc } from './schedule-defaults-rpc';
 
 type Row = Record<string, unknown> & { id: string; user_id?: string };
@@ -190,17 +191,33 @@ export function fakeSupabase() {
     _updateUser: (attributes: { password: string }) => auth.updateUser(attributes),
   });
   const storage = { from: vi.fn(() => bucket) };
-  const rpc = vi.fn(async (name: string, args: InitializeScheduleDefaultsArgs) => {
-    if (!user || args.p_user_id !== user.id) return { data: [], error: null };
-    if (name !== 'initialize_schedule_defaults') throw new Error(`Unexpected RPC: ${name}`);
-    return {
-      data: scheduleDefaultsRpc(
-        Object.fromEntries([...tables].map(([name, rows]) => [name, [...rows.values()]])),
-        args,
-      ),
-      error: null as Error | null,
-    };
-  });
+  const rpc = vi.fn(
+    async (name: string, args: InitializeScheduleDefaultsArgs | SaveScheduleWithDefaultsArgs) => {
+      if (!user || args.p_user_id !== user.id) return { data: [], error: null };
+      let initializeArgs: InitializeScheduleDefaultsArgs;
+      if (name === 'save_schedule_with_defaults' && 'p_item' in args) {
+        const { error } = await execute('schedule_items', 'upsert', [], args.p_item);
+        if (error) return { data: [], error };
+        initializeArgs = {
+          p_user_id: args.p_user_id,
+          p_schedule_id: args.p_item.id,
+          p_car_id: args.p_item.car_id,
+          p_interval_miles: args.p_item.interval_miles,
+          p_interval_months: args.p_item.interval_months,
+          p_today: args.p_today,
+        };
+      } else if (name === 'initialize_schedule_defaults' && 'p_schedule_id' in args) {
+        initializeArgs = args;
+      } else throw new Error(`Unexpected RPC: ${name}`);
+      return {
+        data: scheduleDefaultsRpc(
+          Object.fromEntries([...tables].map(([name, rows]) => [name, [...rows.values()]])),
+          initializeArgs,
+        ),
+        error: null as Error | null,
+      };
+    },
+  );
   return {
     client: { from, rpc, storage, auth: { ...auth } } as unknown as SupabaseClient,
     rpc,

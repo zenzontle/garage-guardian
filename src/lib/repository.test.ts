@@ -14,6 +14,70 @@ beforeEach(async () => {
 });
 afterEach(() => vi.useRealTimers());
 
+describe('atomic cloud schedule saves', () => {
+  it.each(['car', 'visit'] as const)(
+    'initializes a new task from a concurrent %s reading at save time',
+    async (source) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+      const { SupabaseRepository } = await import('./repository');
+      const cloud = fakeSupabase();
+      cloud.emit(account());
+      const repository = new SupabaseRepository(cloud.client, account().id);
+      await repository.saveCar({ ...car, odometer: 69000 });
+      const execute = cloud.execute.getMockImplementation()!;
+      cloud.execute.mockImplementation(async (...args) => {
+        if (args[0] === 'schedule_items' && args[1] === 'upsert') {
+          if (source === 'car') cloud.tables.get('cars')!.get(car.id)!.odometer = 71000;
+          else
+            cloud.tables.set(
+              'visits',
+              new Map([
+                [
+                  visit.id,
+                  {
+                    id: visit.id,
+                    user_id: account().id,
+                    car_id: car.id,
+                    service_date: visit.date,
+                    odometer: 71000,
+                    items: [],
+                    photos: [],
+                  },
+                ],
+              ]),
+            );
+        }
+        return execute(...args);
+      });
+
+      await repository.saveSchedule({ ...schedule, firstDueMiles: null, firstDueDate: null });
+
+      expect(cloud.tables.get('schedule_items')!.get(schedule.id)).toMatchObject({
+        first_due_miles: 75000,
+        first_due_date: '2027-04-13',
+      });
+      const saved = await repository.load();
+      expect(getAllDue(saved.cars, saved.schedules, saved.visits, '2026-10-13')[0].status).toBe(
+        'later',
+      );
+    },
+  );
+
+  it('reports an atomic save failure without persisting an uninitialized task', async () => {
+    const { SupabaseRepository } = await import('./repository');
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    const repository = new SupabaseRepository(cloud.client, account().id);
+    await repository.saveCar(car);
+    cloud.rpc.mockResolvedValueOnce({ data: [], error: new Error('Atomic save failed') });
+    await expect(
+      repository.saveSchedule({ ...schedule, firstDueMiles: null, firstDueDate: null }),
+    ).rejects.toThrow('Atomic save failed');
+    expect(cloud.tables.get('schedule_items')?.has(schedule.id)).toBeFalsy();
+  });
+});
+
 describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
   async function setup() {
     const { LocalRepository, SupabaseRepository } = await import('./repository');
