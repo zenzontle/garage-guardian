@@ -56,7 +56,15 @@ export const diagnosticSchema = z.strictObject({
 export type Diagnostic = z.infer<typeof diagnosticSchema>;
 export const contextSchema = z.strictObject({
   pathname: z.enum(reportPaths),
-  screen: z.enum(['dashboard', 'cars', 'history', 'reports', 'loading', 'recovery']),
+  screen: z.enum([
+    'dashboard',
+    'cars',
+    'history',
+    'reports',
+    'notifications',
+    'loading',
+    'recovery',
+  ]),
   dialog: z.enum(['none', 'add-car', 'edit-car', 'schedule', 'visit']),
   viewport: z.strictObject({
     width: z.number().int().min(1).max(32768),

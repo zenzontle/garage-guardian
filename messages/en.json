@@ -39,7 +39,9 @@
     "recoveryInvalid": "This recovery link is expired, invalid, or already used. Request another email.",
     "resendCooldown": "Wait 60 seconds before requesting another confirmation email.",
     "sessionRevocation": "Your password was updated, but sessions could not be revoked. Retry to finish, or sign in with your new password.",
-    "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying."
+    "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying.",
+    "notificationInput": "Check your reminder preferences and try again.",
+    "notificationSave": "Could not load or save reminder preferences. Try again."
   },
   "shared": {
     "language": "Language",
@@ -391,5 +393,28 @@
   "units": {
     "miles": "miles",
     "kilometers": "kilometers"
+  },
+  "notifications": {
+    "title": "Email reminders",
+    "pageTitle": "Notification settings",
+    "description": "Receive a weekly digest of upcoming and due maintenance for your vehicles at your confirmed account email.",
+    "enabled": "Enable weekly email reminders",
+    "weekday": "Weekday (UTC)",
+    "language": "Email language",
+    "schedule": "Scheduled around 16:00 UTC on your chosen weekday. Delivery may be later. Emails are sent only when maintenance is upcoming or due.",
+    "loading": "Loading reminder preferences…",
+    "saving": "Saving…",
+    "save": "Save reminder preferences",
+    "saved": "Reminder preferences saved.",
+    "signIn": "Sign in to manage email reminders for your account. Local-only garages do not send email.",
+    "days": {
+      "0": "Sunday",
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday"
+    }
   }
 }

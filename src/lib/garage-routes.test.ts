@@ -1,18 +1,42 @@
 import { describe, expect, it } from 'vitest';
-import { accountPath, carPath, reportPath, reportPaths, validatedReturnTo } from './garage-routes';
+import {
+  accountPath,
+  carPath,
+  reportPath,
+  reportPaths,
+  validatedReturnTo,
+  workspaceScreen,
+} from './garage-routes';
 import { contextSchema } from './bug-reports/shared';
 import { report } from './bug-reports/fixtures.test-helper';
 
 describe('garage URLs', () => {
-  it.each(['/', '/cars', '/history', '/reports', '/cars/stable-id', '/cars/%C3%B1'])(
-    'accepts workspace destination %s',
-    (path) => {
-      expect(validatedReturnTo(path)).toBe(path);
-      expect(
-        new URL(accountPath('signup', path), 'http://localhost').searchParams.get('returnTo'),
-      ).toBe(path);
-    },
-  );
+  it('classifies notification settings consistently for navigation and bug reports', () => {
+    const pathname = '/settings/notifications';
+    expect(workspaceScreen(pathname)).toBe('notifications');
+    expect(reportPath(pathname)).toBe(pathname);
+    expect(
+      contextSchema.safeParse({
+        ...report().context,
+        pathname: reportPath(pathname),
+        screen: workspaceScreen(pathname),
+      }).success,
+    ).toBe(true);
+  });
+  it.each([
+    '/',
+    '/cars',
+    '/history',
+    '/reports',
+    '/cars/stable-id',
+    '/cars/%C3%B1',
+    '/settings/notifications',
+  ])('accepts workspace destination %s', (path) => {
+    expect(validatedReturnTo(path)).toBe(path);
+    expect(
+      new URL(accountPath('signup', path), 'http://localhost').searchParams.get('returnTo'),
+    ).toBe(path);
+  });
   it.each([
     null,
     '',

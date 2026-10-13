@@ -31,8 +31,12 @@ export function GarageSidebar({
     const mobile = window.matchMedia?.('(max-width: 720px)');
     const element = sidebar.current;
     const trigger = menuTrigger.current;
-    if (mobile?.matches)
-      element?.querySelector<HTMLAnchorElement>('a[aria-current="page"]')?.focus();
+    if (mobile?.matches) {
+      const link =
+        element?.querySelector<HTMLAnchorElement>('a[aria-current="page"]') ??
+        element?.querySelector<HTMLAnchorElement>('nav a');
+      link?.focus();
+    }
     return () => {
       if (mobile?.matches && element?.contains(document.activeElement)) trigger?.focus();
     };

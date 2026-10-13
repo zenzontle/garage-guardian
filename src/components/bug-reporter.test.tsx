@@ -6,6 +6,7 @@ import { BugReporter } from './bug-reporter';
 import { LocaleProvider } from './locale-provider';
 import { metadata, oversizedReport } from '@/lib/bug-reports/fixtures.test-helper';
 import { recordDiagnostic } from '@/lib/bug-reports/diagnostics';
+import { workspaceScreen } from '@/lib/garage-routes';
 
 const auth = vi.hoisted(() => ({ getSession: vi.fn() }));
 vi.mock('@/lib/repository', () => ({ supabase: { auth } }));
@@ -43,6 +44,25 @@ function failSessionLookup(failure: 'missing' | 'rejected') {
   else auth.getSession.mockResolvedValueOnce({ data: { session: null } });
 }
 describe('authenticated public bug reporter', () => {
+  it('previews notification settings with its own route and screen', async () => {
+    window.history.replaceState(null, '', '/settings/notifications');
+    try {
+      const user = userEvent.setup();
+      render(
+        <BugReporter
+          userId="account"
+          screen={workspaceScreen('/settings/notifications')}
+          dialog="none"
+        />,
+      );
+      await user.click(await screen.findByRole('button', { name: 'Report a bug' }));
+      await review(user);
+      const preview = screen.getByText(/Route: \/settings\/notifications/).textContent;
+      expect(preview).toContain('Screen: notifications');
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
+  });
   it('previews a vehicle route template without exposing the ID or URL parameters', async () => {
     window.history.replaceState(null, '', '/cars/private-vehicle?secret=value#fragment');
     try {
