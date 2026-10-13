@@ -45,7 +45,10 @@ export function GarageTopbar({
       </button>
       <span className="breadcrumbs">
         {t('app.yourGarage')}
-        <span>/</span> <strong>{t(`navigation.${page}`)}</strong>
+        <span>/</span>{' '}
+        <strong>
+          {t(page === 'notifications' ? 'notifications.pageTitle' : `navigation.${page}`)}
+        </strong>
       </span>
       <span className="topbar-right">
         <LocaleSelector />

@@ -5,7 +5,7 @@ export const workspacePaths = {
   reports: '/reports',
 } as const;
 
-export type WorkspaceScreen = keyof typeof workspacePaths;
+export type WorkspaceScreen = keyof typeof workspacePaths | 'notifications';
 export type AccountMode = 'signin' | 'signup';
 
 export function carPath(id: string) {
@@ -13,6 +13,7 @@ export function carPath(id: string) {
 }
 
 export function workspaceScreen(pathname: string): WorkspaceScreen {
+  if (pathname === '/settings/notifications') return 'notifications';
   if (pathname === '/cars' || pathname.startsWith('/cars/')) return 'cars';
   if (pathname === '/history') return 'history';
   if (pathname === '/reports') return 'reports';
@@ -53,6 +54,7 @@ export const reportPaths = [
   '/cars/[carId]',
   '/history',
   '/reports',
+  '/settings/notifications',
   '/signin',
   '/signup',
 ] as const;

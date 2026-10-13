@@ -1,9 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { accountPath, carPath, reportPath, reportPaths, validatedReturnTo } from './garage-routes';
+import {
+  accountPath,
+  carPath,
+  reportPath,
+  reportPaths,
+  validatedReturnTo,
+  workspaceScreen,
+} from './garage-routes';
 import { contextSchema } from './bug-reports/shared';
 import { report } from './bug-reports/fixtures.test-helper';
 
 describe('garage URLs', () => {
+  it('classifies notification settings consistently for navigation and bug reports', () => {
+    const pathname = '/settings/notifications';
+    expect(workspaceScreen(pathname)).toBe('notifications');
+    expect(reportPath(pathname)).toBe(pathname);
+    expect(
+      contextSchema.safeParse({
+        ...report().context,
+        pathname: reportPath(pathname),
+        screen: workspaceScreen(pathname),
+      }).success,
+    ).toBe(true);
+  });
   it.each([
     '/',
     '/cars',

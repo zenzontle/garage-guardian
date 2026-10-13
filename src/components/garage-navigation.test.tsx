@@ -8,6 +8,8 @@ import { createClient } from '@supabase/supabase-js';
 import { car } from '../test/fixtures';
 import { account, fakeSupabase } from '../test/fake-supabase';
 import { accountPath, carPath } from '../lib/garage-routes';
+import en from '../../messages/en.json';
+import es from '../../messages/es.json';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 let cloud: ReturnType<typeof fakeSupabase>;
@@ -67,6 +69,43 @@ it('does not offer an email opt-in for a local-only garage', async () => {
   expect(screen.queryByRole('checkbox')).toBeNull();
   expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
 });
+
+it.each([
+  ['en', en],
+  ['es', es],
+] as const)(
+  'classifies notification settings without activating workspace links in %s',
+  async (locale, copy) => {
+    testRouter.reset('/settings/notifications');
+    localStorage.setItem('garage-guardian:locale', locale);
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const App = await loadGarageTestApp();
+    render(<App />);
+    await screen.findByRole('heading', { name: copy.notifications.pageTitle });
+    expect(
+      within(screen.getByRole('banner')).getByText(copy.notifications.pageTitle),
+    ).toBeDefined();
+    for (const name of [copy.app.mainNavigation, copy.app.mobileNavigation]) {
+      const nav = screen.getByRole('navigation', { name });
+      expect(within(nav).queryAllByRole('link', { current: 'page' })).toHaveLength(0);
+      expect(nav.querySelector('a.active')).toBeNull();
+    }
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: copy.app.openMenu }));
+    expect(document.activeElement).toBe(
+      within(screen.getByRole('navigation', { name: copy.app.mainNavigation })).getByRole('link', {
+        name: copy.navigation.dashboard,
+      }),
+    );
+  },
+);
 
 it('moves vehicle-link focus without navigating until Enter and retains native Tab stops', async () => {
   await seed();
