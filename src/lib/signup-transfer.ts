@@ -12,6 +12,7 @@ type Transfer = {
   userId: string;
   status: 'pending' | 'uploading' | 'uploaded';
   snapshot?: Snapshot;
+  baselineDate?: string;
 };
 const transferKey = (project: string) => `garage-guardian:signup-transfer:v1:${project}`;
 export function pendingTransfer(project: string): Promise<Transfer | undefined> {
@@ -80,10 +81,16 @@ async function runTransfer(
   const snapshot = transfer.snapshot;
 
   if (transfer.status !== 'uploaded') {
-    // Normalize old pending snapshots for verification; keep the cleanup original frozen.
+    // Freeze legacy defaults before any cloud writes; keep the cleanup original unchanged.
+    const baselineDate = transfer.baselineDate ?? todayISO();
+    if (!transfer.baselineDate) {
+      transfer = { ...transfer, baselineDate };
+      assertActive();
+      await set(transferKey(project), transfer);
+    }
     const expected = initializeSnapshotSchedules(
       normalizeSnapshot(structuredClone(snapshot)),
-      todayISO(),
+      baselineDate,
     );
     // Each await is a cancellation boundary: never continue under another session.
     for (const car of expected.cars) {

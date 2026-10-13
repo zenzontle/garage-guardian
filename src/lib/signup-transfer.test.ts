@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clear, get, set } from 'idb-keyval';
 import { LocalRepository, SupabaseRepository } from './repository';
 import { pendingTransfer, registerSignup, transferSignupData } from './signup-transfer';
@@ -12,6 +12,7 @@ beforeEach(async () => {
   await clear();
   localStorage.clear();
 });
+afterEach(() => vi.useRealTimers());
 
 async function seedLocal(withPhoto = true) {
   const local = new LocalRepository();
@@ -30,6 +31,53 @@ async function seedLocal(withPhoto = true) {
 }
 
 describe('signup transfer', () => {
+  it('keeps legacy transfer due dates fixed across failed uploads and later-day reload retries', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+    const { local, snapshot: saved } = await seedLocal();
+    const snapshot = {
+      ...saved,
+      schedules: [{ ...schedule, firstDueMiles: null, firstDueDate: null }],
+    };
+    await set('garage-guardian:local:v1', snapshot);
+    await set(`garage-guardian:signup-transfer:v1:${project}`, {
+      userId: account().id,
+      status: 'uploading',
+      snapshot,
+    });
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    const execute = cloud.execute.getMockImplementation()!;
+    cloud.execute.mockImplementationOnce(async (...args) => {
+      expect((await pendingTransfer(project))?.baselineDate).toBe('2026-10-13');
+      return execute(...args);
+    });
+    cloud.bucket.upload
+      .mockResolvedValueOnce({ error: new Error('Upload interrupted') })
+      .mockResolvedValueOnce({ error: new Error('Upload interrupted') });
+    await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
+      'Upload interrupted',
+    );
+    expect(cloud.tables.get('schedule_items')!.get(schedule.id)!.first_due_date).toBe('2027-04-13');
+    expect((await pendingTransfer(project))?.snapshot).toEqual(snapshot);
+
+    vi.resetModules();
+    const reloaded = await import('./signup-transfer');
+    vi.setSystemTime(new Date('2026-10-20T19:00:00Z'));
+    await expect(reloaded.transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
+      'Upload interrupted',
+    );
+    expect(cloud.tables.get('schedule_items')!.get(schedule.id)!.first_due_date).toBe('2027-04-13');
+    expect((await reloaded.pendingTransfer(project))?.snapshot).toEqual(snapshot);
+    expect((await reloaded.pendingTransfer(project))?.baselineDate).toBe('2026-10-13');
+
+    vi.setSystemTime(new Date('2026-10-28T19:00:00Z'));
+    await reloaded.transferSignupData(cloud.client, project, account().id);
+    expect(cloud.tables.get('schedule_items')!.get(schedule.id)!.first_due_date).toBe('2027-04-13');
+    expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+    expect(await pendingTransfer(project)).toBeUndefined();
+  });
+
   it.each([false, true])(
     'resumes interval-only schedules from a frozen legacy upload (interrupted: %s)',
     async (interrupted) => {
