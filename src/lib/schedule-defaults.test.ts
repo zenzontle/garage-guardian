@@ -97,12 +97,20 @@ describe('cloud initialization safeguards', () => {
     const row = {
       id: schedule.id,
       user_id: account().id,
+      car_id: car.id,
+      name: schedule.name,
+      source_note: schedule.sourceNote,
+      created_at: schedule.createdAt,
       interval_miles: schedule.intervalMiles,
       interval_months: schedule.intervalMonths,
       is_active: true,
       first_due_miles: null as number | null,
       first_due_date: null as string | null,
     };
+    cloud.tables.set(
+      'cars',
+      new Map([[car.id, { ...car, user_id: account().id, odometer: 69000 }]]),
+    );
     cloud.tables.set('schedule_items', new Map([[row.id, row]]));
     return { cloud, row, db: cloud.client as unknown as SupabaseClient };
   }
@@ -114,10 +122,10 @@ describe('cloud initialization safeguards', () => {
     { is_active: false },
   ])('does not overwrite a concurrent edit %j', async (edit) => {
     const { cloud, row, db } = setup();
-    const execute = cloud.execute.getMockImplementation()!;
-    cloud.execute.mockImplementationOnce(async (...args) => {
+    const rpc = cloud.rpc.getMockImplementation()!;
+    cloud.rpc.mockImplementationOnce(async (...args) => {
       Object.assign(row, edit);
-      return execute(...args);
+      return rpc(...args);
     });
     const initialized = await initializeCloudSchedules(db, account().id, snapshot, '2026-10-13');
     expect(row).toMatchObject(edit);
@@ -125,7 +133,72 @@ describe('cloud initialization safeguards', () => {
       expect(row.first_due_miles).toBeNull();
       expect(row.first_due_date).toBeNull();
     }
-    expect(initialized.schedules[0]).toBe(intervalOnly);
+    expect(initialized.schedules[0]).toEqual({
+      ...intervalOnly,
+      firstDueMiles: row.first_due_miles,
+      firstDueDate: row.first_due_date,
+      intervalMiles: row.interval_miles,
+      isActive: row.is_active,
+    });
+  });
+
+  it.each(['car', 'visit'] as const)(
+    'uses a concurrent %s reading instead of the stale snapshot',
+    async (source) => {
+      const { cloud, row, db } = setup();
+      const rpc = cloud.rpc.getMockImplementation()!;
+      cloud.rpc.mockImplementationOnce(async (...args) => {
+        if (source === 'car') cloud.tables.get('cars')!.get(car.id)!.odometer = 71000;
+        else
+          cloud.tables.set(
+            'visits',
+            new Map([
+              [
+                visit.id,
+                {
+                  id: visit.id,
+                  user_id: account().id,
+                  car_id: car.id,
+                  odometer: 71000,
+                },
+              ],
+            ]),
+          );
+        return rpc(...args);
+      });
+      const initialized = await initializeCloudSchedules(db, account().id, snapshot, '2026-10-13');
+      expect(row.first_due_miles).toBe(75000);
+      expect(initialized.schedules[0].firstDueMiles).toBe(75000);
+      expect(snapshot.cars[0].odometer).toBe(69000);
+    },
+  );
+
+  it('removes a concurrently deleted schedule instead of returning the old record', async () => {
+    const { cloud, db } = setup();
+    const rpc = cloud.rpc.getMockImplementation()!;
+    cloud.rpc.mockImplementationOnce(async (...args) => {
+      cloud.tables.get('schedule_items')!.delete(schedule.id);
+      return rpc(...args);
+    });
+    const initialized = await initializeCloudSchedules(db, account().id, snapshot, '2026-10-13');
+    expect(initialized.schedules).toEqual([]);
+    expect(snapshot.schedules).toEqual([intervalOnly]);
+  });
+
+  it('returns current metadata after another tab edits a task while its defaults are initialized', async () => {
+    const { cloud, row, db } = setup();
+    const rpc = cloud.rpc.getMockImplementation()!;
+    cloud.rpc.mockImplementationOnce(async (...args) => {
+      row.name = 'Updated task';
+      row.source_note = 'Updated manual';
+      return rpc(...args);
+    });
+    const initialized = await initializeCloudSchedules(db, account().id, snapshot, '2026-10-13');
+    expect(initialized.schedules[0]).toMatchObject({
+      name: 'Updated task',
+      sourceNote: 'Updated manual',
+      firstDueMiles: 70000,
+    });
   });
 
   it('cannot initialize another owner’s task', async () => {
@@ -138,7 +211,7 @@ describe('cloud initialization safeguards', () => {
 
   it('reports a failed write instead of returning an unpersisted due point', async () => {
     const { cloud, row, db } = setup();
-    cloud.execute.mockResolvedValueOnce({ data: null, error: new Error('Initialization failed') });
+    cloud.rpc.mockResolvedValueOnce({ data: [], error: new Error('Initialization failed') });
     await expect(
       initializeCloudSchedules(db, account().id, snapshot, '2026-10-13'),
     ).rejects.toThrow('Initialization failed');

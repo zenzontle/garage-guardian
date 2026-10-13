@@ -74,10 +74,14 @@ describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
     await repository.saveSchedule(schedule);
     expect((await repository.load()).schedules).toEqual([schedule]);
     if (mode === 'cloud') {
-      const update = cloud.execute.mock.calls.find(([, operation]) => operation === 'update');
-      expect(update?.[2]).toContainEqual(['user_id', account().id]);
-      expect(update?.[2]).toContainEqual(['first_due_miles', null]);
-      expect(update?.[2]).toContainEqual(['first_due_date', null]);
+      expect(cloud.rpc).toHaveBeenCalledWith('initialize_schedule_defaults', {
+        p_user_id: account().id,
+        p_schedule_id: schedule.id,
+        p_car_id: car.id,
+        p_interval_miles: schedule.intervalMiles,
+        p_interval_months: schedule.intervalMonths,
+        p_today: '2026-10-13',
+      });
     }
   });
 

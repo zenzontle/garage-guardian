@@ -1,8 +1,11 @@
 import { vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { InitializeScheduleDefaultsArgs } from '@/lib/schedule-defaults';
+import { scheduleDefaultsRpc } from '@/test/schedule-defaults-rpc';
 
 type Row = Record<string, unknown>;
 type Result = { data: unknown; error: { code: string } | null; count?: number };
+type RpcArgs = { p_user_id: string } | InitializeScheduleDefaultsArgs;
 export function reminderStore() {
   const tables: Record<string, Row[]> = {
     notification_preferences: [],
@@ -152,7 +155,9 @@ export function reminderStore() {
     error: null,
   }));
   const getUser = vi.fn(async () => ({ data: { user: { id: 'owner' } }, error: null }));
-  const rpc = vi.fn(async (_name: string, args: { p_user_id: string }) => {
+  const rpc = vi.fn(async (name: string, args: RpcArgs) => {
+    if (name === 'initialize_schedule_defaults' && 'p_schedule_id' in args)
+      return { data: scheduleDefaultsRpc(tables, args), error: null };
     if (failClaims) return { data: null, error: { code: 'db_down' } };
     const pref = tables.notification_preferences.find((row) => row.user_id === args.p_user_id);
     if (!pref?.enabled || String(pref.next_scheduled_at) > new Date().toISOString())

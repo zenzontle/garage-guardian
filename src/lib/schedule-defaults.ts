@@ -44,28 +44,46 @@ export async function initializeCloudSchedules(
   today: string,
 ): Promise<Snapshot> {
   const initialized = initializeSnapshotSchedules(snapshot, today);
+  if (initialized === snapshot) return snapshot;
+  const schedules: ScheduleItem[] = [];
   for (const [index, item] of initialized.schedules.entries()) {
-    if (item === snapshot.schedules[index]) continue;
-    // Only fill still-empty due points; never overwrite another tab's interval or due-point edit.
-    let query = db
-      .from('schedule_items')
-      .update({ first_due_miles: item.firstDueMiles, first_due_date: item.firstDueDate })
-      .eq('user_id', userId)
-      .eq('id', item.id)
-      .eq('is_active', true)
-      .is('first_due_miles', null)
-      .is('first_due_date', null);
-    query =
-      item.intervalMiles === null
-        ? query.is('interval_miles', null)
-        : query.eq('interval_miles', item.intervalMiles);
-    query =
-      item.intervalMonths === null
-        ? query.is('interval_months', null)
-        : query.eq('interval_months', item.intervalMonths);
-    const { data, error } = await query.select('first_due_miles, first_due_date');
+    if (item === snapshot.schedules[index]) {
+      schedules.push(item);
+      continue;
+    }
+    // The transaction locks the baseline inputs and returns the current row even if a guard fails.
+    const { data, error } = await db.rpc('initialize_schedule_defaults', {
+      p_user_id: userId,
+      p_schedule_id: item.id,
+      p_car_id: item.carId,
+      p_interval_miles: item.intervalMiles,
+      p_interval_months: item.intervalMonths,
+      p_today: today,
+    } satisfies InitializeScheduleDefaultsArgs);
     if (error) throw error;
-    if (!data?.length) initialized.schedules[index] = snapshot.schedules[index];
+    const row = data?.[0];
+    if (row)
+      schedules.push({
+        id: row.id,
+        carId: row.car_id,
+        name: row.name,
+        intervalMiles: row.interval_miles,
+        intervalMonths: row.interval_months,
+        firstDueMiles: row.first_due_miles,
+        firstDueDate: row.first_due_date,
+        sourceNote: row.source_note,
+        isActive: row.is_active,
+        createdAt: row.created_at,
+      });
   }
-  return initialized;
+  return { ...snapshot, schedules };
 }
+
+export type InitializeScheduleDefaultsArgs = {
+  p_user_id: string;
+  p_schedule_id: string;
+  p_car_id: string;
+  p_interval_miles: number | null;
+  p_interval_months: number | null;
+  p_today: string;
+};

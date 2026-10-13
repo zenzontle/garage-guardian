@@ -49,6 +49,6 @@ it('initializes interval-only reminder targets once and keeps them fixed as mile
   const due = await loadReminderItems(store.db, 'owner', '2026-10-14');
   expect(due[0]).toMatchObject({ status: 'due', dueMiles: 70000, dueDate: '2027-04-13' });
   expect(
-    store.calls.filter((call) => call.table === 'schedule_items' && call.operation === 'update'),
+    store.rpc.mock.calls.filter(([name]) => name === 'initialize_schedule_defaults'),
   ).toHaveLength(1);
 });

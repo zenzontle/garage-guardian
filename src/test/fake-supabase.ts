@@ -1,5 +1,7 @@
 import { vi } from 'vitest';
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
+import type { InitializeScheduleDefaultsArgs } from '@/lib/schedule-defaults';
+import { scheduleDefaultsRpc } from './schedule-defaults-rpc';
 
 type Row = Record<string, unknown> & { id: string; user_id?: string };
 type Result = { data: unknown; error: Error | null };
@@ -188,8 +190,20 @@ export function fakeSupabase() {
     _updateUser: (attributes: { password: string }) => auth.updateUser(attributes),
   });
   const storage = { from: vi.fn(() => bucket) };
+  const rpc = vi.fn(async (name: string, args: InitializeScheduleDefaultsArgs) => {
+    if (!user || args.p_user_id !== user.id) return { data: [], error: null };
+    if (name !== 'initialize_schedule_defaults') throw new Error(`Unexpected RPC: ${name}`);
+    return {
+      data: scheduleDefaultsRpc(
+        Object.fromEntries([...tables].map(([name, rows]) => [name, [...rows.values()]])),
+        args,
+      ),
+      error: null as Error | null,
+    };
+  });
   return {
-    client: { from, storage, auth: { ...auth } } as unknown as SupabaseClient,
+    client: { from, rpc, storage, auth: { ...auth } } as unknown as SupabaseClient,
+    rpc,
     auth,
     from,
     bucket,
