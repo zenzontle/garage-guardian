@@ -6,6 +6,8 @@ Choose **Miles** (default) or **Kilometers** when adding a car. The distance uni
 
 Each car can have an optional **License plate**, shown in its detail header when present. Add, edit, or clear it alongside VIN. Plates are free text up to **20 characters** after trimming leading and trailing whitespace; case, internal spaces, and punctuation are preserved. Blank input means no plate. No country-specific format, uniqueness rule, registration jurisdiction, or plate lookup is used. Older records load with no plate, and signup transfers preserve saved plates, including interrupted transfers resumed after a reload.
 
+Repeat intervals alone are enough. With no first due point, a distance interval uses the next multiple of that interval at or above the latest recorded odometer (for example, 69,000 miles with a 5,000-mile interval is first due at 70,000 miles; a zero odometer starts at 5,000). A time interval starts when the task is saved. These automatic first due points are persisted, so reloads, edits to the car's odometer, and the passage of time cannot push them forward. Existing active interval-only tasks are initialized once when loaded by the app or email reminder worker; no database migration is needed. An explicit first due point is preserved, and linked service visits advance repeats from their recorded date/odometer. A service visit without an odometer does not advance a distance target. Tasks with neither intervals nor a due point still appear in dashboard setup guidance, with links to their vehicle schedules.
+
 ## Navigation
 
 Dashboard lives at `/`, Vehicles at `/cars`, individual vehicles at `/cars/[carId]`,

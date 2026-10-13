@@ -161,7 +161,7 @@
     "attention": "What needs attention",
     "caughtUp": "All caught up",
     "noDue": "No scheduled work is due soon.",
-    "setupNote": "Some tasks need intervals from your owner’s manual.",
+    "setupNote": "{count, plural, one {# task needs a repeat interval or a one-time due point.} other {# tasks need a repeat interval or a one-time due point.}}",
     "yourVehicles": "YOUR VEHICLES",
     "inGarage": "In the garage",
     "addAnother": "Add another car",
@@ -228,7 +228,7 @@
     "repeatMonths": "Repeat every months",
     "intervalExample": "e.g. 5,000",
     "monthsExample": "e.g. 6",
-    "hint": "If both date and odometer are set, the first one reached makes the task due. Leave repeat fields blank for a one-time task.",
+    "hint": "Repeat intervals alone are enough: distance starts at the next odometer milestone, and time starts when saved. First due fields are optional overrides. The first date or odometer reached makes the task due. Leave repeat fields blank for a one-time task.",
     "source": "Manual or source note",
     "sourceExample": "e.g. Owner’s manual, page 214",
     "active": "Keep this task active",
@@ -307,7 +307,7 @@
     "emptyHint": "Log a service visit to see your spending here."
   },
   "due": {
-    "setup": "Add a due date or odometer reading",
+    "setup": "Add a repeat interval or a one-time due point",
     "completed": "One-time task completed",
     "date": "by {date}",
     "distance": "at {distance}",

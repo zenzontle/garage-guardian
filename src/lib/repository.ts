@@ -5,6 +5,12 @@ import { AppError } from './app-error';
 import { accountAuthStorageKey, serializeAccountSignIns } from './account-session';
 import { bootstrapRecovery } from './account-recovery';
 import { recordDiagnostic } from './bug-reports/diagnostics';
+import {
+  initializeCloudSchedules,
+  initializeSchedule,
+  initializeSnapshotSchedules,
+} from './schedule-defaults';
+import { todayISO } from './today-iso';
 import { createClient, navigatorLock, type SupabaseClient } from '@supabase/supabase-js';
 import {
   EMPTY_SNAPSHOT,
@@ -36,7 +42,17 @@ const clone = <T>(value: T): T => structuredClone(value);
 
 export class LocalRepository implements Repository {
   async load(): Promise<Snapshot> {
-    return normalizeSnapshot(clone((await get<Snapshot>(SNAPSHOT_KEY)) ?? EMPTY_SNAPSHOT));
+    const snapshot = normalizeSnapshot(
+      clone((await get<Snapshot>(SNAPSHOT_KEY)) ?? EMPTY_SNAPSHOT),
+    );
+    const today = todayISO();
+    if (initializeSnapshotSchedules(snapshot, today) === snapshot) return snapshot;
+    let initialized = snapshot;
+    await mutateLocalSnapshot((current) => {
+      current.schedules = initializeSnapshotSchedules(current, today).schedules;
+      initialized = clone(current);
+    });
+    return initialized;
   }
   private async write(update: (snapshot: Snapshot) => void) {
     await mutateLocalSnapshot(update);
@@ -60,7 +76,11 @@ export class LocalRepository implements Repository {
   }
   saveSchedule(item: ScheduleItem) {
     return this.write((snapshot) => {
-      snapshot.schedules = upsert(snapshot.schedules, item);
+      const car = snapshot.cars.find((car) => car.id === item.carId);
+      snapshot.schedules = upsert(
+        snapshot.schedules,
+        car ? initializeSchedule(item, car, snapshot.visits, todayISO()) : item,
+      );
     });
   }
   deleteSchedule(id: string) {
@@ -223,7 +243,7 @@ export class SupabaseRepository implements Repository {
         .order('service_date', { ascending: false }),
     ]);
     for (const result of [cars, schedules, visits]) if (result.error) throw result.error;
-    return {
+    const snapshot: Snapshot = {
       cars: (cars.data ?? []).map((row) =>
         normalizeCar({
           id: row.id,
@@ -265,6 +285,7 @@ export class SupabaseRepository implements Repository {
         createdAt: row.created_at,
       })),
     };
+    return initializeCloudSchedules(this.client, this.userId, snapshot, todayISO());
   }
 
   async saveCar(car: Car) {
@@ -291,6 +312,15 @@ export class SupabaseRepository implements Repository {
     if (paths.length) await this.client.storage.from('visit-photos').remove(paths);
   }
   async saveSchedule(item: ScheduleItem) {
+    if (
+      item.firstDueDate === null &&
+      item.firstDueMiles === null &&
+      (item.intervalMiles !== null || item.intervalMonths !== null)
+    ) {
+      const snapshot = await this.load();
+      const car = snapshot.cars.find((car) => car.id === item.carId);
+      if (car) item = initializeSchedule(item, car, snapshot.visits, todayISO());
+    }
     const { error } = await this.client
       .from('schedule_items')
       .upsert(scheduleToRow(item, this.userId));

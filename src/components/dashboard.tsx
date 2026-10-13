@@ -38,6 +38,7 @@ export function Dashboard({
   const { number, money, displayDate, formatDistance } = useDisplay();
   const due = allDue.filter((item) => item.status === 'due');
   const upcoming = allDue.filter((item) => item.status === 'upcoming');
+  const setup = allDue.filter((item) => item.status === 'setup');
   const spendThisYear = visits
     .filter((visit) => visit.date.startsWith(String(new Date().getFullYear())))
     .reduce((sum, visit) => sum + visit.totalCostCents, 0);
@@ -119,11 +120,18 @@ export function Dashboard({
                   </div>
                 </div>
               )}
-              {allDue.some((item) => item.status === 'setup') && (
-                <div className="setup-note">
-                  <Settings2 size={16} />
-                  {t('dashboard.setupNote')}
-                </div>
+              {setup.length > 0 && (
+                <>
+                  <div className="setup-note">
+                    <Settings2 size={16} />
+                    <span>{t('dashboard.setupNote', { count: setup.length })}</span>
+                  </div>
+                  <div className="due-list">
+                    {setup.map((item) => (
+                      <DueRow key={item.schedule.id} item={item} href={carPath(item.car.id)} />
+                    ))}
+                  </div>
+                </>
               )}
             </section>
             <section className="panel">

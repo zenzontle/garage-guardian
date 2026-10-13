@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clear, get, set } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../test/fake-supabase';
 import { car, schedule, visit } from '../test/fixtures';
 import type { Car } from './model';
+import { getAllDue } from './due';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 
@@ -11,6 +12,7 @@ beforeEach(async () => {
   await clear();
   vi.resetModules();
 });
+afterEach(() => vi.useRealTimers());
 
 describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
   async function setup() {
@@ -25,6 +27,59 @@ describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
           : new SupabaseRepository(cloud.client, account().id),
     };
   }
+
+  it('persists interval-only milestones and dates across reloads and odometer updates', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+    const { repository } = await setup();
+    await repository.saveCar({ ...car, odometer: 69000 });
+    await repository.saveSchedule({ ...schedule, firstDueMiles: null, firstDueDate: null });
+    const initial = await repository.load();
+    expect(initial.schedules[0]).toMatchObject({
+      firstDueMiles: 70000,
+      firstDueDate: '2027-04-13',
+    });
+    vi.setSystemTime(new Date('2026-10-20T19:00:00Z'));
+    await repository.saveCar({ ...car, odometer: 71000 });
+    const reloaded = await repository.load();
+    expect(reloaded.schedules).toEqual(initial.schedules);
+    expect(
+      getAllDue(reloaded.cars, reloaded.schedules, reloaded.visits, '2026-10-20')[0].status,
+    ).toBe('due');
+  });
+
+  it('initializes existing interval-only records once without changing explicit due points', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+    const { repository, cloud } = await setup();
+    await repository.saveCar({ ...car, odometer: 69000 });
+    await repository.saveSchedule(schedule);
+    const legacy = { ...schedule, firstDueMiles: null, firstDueDate: null };
+    if (mode === 'local') {
+      await set('garage-guardian:local:v1', {
+        cars: [{ ...car, odometer: 69000 }],
+        schedules: [legacy],
+        visits: [],
+      });
+    } else {
+      Object.assign(cloud.tables.get('schedule_items')!.get(schedule.id)!, {
+        first_due_miles: null,
+        first_due_date: null,
+      });
+    }
+    const first = await repository.load();
+    expect(first.schedules[0]).toMatchObject({ firstDueMiles: 70000, firstDueDate: '2027-04-13' });
+    vi.setSystemTime(new Date('2026-11-13T19:00:00Z'));
+    expect((await repository.load()).schedules).toEqual(first.schedules);
+    await repository.saveSchedule(schedule);
+    expect((await repository.load()).schedules).toEqual([schedule]);
+    if (mode === 'cloud') {
+      const update = cloud.execute.mock.calls.find(([, operation]) => operation === 'update');
+      expect(update?.[2]).toContainEqual(['user_id', account().id]);
+      expect(update?.[2]).toContainEqual(['first_due_miles', null]);
+      expect(update?.[2]).toContainEqual(['first_due_date', null]);
+    }
+  });
 
   it.each([undefined, null, '', 'AbC  - 123'])(
     'loads legacy or saved plate %s without losing other records',

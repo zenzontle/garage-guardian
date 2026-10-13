@@ -116,8 +116,18 @@ describe('due calculations', () => {
 
   it('does not invent due information for an unconfigured starter', () => {
     expect(
-      getDueItem({ ...schedule, firstDueDate: null, firstDueMiles: null }, car, [], '2026-09-25')
-        .status,
+      getDueItem(
+        {
+          ...schedule,
+          firstDueDate: null,
+          firstDueMiles: null,
+          intervalMonths: null,
+          intervalMiles: null,
+        },
+        car,
+        [],
+        '2026-09-25',
+      ).status,
     ).toBe('setup');
   });
 
@@ -126,14 +136,14 @@ describe('due calculations', () => {
   });
 });
 
-it('preserves date reminders without inventing a mileage baseline for unknown readings', () => {
+it('preserves the distance target without inventing a service reading for unknown readings', () => {
   const unknown = { ...visit, odometer: null };
   expect(latestOdometer(car, [unknown])).toBe(car.odometer);
   const result = getDueItem(schedule, car, [unknown], '2026-10-09');
-  expect(result.dueMiles).toBeNull();
+  expect(result.dueMiles).toBe(schedule.firstDueMiles);
   expect(result.dueDate).toBe(addMonths(visit.date, 6));
-  expect(result.status).toBe('later');
+  expect(result.status).toBe('upcoming');
   expect(
     getDueItem({ ...schedule, intervalMonths: null }, car, [unknown], '2026-10-09').status,
-  ).toBe('setup');
+  ).toBe('upcoming');
 });

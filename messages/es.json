@@ -161,7 +161,7 @@
     "attention": "Lo que requiere atención",
     "caughtUp": "Todo al día",
     "noDue": "No hay tareas programadas próximas a vencer.",
-    "setupNote": "Algunas tareas necesitan los intervalos del manual del propietario.",
+    "setupNote": "{count, plural, one {# tarea necesita un intervalo de repetición o un vencimiento único.} other {# tareas necesitan un intervalo de repetición o un vencimiento único.}}",
     "yourVehicles": "TUS VEHÍCULOS",
     "inGarage": "En el garaje",
     "addAnother": "Añadir otro auto",
@@ -228,7 +228,7 @@
     "repeatMonths": "Repetir cada (meses)",
     "intervalExample": "p. ej., 5000",
     "monthsExample": "p. ej., 6",
-    "hint": "Si se indican una fecha y un odómetro, la tarea vence cuando se alcance el primero. Deja los campos de repetición vacíos para una tarea única.",
+    "hint": "Basta con los intervalos de repetición: la distancia comienza en el próximo múltiplo del intervalo en el odómetro y el tiempo al guardar. Los campos del primer vencimiento son opcionales y permiten cambiar estos valores. La tarea vence al alcanzar primero la fecha o el odómetro. Deja la repetición vacía para una tarea única.",
     "source": "Manual o nota de la fuente",
     "sourceExample": "p. ej., Manual del propietario, página 214",
     "active": "Mantener esta tarea activa",
@@ -307,7 +307,7 @@
     "emptyHint": "Registra una visita de servicio para ver tus gastos aquí."
   },
   "due": {
-    "setup": "Añade una fecha de vencimiento o una lectura del odómetro",
+    "setup": "Añade un intervalo de repetición o un vencimiento único",
     "completed": "Tarea única completada",
     "date": "para el {date}",
     "distance": "a los {distance}",

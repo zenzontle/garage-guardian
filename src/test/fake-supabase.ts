@@ -62,6 +62,9 @@ export function fakeSupabase() {
         (entry) =>
           entry.user_id === user?.id && filters.every(([key, value]) => entry[key] === value),
       );
+      if (operation === 'update') {
+        for (const entry of matches) Object.assign(entry, structuredClone(row));
+      }
       if (operation === 'delete') {
         for (const entry of matches) {
           table.delete(entry.id);
@@ -86,6 +89,10 @@ export function fakeSupabase() {
         filters.push([key, value]);
         return builder;
       }),
+      is: vi.fn((key: string, value: unknown) => {
+        filters.push([key, value]);
+        return builder;
+      }),
       order: vi.fn(() => builder),
       range: vi.fn((start: number, end: number) => {
         range = [start, end];
@@ -94,6 +101,11 @@ export function fakeSupabase() {
       upsert: vi.fn((value: Row) => {
         operation = 'upsert';
         row = value;
+        return builder;
+      }),
+      update: vi.fn((value: Partial<Row>) => {
+        operation = 'update';
+        row = value as Row;
         return builder;
       }),
       delete: vi.fn(() => {

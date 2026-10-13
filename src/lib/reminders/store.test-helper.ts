@@ -33,6 +33,10 @@ export function reminderStore() {
         filters.push(['eq', key, value]);
         return builder;
       },
+      is: (key: string, value: unknown) => {
+        filters.push(['eq', key, value]);
+        return builder;
+      },
       lt: (key: string, value: unknown) => {
         filters.push(['lt', key, value]);
         return builder;
