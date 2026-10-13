@@ -62,6 +62,8 @@ export const contextSchema = z.strictObject({
     'history',
     'reports',
     'notifications',
+    'account',
+    'security',
     'loading',
     'recovery',
   ]),

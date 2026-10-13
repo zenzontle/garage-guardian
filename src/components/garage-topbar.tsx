@@ -48,7 +48,15 @@ export function GarageTopbar({
         <span className="breadcrumbs-home">{t('app.yourGarage')}</span>
         <span className="breadcrumbs-divider">/</span>{' '}
         <strong>
-          {t(page === 'notifications' ? 'notifications.pageTitle' : `navigation.${page}`)}
+          {t(
+            page === 'notifications'
+              ? 'notifications.pageTitle'
+              : page === 'account'
+                ? 'account.settings'
+                : page === 'security'
+                  ? 'account.security'
+                  : `navigation.${page}`,
+          )}
         </strong>
       </span>
       <div className="topbar-right">

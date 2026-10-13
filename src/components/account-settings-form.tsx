@@ -14,7 +14,7 @@ export function AccountSettingsForm({
 }: {
   kind: 'email' | 'password';
   disabled: boolean;
-  headingLevel?: 3 | 4;
+  headingLevel?: 2 | 3 | 4;
 }) {
   const t = useTranslations();
   const garage = useGarage();
@@ -26,7 +26,7 @@ export function AccountSettingsForm({
   const [error, setError] = useState<AppFailure | null>(null);
   const [pendingEmail, setPendingEmail] = useState('');
   const title = kind === 'email' ? 'changeEmail' : 'changePassword';
-  const Heading = headingLevel === 4 ? 'h4' : 'h3';
+  const Heading = headingLevel === 2 ? 'h2' : headingLevel === 4 ? 'h4' : 'h3';
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);

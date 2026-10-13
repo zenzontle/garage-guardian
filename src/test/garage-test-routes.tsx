@@ -5,7 +5,8 @@ export type Screens = typeof import('@/components/dashboard-screen') &
   typeof import('@/components/reports-screen') &
   typeof import('@/components/account-screen') &
   typeof import('@/components/account-recovery-screen') &
-  typeof import('@/components/notification-settings-screen');
+  typeof import('@/components/notification-settings-screen') &
+  typeof import('@/components/account-settings-screen');
 
 export function TestRoutes({ screens, url }: { screens: Screens; url: string }) {
   const pathname = new URL(url, 'http://localhost').pathname;
@@ -16,6 +17,9 @@ export function TestRoutes({ screens, url }: { screens: Screens; url: string }) 
   if (pathname === '/history') return <screens.HistoryScreen />;
   if (pathname === '/reports') return <screens.ReportsScreen />;
   if (pathname === '/settings/notifications') return <screens.NotificationSettingsScreen />;
+  if (pathname === '/settings/account') return <screens.AccountSettingsScreen section="account" />;
+  if (pathname === '/settings/security')
+    return <screens.AccountSettingsScreen section="security" />;
   if (pathname === '/auth/recovery') return <screens.AccountRecoveryScreen />;
   if (pathname === '/signin' || pathname === '/signup')
     return (

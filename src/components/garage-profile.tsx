@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Bell, LogOut, Shield, UserRound } from 'lucide-react';
-import { accountPath } from '@/lib/garage-routes';
 import { isCloudConfigured } from '@/lib/repository';
 import { useGarage } from './garage-provider';
 import { Modal } from './modal';
@@ -21,11 +20,6 @@ export function GarageProfile() {
   function close() {
     setOpen(false);
     trigger.current?.focus();
-  }
-
-  function openSettings(section?: 'security') {
-    close();
-    garage.setModal({ kind: 'account', section });
   }
 
   return (
@@ -50,22 +44,8 @@ export function GarageProfile() {
           onClose={close}
         >
           <nav className="modal-body profile-options" aria-label={t('account.settings')}>
-            {garage.user ? (
-              <button
-                type="button"
-                className="profile-option"
-                disabled={garage.accountBusy}
-                onClick={() => openSettings()}
-              >
-                <UserRound size={19} aria-hidden="true" />
-                {t('account.settings')}
-              </button>
-            ) : isCloudConfigured ? (
-              <Link
-                className="profile-option"
-                href={accountPath('signin', pathname)}
-                onClick={close}
-              >
+            {isCloudConfigured ? (
+              <Link className="profile-option" href="/settings/account" onClick={close}>
                 <UserRound size={19} aria-hidden="true" />
                 {t('account.settings')}
               </Link>
@@ -79,22 +59,8 @@ export function GarageProfile() {
               <Bell size={19} aria-hidden="true" />
               {t('account.notifications')}
             </Link>
-            {garage.user ? (
-              <button
-                type="button"
-                className="profile-option"
-                disabled={garage.accountBusy}
-                onClick={() => openSettings('security')}
-              >
-                <Shield size={19} aria-hidden="true" />
-                {t('account.security')}
-              </button>
-            ) : isCloudConfigured ? (
-              <Link
-                className="profile-option"
-                href={accountPath('signin', pathname)}
-                onClick={close}
-              >
+            {isCloudConfigured ? (
+              <Link className="profile-option" href="/settings/security" onClick={close}>
                 <Shield size={19} aria-hidden="true" />
                 {t('account.security')}
               </Link>
