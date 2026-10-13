@@ -39,7 +39,9 @@
     "recoveryInvalid": "Este enlace de recuperación caducó, no es válido o ya se usó. Solicita otro correo.",
     "resendCooldown": "Espera 60 segundos antes de solicitar otro correo de confirmación.",
     "sessionRevocation": "Tu contraseña se actualizó, pero no se pudieron revocar las sesiones. Reintenta para terminar o inicia sesión con la nueva contraseña.",
-    "accountSessionCleanup": "Es posible que la solicitud se haya completado, pero no se pudo cerrar la sesión temporal de verificación. Comprueba tu cuenta antes de reintentar."
+    "accountSessionCleanup": "Es posible que la solicitud se haya completado, pero no se pudo cerrar la sesión temporal de verificación. Comprueba tu cuenta antes de reintentar.",
+    "notificationInput": "Revisa tus preferencias de recordatorios e inténtalo de nuevo.",
+    "notificationSave": "No se pudieron cargar o guardar las preferencias de recordatorios. Inténtalo de nuevo."
   },
   "shared": {
     "language": "Idioma",
@@ -391,5 +393,28 @@
   "units": {
     "miles": "millas",
     "kilometers": "kilómetros"
+  },
+  "notifications": {
+    "title": "Recordatorios por correo",
+    "pageTitle": "Configuración de notificaciones",
+    "description": "Recibe un resumen semanal del mantenimiento próximo y vencido de tus vehículos en el correo confirmado de tu cuenta.",
+    "enabled": "Activar recordatorios semanales por correo",
+    "weekday": "Día de la semana (UTC)",
+    "language": "Idioma del correo",
+    "schedule": "Programado alrededor de las 16:00 UTC del día elegido. La entrega puede demorarse. Solo se envían correos cuando hay mantenimiento próximo o vencido.",
+    "loading": "Cargando preferencias de recordatorios…",
+    "saving": "Guardando…",
+    "save": "Guardar preferencias de recordatorios",
+    "saved": "Preferencias de recordatorios guardadas.",
+    "signIn": "Inicia sesión para administrar los recordatorios por correo de tu cuenta. Los garajes solo locales no envían correos.",
+    "days": {
+      "0": "Domingo",
+      "1": "Lunes",
+      "2": "Martes",
+      "3": "Miércoles",
+      "4": "Jueves",
+      "5": "Viernes",
+      "6": "Sábado"
+    }
   }
 }

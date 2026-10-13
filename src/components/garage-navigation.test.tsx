@@ -38,6 +38,36 @@ function configureCloud() {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'test-key');
 }
 
+it('returns from email notification settings through sign-in and loads the account form', async () => {
+  configureCloud();
+  testRouter.reset('/settings/notifications');
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response(JSON.stringify({ preferences: null }))),
+  );
+  const App = await loadGarageTestApp();
+  render(<App />);
+  const user = userEvent.setup();
+  await screen.findByRole('heading', { name: 'Notification settings' });
+  const links = screen.getAllByRole('link', { name: 'Sign in' });
+  await user.click(links[links.length - 1]);
+  expect(testRouter.url).toBe('/signin?returnTo=%2Fsettings%2Fnotifications');
+  await user.type(await screen.findByLabelText('Email'), 'owner@example.com');
+  await user.type(screen.getByLabelText('Password'), 'password');
+  await user.click(screen.getByRole('button', { name: 'Sign in' }));
+  await screen.findByRole('checkbox', { name: 'Enable weekly email reminders' });
+  expect(testRouter.url).toBe('/settings/notifications');
+});
+
+it('does not offer an email opt-in for a local-only garage', async () => {
+  testRouter.reset('/settings/notifications');
+  const App = await loadGarageTestApp();
+  render(<App />);
+  await screen.findByRole('heading', { name: 'Notification settings' });
+  expect(screen.queryByRole('checkbox')).toBeNull();
+  expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
+});
+
 it('moves vehicle-link focus without navigating until Enter and retains native Tab stops', async () => {
   await seed();
   testRouter.reset(carPath(car.id));

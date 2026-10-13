@@ -1747,6 +1747,19 @@ a.button {
 .account-section p {
   overflow-wrap: anywhere;
 }
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.notification-settings {
+  max-width: 42rem;
+}
+.checkbox-row input[type='checkbox'] {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+}
 
 input[type='number'] {
   appearance: textfield;

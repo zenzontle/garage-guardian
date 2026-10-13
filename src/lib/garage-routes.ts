@@ -27,6 +27,7 @@ export function accountMode(pathname: string): AccountMode | null {
 
 export function validatedReturnTo(value: string | null): string {
   if (!value || /[?#\\\s]/.test(value)) return '/';
+  if (value === '/settings/notifications') return value;
   if (Object.values(workspacePaths).some((path) => path === value)) return value;
   const match = /^\/cars\/([^/]+)$/.exec(value);
   if (!match) return '/';

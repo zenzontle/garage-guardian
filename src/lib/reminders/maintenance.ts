@@ -1,0 +1,70 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { getAllDue } from '@/lib/due';
+import { normalizeCar, type ScheduleItem, type Visit } from '@/lib/model';
+
+// Page every owner-scoped table: a user's history may exceed PostgREST's row limit.
+async function rows(db: SupabaseClient, table: string, userId: string) {
+  const collected = [];
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await db
+      .from(table)
+      .select('*')
+      .eq('user_id', userId)
+      .order('id')
+      .range(offset, offset + 499);
+    if (error) throw new Error('maintenance_load');
+    collected.push(...(data ?? []));
+    if (!data || data.length < 500) return collected;
+  }
+}
+
+export async function loadReminderItems(db: SupabaseClient, userId: string, today: string) {
+  const [cars, schedules, visits] = await Promise.all([
+    rows(db, 'cars', userId),
+    rows(db, 'schedule_items', userId),
+    rows(db, 'visits', userId),
+  ]);
+  return getAllDue(
+    cars.map((row) =>
+      normalizeCar({
+        id: row.id,
+        name: row.name,
+        year: row.year,
+        make: row.make,
+        model: row.model,
+        vin: row.vin,
+        plate: row.plate,
+        distanceUnit: row.distance_unit,
+        odometer: row.odometer,
+        reminderDays: row.reminder_days,
+        reminderMiles: row.reminder_miles,
+        createdAt: row.created_at,
+      }),
+    ),
+    schedules.map((row): ScheduleItem => ({
+      id: row.id,
+      carId: row.car_id,
+      name: row.name,
+      intervalMiles: row.interval_miles,
+      intervalMonths: row.interval_months,
+      firstDueMiles: row.first_due_miles,
+      firstDueDate: row.first_due_date,
+      sourceNote: row.source_note,
+      isActive: row.is_active,
+      createdAt: row.created_at,
+    })),
+    visits.map((row): Visit => ({
+      id: row.id,
+      carId: row.car_id,
+      date: row.service_date,
+      odometer: row.odometer,
+      totalCostCents: row.total_cost_cents,
+      provider: row.provider,
+      notes: row.notes,
+      items: row.items ?? [],
+      photos: [],
+      createdAt: row.created_at,
+    })),
+    today,
+  ).filter((item) => item.status === 'due' || item.status === 'upcoming');
+}

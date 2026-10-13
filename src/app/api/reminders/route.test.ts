@@ -1,97 +1,57 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { runReminders } from '@/lib/reminders/worker';
 import { GET } from './route';
 
-vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
-
+vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => ({})) }));
+vi.mock('@/lib/reminders/worker', () => ({ runReminders: vi.fn() }));
 beforeEach(() => {
-  vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-10-05T12:00:00Z'));
   for (const [name, value] of Object.entries({
-    CRON_SECRET: 'test-secret',
+    CRON_SECRET: 'secret',
+    REMINDERS_ENABLED: 'true',
     NEXT_PUBLIC_SUPABASE_URL: 'https://garage.supabase.co',
-    SUPABASE_SECRET_KEY: 'test-key',
+    SUPABASE_SECRET_KEY: 'key',
     BREVO_API_KEY: 'email-key',
     BREVO_SENDER_EMAIL: 'sender@example.com',
-    REMINDER_TO_EMAIL: 'owner@example.com',
+    REMINDER_APP_ORIGIN: 'https://garage.example',
   }))
     vi.stubEnv(name, value);
+  vi.mocked(runReminders).mockResolvedValue({
+    accepted: 2,
+    failed: 0,
+    unknown: 0,
+    skipped: 0,
+    deferred: 0,
+    errors: 0,
+  });
 });
-afterEach(() => {
-  vi.useRealTimers();
+const request = (authorization = 'Bearer secret') =>
+  new NextRequest('https://garage.example/api/reminders', { headers: { authorization } });
+it('rejects unauthenticated cron calls before creating a client', async () => {
+  expect((await GET(request('wrong'))).status).toBe(401);
+  expect(createClient).not.toHaveBeenCalled();
 });
-
-it.each([
-  ['miles', 500, 500, 'sent'],
-  ['miles', 500, 501, 'nothing_due'],
-  ['kilometers', 1000, 1000, 'sent'],
-  ['kilometers', 1000, 1001, 'nothing_due'],
-  ['kilometers', null, 1000, 'sent'],
-  ['kilometers', 0, 1, 'nothing_due'],
-  [undefined, 500, 500, 'sent'],
-] as const)(
-  'classifies %s reminders with window %s and %s remaining',
-  async (unit, window, remaining, status) => {
-    const tables: Record<string, unknown[]> = {
-      cars: [
-        {
-          id: 'car',
-          name: 'Daily driver',
-          odometer: 5000 - remaining,
-          distance_unit: unit,
-          reminder_days: 30,
-          reminder_miles: window,
-        },
-      ],
-      schedule_items: [
-        {
-          id: 'task',
-          car_id: 'car',
-          name: 'Oil change',
-          interval_miles: 5000,
-          interval_months: null,
-          first_due_miles: 5000,
-          first_due_date: null,
-          is_active: true,
-        },
-      ],
-      visits: [],
-    };
-    const from = vi.fn((table: string) => {
-      const query = {
-        select: () => query,
-        eq: async () => ({ data: tables[table], error: null }),
-        insert: async () => ({ error: null }),
-      };
-      return query;
-    });
-    vi.mocked(createClient).mockReturnValue({
-      from,
-      auth: {
-        admin: {
-          listUsers: async () => ({
-            data: { users: [{ id: 'owner', email: 'owner@example.com' }] },
-            error: null,
-          }),
-        },
-      },
-    } as unknown as ReturnType<typeof createClient>);
-    const send = vi.fn(async () => new Response('{}', { status: 200 }));
-    vi.stubGlobal('fetch', send);
-    const response = await GET(
-      new NextRequest('http://localhost/api/reminders', {
-        headers: { authorization: 'Bearer test-secret' },
-      }),
-    );
-    expect(await response.json()).toMatchObject({ status });
-    expect(send).toHaveBeenCalledTimes(status === 'sent' ? 1 : 0);
-    if (status === 'sent') {
-      const body = JSON.parse(
-        (send.mock.calls[0] as unknown as [string, RequestInit])[1].body as string,
-      );
-      expect(body.htmlContent).toContain('coming up');
-      expect(body.htmlContent).toContain('odometer readings');
-    }
+it('defaults to disabled and does no work', async () => {
+  vi.stubEnv('REMINDERS_ENABLED', '');
+  expect(await (await GET(request())).json()).toEqual({ status: 'email_disabled' });
+  expect(runReminders).not.toHaveBeenCalled();
+});
+it.each(['BREVO_API_KEY', 'SUPABASE_SECRET_KEY', 'BREVO_SENDER_EMAIL', 'REMINDER_APP_ORIGIN'])(
+  'fails closed when %s is missing',
+  async (name) => {
+    vi.stubEnv(name, '');
+    expect((await GET(request())).status).toBe(503);
+    expect(runReminders).not.toHaveBeenCalled();
   },
 );
+it('sends without the legacy single-recipient setting and returns aggregate counts', async () => {
+  vi.stubEnv('REMINDER_TO_EMAIL', '');
+  expect(await (await GET(request())).json()).toMatchObject({ status: 'completed', accepted: 2 });
+});
+it('reports errors without leaking provider details', async () => {
+  vi.mocked(runReminders).mockRejectedValue(new Error('secret body'));
+  const response = await GET(request());
+  expect(response.status).toBe(502);
+  expect(await response.text()).not.toContain('secret body');
+});

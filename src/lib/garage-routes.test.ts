@@ -4,15 +4,20 @@ import { contextSchema } from './bug-reports/shared';
 import { report } from './bug-reports/fixtures.test-helper';
 
 describe('garage URLs', () => {
-  it.each(['/', '/cars', '/history', '/reports', '/cars/stable-id', '/cars/%C3%B1'])(
-    'accepts workspace destination %s',
-    (path) => {
-      expect(validatedReturnTo(path)).toBe(path);
-      expect(
-        new URL(accountPath('signup', path), 'http://localhost').searchParams.get('returnTo'),
-      ).toBe(path);
-    },
-  );
+  it.each([
+    '/',
+    '/cars',
+    '/history',
+    '/reports',
+    '/cars/stable-id',
+    '/cars/%C3%B1',
+    '/settings/notifications',
+  ])('accepts workspace destination %s', (path) => {
+    expect(validatedReturnTo(path)).toBe(path);
+    expect(
+      new URL(accountPath('signup', path), 'http://localhost').searchParams.get('returnTo'),
+    ).toBe(path);
+  });
   it.each([
     null,
     '',
