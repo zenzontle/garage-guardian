@@ -50,7 +50,7 @@ it('renders whole due descriptions for both languages without changing calculati
     `a los ${es.formatDistance(5000, 'miles')}`,
   );
   expect(es.dueDescription({ ...base, status: 'setup' })).toBe(
-    'Añade una fecha de vencimiento o una lectura del odómetro',
+    'Añade un intervalo de repetición o un vencimiento único',
   );
   expect(es.dueDescription({ ...base, status: 'completed' })).toBe('Tarea única completada');
   expect(base).toMatchObject({

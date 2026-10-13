@@ -1,15 +1,81 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clear, get, set } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../test/fake-supabase';
 import { car, schedule, visit } from '../test/fixtures';
 import type { Car } from './model';
+import { getAllDue } from './due';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 
 beforeEach(async () => {
   await clear();
   vi.resetModules();
+});
+afterEach(() => vi.useRealTimers());
+
+describe('atomic cloud schedule saves', () => {
+  it.each(['car', 'visit'] as const)(
+    'initializes a new task from a concurrent %s reading at save time',
+    async (source) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+      const { SupabaseRepository } = await import('./repository');
+      const cloud = fakeSupabase();
+      cloud.emit(account());
+      const repository = new SupabaseRepository(cloud.client, account().id);
+      await repository.saveCar({ ...car, odometer: 69000 });
+      const execute = cloud.execute.getMockImplementation()!;
+      cloud.execute.mockImplementation(async (...args) => {
+        if (args[0] === 'schedule_items' && args[1] === 'upsert') {
+          if (source === 'car') cloud.tables.get('cars')!.get(car.id)!.odometer = 71000;
+          else
+            cloud.tables.set(
+              'visits',
+              new Map([
+                [
+                  visit.id,
+                  {
+                    id: visit.id,
+                    user_id: account().id,
+                    car_id: car.id,
+                    service_date: visit.date,
+                    odometer: 71000,
+                    items: [],
+                    photos: [],
+                  },
+                ],
+              ]),
+            );
+        }
+        return execute(...args);
+      });
+
+      await repository.saveSchedule({ ...schedule, firstDueMiles: null, firstDueDate: null });
+
+      expect(cloud.tables.get('schedule_items')!.get(schedule.id)).toMatchObject({
+        first_due_miles: 75000,
+        first_due_date: '2027-04-13',
+      });
+      const saved = await repository.load();
+      expect(getAllDue(saved.cars, saved.schedules, saved.visits, '2026-10-13')[0].status).toBe(
+        'later',
+      );
+    },
+  );
+
+  it('reports an atomic save failure without persisting an uninitialized task', async () => {
+    const { SupabaseRepository } = await import('./repository');
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    const repository = new SupabaseRepository(cloud.client, account().id);
+    await repository.saveCar(car);
+    cloud.rpc.mockResolvedValueOnce({ data: [], error: new Error('Atomic save failed') });
+    await expect(
+      repository.saveSchedule({ ...schedule, firstDueMiles: null, firstDueDate: null }),
+    ).rejects.toThrow('Atomic save failed');
+    expect(cloud.tables.get('schedule_items')?.has(schedule.id)).toBeFalsy();
+  });
 });
 
 describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
@@ -25,6 +91,63 @@ describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
           : new SupabaseRepository(cloud.client, account().id),
     };
   }
+
+  it('persists interval-only milestones and dates across reloads and odometer updates', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+    const { repository } = await setup();
+    await repository.saveCar({ ...car, odometer: 69000 });
+    await repository.saveSchedule({ ...schedule, firstDueMiles: null, firstDueDate: null });
+    const initial = await repository.load();
+    expect(initial.schedules[0]).toMatchObject({
+      firstDueMiles: 70000,
+      firstDueDate: '2027-04-13',
+    });
+    vi.setSystemTime(new Date('2026-10-20T19:00:00Z'));
+    await repository.saveCar({ ...car, odometer: 71000 });
+    const reloaded = await repository.load();
+    expect(reloaded.schedules).toEqual(initial.schedules);
+    expect(
+      getAllDue(reloaded.cars, reloaded.schedules, reloaded.visits, '2026-10-20')[0].status,
+    ).toBe('due');
+  });
+
+  it('initializes existing interval-only records once without changing explicit due points', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+    const { repository, cloud } = await setup();
+    await repository.saveCar({ ...car, odometer: 69000 });
+    await repository.saveSchedule(schedule);
+    const legacy = { ...schedule, firstDueMiles: null, firstDueDate: null };
+    if (mode === 'local') {
+      await set('garage-guardian:local:v1', {
+        cars: [{ ...car, odometer: 69000 }],
+        schedules: [legacy],
+        visits: [],
+      });
+    } else {
+      Object.assign(cloud.tables.get('schedule_items')!.get(schedule.id)!, {
+        first_due_miles: null,
+        first_due_date: null,
+      });
+    }
+    const first = await repository.load();
+    expect(first.schedules[0]).toMatchObject({ firstDueMiles: 70000, firstDueDate: '2027-04-13' });
+    vi.setSystemTime(new Date('2026-11-13T19:00:00Z'));
+    expect((await repository.load()).schedules).toEqual(first.schedules);
+    await repository.saveSchedule(schedule);
+    expect((await repository.load()).schedules).toEqual([schedule]);
+    if (mode === 'cloud') {
+      expect(cloud.rpc).toHaveBeenCalledWith('initialize_schedule_defaults', {
+        p_user_id: account().id,
+        p_schedule_id: schedule.id,
+        p_car_id: car.id,
+        p_interval_miles: schedule.intervalMiles,
+        p_interval_months: schedule.intervalMonths,
+        p_today: '2026-10-13',
+      });
+    }
+  });
 
   it.each([undefined, null, '', 'AbC  - 123'])(
     'loads legacy or saved plate %s without losing other records',

@@ -1,15 +1,18 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clear, get, set } from 'idb-keyval';
 import { LocalRepository, SupabaseRepository } from './repository';
 import { pendingTransfer, registerSignup, transferSignupData } from './signup-transfer';
 import { account, fakeSupabase } from '../test/fake-supabase';
 import { car, schedule, visit } from '../test/fixtures';
+import { addMonths } from './due';
+import { todayISO } from './today-iso';
 
 const project = 'https://garage.supabase.co';
 beforeEach(async () => {
   await clear();
   localStorage.clear();
 });
+afterEach(() => vi.useRealTimers());
 
 async function seedLocal(withPhoto = true) {
   const local = new LocalRepository();
@@ -28,6 +31,199 @@ async function seedLocal(withPhoto = true) {
 }
 
 describe('signup transfer', () => {
+  it.each(['none', 'metadata', 'due point', 'new task'] as const)(
+    'cleans up legacy uploaded defaults across days without removing guest changes (%s)',
+    async (edit) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+      const { local, snapshot: saved, photo } = await seedLocal();
+      const intervalOnly = { ...schedule, firstDueMiles: null, firstDueDate: null };
+      const snapshot = { ...saved, schedules: [intervalOnly] };
+      await set(`garage-guardian:signup-transfer:v1:${project}`, {
+        userId: account().id,
+        status: 'uploaded',
+        snapshot,
+      });
+      await set('garage-guardian:local:v1', {
+        ...snapshot,
+        schedules:
+          edit === 'new task'
+            ? [intervalOnly, { ...intervalOnly, id: '55555555-5555-4555-8555-555555555555' }]
+            : [intervalOnly],
+      });
+      const guest = await local.load();
+      expect(guest.schedules[0].firstDueDate).toBe('2027-04-13');
+      const edited = {
+        ...guest.schedules[0],
+        ...(edit === 'metadata' ? { sourceNote: 'New guest notes' } : {}),
+        // This date also matches a naive initialization using the later retry date.
+        ...(edit === 'due point' ? { firstDueDate: '2027-04-20' } : {}),
+      };
+      if (edit === 'metadata' || edit === 'due point') await local.saveSchedule(edited);
+
+      vi.setSystemTime(new Date('2026-10-20T19:00:00Z'));
+      vi.resetModules();
+      const reloaded = await import('./signup-transfer');
+      const cloud = fakeSupabase();
+      cloud.emit(account());
+      await reloaded.transferSignupData(cloud.client, project, account().id);
+
+      expect(await local.load()).toEqual({
+        cars: edit === 'none' ? [] : [car],
+        schedules: edit === 'none' ? [] : edit === 'new task' ? [guest.schedules[1]] : [edited],
+        visits: [],
+      });
+      expect(await get(`photo:${photo.path}`)).toBeUndefined();
+      expect(cloud.from).not.toHaveBeenCalled();
+      expect(cloud.rpc).not.toHaveBeenCalled();
+      expect(cloud.bucket.upload).not.toHaveBeenCalled();
+      expect(await pendingTransfer(project)).toBeUndefined();
+    },
+  );
+
+  it.each(['none', 'metadata', 'due point'] as const)(
+    'cleans up initialized guest schedules after retry (guest edit: %s)',
+    async (edit) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+      const { local, snapshot: saved, photo } = await seedLocal();
+      const snapshot = {
+        ...saved,
+        schedules: [{ ...schedule, firstDueMiles: null, firstDueDate: null }],
+      };
+      await set('garage-guardian:local:v1', snapshot);
+      await set(`garage-guardian:signup-transfer:v1:${project}`, {
+        userId: account().id,
+        status: 'uploading',
+        snapshot,
+      });
+      const cloud = fakeSupabase();
+      cloud.emit(account());
+      cloud.bucket.upload.mockResolvedValueOnce({ error: new Error('Upload interrupted') });
+      await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
+        'Upload interrupted',
+      );
+
+      cloud.emit(null);
+      const guest = await local.load();
+      expect(guest.schedules[0]).toMatchObject({ firstDueMiles: 5000, firstDueDate: '2027-04-13' });
+      expect((await pendingTransfer(project))?.snapshot).toEqual(snapshot);
+      const edited = {
+        ...guest.schedules[0],
+        ...(edit === 'metadata' ? { sourceNote: 'New guest notes' } : {}),
+        ...(edit === 'due point' ? { firstDueDate: '2028-01-01' } : {}),
+      };
+      if (edit !== 'none') await local.saveSchedule(edited);
+
+      vi.resetModules();
+      const reloaded = await import('./signup-transfer');
+      cloud.emit(account());
+      await reloaded.transferSignupData(cloud.client, project, account().id);
+
+      expect(await local.load()).toEqual({
+        cars: edit === 'none' ? [] : [car],
+        schedules: edit === 'none' ? [] : [edited],
+        visits: [],
+      });
+      expect(await get(`photo:${photo.path}`)).toBeUndefined();
+      expect(cloud.tables.get('schedule_items')!.get(schedule.id)).toMatchObject({
+        source_note: schedule.sourceNote,
+        first_due_date: '2027-04-13',
+      });
+      expect(await pendingTransfer(project)).toBeUndefined();
+    },
+  );
+
+  it('keeps legacy transfer due dates fixed across failed uploads and later-day reload retries', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-13T19:00:00Z'));
+    const { local, snapshot: saved } = await seedLocal();
+    const snapshot = {
+      ...saved,
+      schedules: [{ ...schedule, firstDueMiles: null, firstDueDate: null }],
+    };
+    await set('garage-guardian:local:v1', snapshot);
+    await set(`garage-guardian:signup-transfer:v1:${project}`, {
+      userId: account().id,
+      status: 'uploading',
+      snapshot,
+    });
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    const execute = cloud.execute.getMockImplementation()!;
+    cloud.execute.mockImplementationOnce(async (...args) => {
+      expect((await pendingTransfer(project))?.baselineDate).toBe('2026-10-13');
+      return execute(...args);
+    });
+    cloud.bucket.upload
+      .mockResolvedValueOnce({ error: new Error('Upload interrupted') })
+      .mockResolvedValueOnce({ error: new Error('Upload interrupted') });
+    await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
+      'Upload interrupted',
+    );
+    expect(cloud.tables.get('schedule_items')!.get(schedule.id)!.first_due_date).toBe('2027-04-13');
+    expect((await pendingTransfer(project))?.snapshot).toEqual(snapshot);
+
+    vi.resetModules();
+    const reloaded = await import('./signup-transfer');
+    vi.setSystemTime(new Date('2026-10-20T19:00:00Z'));
+    await expect(reloaded.transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
+      'Upload interrupted',
+    );
+    expect(cloud.tables.get('schedule_items')!.get(schedule.id)!.first_due_date).toBe('2027-04-13');
+    expect((await reloaded.pendingTransfer(project))?.snapshot).toEqual(snapshot);
+    expect((await reloaded.pendingTransfer(project))?.baselineDate).toBe('2026-10-13');
+
+    vi.setSystemTime(new Date('2026-10-28T19:00:00Z'));
+    await reloaded.transferSignupData(cloud.client, project, account().id);
+    expect(cloud.tables.get('schedule_items')!.get(schedule.id)!.first_due_date).toBe('2027-04-13');
+    expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+    expect(await pendingTransfer(project)).toBeUndefined();
+  });
+
+  it.each([false, true])(
+    'resumes interval-only schedules from a frozen legacy upload (interrupted: %s)',
+    async (interrupted) => {
+      const { local, snapshot: saved } = await seedLocal();
+      const snapshot = {
+        ...saved,
+        cars: [{ ...car, odometer: 69000 }],
+        schedules: [{ ...schedule, firstDueMiles: null, firstDueDate: null }],
+        visits: [{ ...saved.visits[0], odometer: 71000 }],
+      };
+      await set('garage-guardian:local:v1', snapshot);
+      await set(`garage-guardian:signup-transfer:v1:${project}`, {
+        userId: account().id,
+        status: 'uploading',
+        snapshot,
+      });
+      const cloud = fakeSupabase();
+      cloud.emit(account());
+      if (interrupted) {
+        cloud.bucket.upload.mockResolvedValueOnce({ error: new Error('Upload interrupted') });
+        await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
+          'Upload interrupted',
+        );
+        expect((await pendingTransfer(project))?.snapshot).toEqual(snapshot);
+        expect(await get('garage-guardian:local:v1')).toEqual(snapshot);
+      }
+
+      await transferSignupData(cloud.client, project, account().id);
+
+      const transferred = await new SupabaseRepository(cloud.client, account().id).load();
+      expect(transferred.schedules).toEqual([
+        {
+          ...schedule,
+          firstDueMiles: 75000,
+          firstDueDate: addMonths(todayISO(), 6),
+        },
+      ]);
+      expect(transferred.visits[0].odometer).toBe(71000);
+      expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+      expect(await pendingTransfer(project)).toBeUndefined();
+    },
+  );
+
   it.each(['pending', 'uploading', 'uploaded'])(
     'resumes a legacy %s transfer and cleans up equivalent guest records',
     async (status) => {

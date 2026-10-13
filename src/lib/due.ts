@@ -71,10 +71,13 @@ export function getDueItem(
       ? addMonths(lastDone.date, schedule.intervalMonths)
       : null
     : schedule.firstDueDate;
+  const lastDoneOdometer = completed.find((visit) => visit.odometer !== null)?.odometer ?? null;
   const dueMiles = lastDone
-    ? schedule.intervalMiles !== null && lastDone.odometer !== null
-      ? lastDone.odometer + schedule.intervalMiles
-      : null
+    ? schedule.intervalMiles !== null && lastDoneOdometer !== null
+      ? lastDoneOdometer + schedule.intervalMiles
+      : schedule.intervalMiles !== null
+        ? schedule.firstDueMiles
+        : null
     : schedule.firstDueMiles;
   const daysRemaining = dueDate ? daysBetween(today, dueDate) : null;
   const milesRemaining = dueMiles !== null ? dueMiles - latestOdometer(car, visits) : null;
@@ -114,7 +117,7 @@ export function getAllDue(
 }
 
 export function dueDescription(item: DueItem): string {
-  if (item.status === 'setup') return 'Add a due date or odometer reading';
+  if (item.status === 'setup') return 'Add a repeat interval or a due date or odometer reading';
   if (item.status === 'completed') return 'One-time task completed';
   const pieces: string[] = [];
   if (item.dueDate) pieces.push(`by ${item.dueDate}`);

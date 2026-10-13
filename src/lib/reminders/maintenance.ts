@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAllDue } from '@/lib/due';
-import { normalizeCar, type ScheduleItem, type Visit } from '@/lib/model';
+import { normalizeCar, type ScheduleItem, type Visit, type Snapshot } from '@/lib/model';
+import { initializeCloudSchedules } from '@/lib/schedule-defaults';
 
 // Page every owner-scoped table: a user's history may exceed PostgREST's row limit.
 async function rows(db: SupabaseClient, table: string, userId: string) {
@@ -24,8 +25,8 @@ export async function loadReminderItems(db: SupabaseClient, userId: string, toda
     rows(db, 'schedule_items', userId),
     rows(db, 'visits', userId),
   ]);
-  return getAllDue(
-    cars.map((row) =>
+  const snapshot: Snapshot = {
+    cars: cars.map((row) =>
       normalizeCar({
         id: row.id,
         name: row.name,
@@ -41,7 +42,7 @@ export async function loadReminderItems(db: SupabaseClient, userId: string, toda
         createdAt: row.created_at,
       }),
     ),
-    schedules.map((row): ScheduleItem => ({
+    schedules: schedules.map((row): ScheduleItem => ({
       id: row.id,
       carId: row.car_id,
       name: row.name,
@@ -53,7 +54,7 @@ export async function loadReminderItems(db: SupabaseClient, userId: string, toda
       isActive: row.is_active,
       createdAt: row.created_at,
     })),
-    visits.map((row): Visit => ({
+    visits: visits.map((row): Visit => ({
       id: row.id,
       carId: row.car_id,
       date: row.service_date,
@@ -65,6 +66,9 @@ export async function loadReminderItems(db: SupabaseClient, userId: string, toda
       photos: [],
       createdAt: row.created_at,
     })),
-    today,
-  ).filter((item) => item.status === 'due' || item.status === 'upcoming');
+  };
+  const initialized = await initializeCloudSchedules(db, userId, snapshot, today);
+  return getAllDue(initialized.cars, initialized.schedules, initialized.visits, today).filter(
+    (item) => item.status === 'due' || item.status === 'upcoming',
+  );
 }

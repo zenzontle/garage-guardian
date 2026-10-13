@@ -5,6 +5,12 @@ import { AppError } from './app-error';
 import { accountAuthStorageKey, serializeAccountSignIns } from './account-session';
 import { bootstrapRecovery } from './account-recovery';
 import { recordDiagnostic } from './bug-reports/diagnostics';
+import {
+  initializeCloudSchedules,
+  initializeSchedule,
+  initializeSnapshotSchedules,
+} from './schedule-defaults';
+import { todayISO } from './today-iso';
 import { createClient, navigatorLock, type SupabaseClient } from '@supabase/supabase-js';
 import {
   EMPTY_SNAPSHOT,
@@ -33,12 +39,33 @@ export type Repository = {
 
 const SNAPSHOT_KEY = 'garage-guardian:local:v1';
 const clone = <T>(value: T): T => structuredClone(value);
+// Keep load-time initialization provenance private and atomic with the guest records.
+type LocalSnapshot = Snapshot & { automaticSchedules?: ScheduleItem[] };
+
+function snapshotData(snapshot: Snapshot): Snapshot {
+  return { cars: snapshot.cars, schedules: snapshot.schedules, visits: snapshot.visits };
+}
 
 export class LocalRepository implements Repository {
   async load(): Promise<Snapshot> {
-    return normalizeSnapshot(clone((await get<Snapshot>(SNAPSHOT_KEY)) ?? EMPTY_SNAPSHOT));
+    const snapshot = normalizeSnapshot(
+      clone(snapshotData((await get<LocalSnapshot>(SNAPSHOT_KEY)) ?? EMPTY_SNAPSHOT)),
+    );
+    const today = todayISO();
+    if (initializeSnapshotSchedules(snapshot, today) === snapshot) return snapshot;
+    let initialized = snapshot;
+    await mutateLocalSnapshot((current) => {
+      const schedules = initializeSnapshotSchedules(current, today).schedules;
+      current.automaticSchedules = [
+        ...(current.automaticSchedules ?? []),
+        ...schedules.filter((item, index) => item !== current.schedules[index]),
+      ];
+      current.schedules = schedules;
+      initialized = clone(snapshotData(current));
+    });
+    return initialized;
   }
-  private async write(update: (snapshot: Snapshot) => void) {
+  private async write(update: (snapshot: LocalSnapshot) => void) {
     await mutateLocalSnapshot(update);
   }
   async saveCar(car: Car) {
@@ -60,7 +87,11 @@ export class LocalRepository implements Repository {
   }
   saveSchedule(item: ScheduleItem) {
     return this.write((snapshot) => {
-      snapshot.schedules = upsert(snapshot.schedules, item);
+      const car = snapshot.cars.find((car) => car.id === item.carId);
+      snapshot.schedules = upsert(
+        snapshot.schedules,
+        car ? initializeSchedule(item, car, snapshot.visits, todayISO()) : item,
+      );
     });
   }
   deleteSchedule(id: string) {
@@ -99,10 +130,20 @@ export class LocalRepository implements Repository {
     if (!file) throw new AppError('photoMissing', { name: photo.name });
     return file;
   }
-  async clearTransferred(transferred: Snapshot) {
+  async clearTransferred(transferred: Snapshot, initializedSchedules: ScheduleItem[] = []) {
     transferred = normalizeSnapshot(transferred);
     // Preserve anything edited in another tab or after signing out during a transfer.
     await this.write((current) => {
+      const automaticallyInitialized = (current.automaticSchedules ?? []).filter((item) =>
+        transferred.schedules.some((original) =>
+          sameRecord({ ...item, firstDueMiles: null, firstDueDate: null }, original),
+        ),
+      );
+      const cleanupSchedules = [
+        ...transferred.schedules,
+        ...initializedSchedules,
+        ...automaticallyInitialized,
+      ];
       const changed = <T extends { id: string }>(item: T, originals: T[]) =>
         !originals.some((original) => original.id === item.id && sameRecord(item, original));
       current.visits = current.visits.filter((item) => changed(item, transferred.visits));
@@ -110,7 +151,7 @@ export class LocalRepository implements Repository {
         current.visits.flatMap((visit) => visit.items.map((item) => item.scheduleItemId)),
       );
       current.schedules = current.schedules.filter(
-        (item) => changed(item, transferred.schedules) || neededSchedules.has(item.id),
+        (item) => changed(item, cleanupSchedules) || neededSchedules.has(item.id),
       );
       const neededCars = new Set(
         [...current.schedules, ...current.visits].map((item) => item.carId),
@@ -133,10 +174,17 @@ export class LocalRepository implements Repository {
   }
 }
 
-async function mutateLocalSnapshot(mutate: (snapshot: Snapshot) => void) {
-  await update<Snapshot>(SNAPSHOT_KEY, (saved) => {
-    const snapshot = normalizeSnapshot(clone(saved ?? EMPTY_SNAPSHOT));
+async function mutateLocalSnapshot(mutate: (snapshot: LocalSnapshot) => void) {
+  await update<LocalSnapshot>(SNAPSHOT_KEY, (saved) => {
+    const snapshot: LocalSnapshot = normalizeSnapshot(clone(saved ?? EMPTY_SNAPSHOT));
     mutate(snapshot);
+    if (snapshot.automaticSchedules) {
+      const schedules = new Map(snapshot.schedules.map((item) => [item.id, item]));
+      snapshot.automaticSchedules = snapshot.automaticSchedules.filter((automatic) =>
+        sameRecord(schedules.get(automatic.id), automatic),
+      );
+      if (!snapshot.automaticSchedules.length) delete snapshot.automaticSchedules;
+    }
     return snapshot;
   });
 }
@@ -192,6 +240,11 @@ const scheduleToRow = (item: ScheduleItem, userId: string) => ({
   is_active: item.isActive,
   created_at: item.createdAt,
 });
+export type SaveScheduleWithDefaultsArgs = {
+  p_user_id: string;
+  p_item: ReturnType<typeof scheduleToRow>;
+  p_today: string;
+};
 const visitToRow = (visit: Visit, userId: string) => ({
   id: visit.id,
   user_id: userId,
@@ -223,7 +276,7 @@ export class SupabaseRepository implements Repository {
         .order('service_date', { ascending: false }),
     ]);
     for (const result of [cars, schedules, visits]) if (result.error) throw result.error;
-    return {
+    const snapshot: Snapshot = {
       cars: (cars.data ?? []).map((row) =>
         normalizeCar({
           id: row.id,
@@ -265,6 +318,7 @@ export class SupabaseRepository implements Repository {
         createdAt: row.created_at,
       })),
     };
+    return initializeCloudSchedules(this.client, this.userId, snapshot, todayISO());
   }
 
   async saveCar(car: Car) {
@@ -291,6 +345,20 @@ export class SupabaseRepository implements Repository {
     if (paths.length) await this.client.storage.from('visit-photos').remove(paths);
   }
   async saveSchedule(item: ScheduleItem) {
+    if (
+      item.isActive &&
+      item.firstDueDate === null &&
+      item.firstDueMiles === null &&
+      (item.intervalMiles !== null || item.intervalMonths !== null)
+    ) {
+      const { error } = await this.client.rpc('save_schedule_with_defaults', {
+        p_user_id: this.userId,
+        p_item: scheduleToRow(item, this.userId),
+        p_today: todayISO(),
+      } satisfies SaveScheduleWithDefaultsArgs);
+      if (error) throw error;
+      return;
+    }
     const { error } = await this.client
       .from('schedule_items')
       .upsert(scheduleToRow(item, this.userId));
