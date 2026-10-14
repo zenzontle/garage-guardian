@@ -166,7 +166,9 @@ export function CarsPage({
                         <small>{t('car.source', { source: due.schedule.sourceNote })}</small>
                       )}
                     </div>
-                    {due.status !== 'later' && (
+                    {due.status === 'later' ? (
+                      <span className="sr-only">{t('shared.later')}</span>
+                    ) : (
                       <span className={`status-pill ${due.status}`}>
                         {due.status === 'due'
                           ? t('car.due')

@@ -514,6 +514,11 @@ describe.each([
     await user.selectOptions(dialog.getByLabelText('Choose scheduled task'), taskOption.value);
     await user.click(dialog.getByRole('button', { name: 'Save visit' }));
     await screen.findByText('at 6,200 km');
+    const laterStatus = within(
+      screen.getByRole('button', { name: 'Edit Brake check' }).parentElement!,
+    ).getByText('Later');
+    expect(laterStatus.className).toBe('sr-only');
+    expect(laterStatus.getAttribute('aria-hidden')).toBeNull();
     expect(
       screen
         .getByRole('button', { name: 'Edit Brake check' })
