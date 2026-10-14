@@ -166,17 +166,19 @@ export function CarsPage({
                         <small>{t('car.source', { source: due.schedule.sourceNote })}</small>
                       )}
                     </div>
-                    <span className={`status-pill ${due.status}`}>
-                      {due.status === 'due'
-                        ? t('car.due')
-                        : due.status === 'upcoming'
-                          ? t('car.soon')
-                          : due.status === 'setup'
-                            ? t('shared.setup')
-                            : due.status === 'completed'
-                              ? t('shared.done')
-                              : t('shared.later')}
-                    </span>
+                    {due.status === 'later' ? (
+                      <span className="sr-only">{t('shared.later')}</span>
+                    ) : (
+                      <span className={`status-pill ${due.status}`}>
+                        {due.status === 'due'
+                          ? t('car.due')
+                          : due.status === 'upcoming'
+                            ? t('shared.comingUp')
+                            : due.status === 'setup'
+                              ? t('shared.setup')
+                              : t('shared.done')}
+                      </span>
+                    )}
                     <button
                       className="icon-button"
                       aria-label={t('shared.editNamed', { name: due.schedule.name })}

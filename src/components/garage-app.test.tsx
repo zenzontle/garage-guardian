@@ -504,7 +504,7 @@ describe.each([
     });
     await user.click(dialog.getByRole('button', { name: 'Save task' }));
     await screen.findByText('at 1,100 km');
-    expect(screen.getByText('Soon')).toBeDefined();
+    expect(screen.getByText('Coming up')).toBeDefined();
     await user.click(screen.getByRole('button', { name: 'Log service' }));
     dialog = within(screen.getByRole('dialog', { name: 'Log service' }));
     expect((dialog.getByLabelText('Odometer (kilometers)') as HTMLInputElement).value).toBe('100');
@@ -514,11 +514,16 @@ describe.each([
     await user.selectOptions(dialog.getByLabelText('Choose scheduled task'), taskOption.value);
     await user.click(dialog.getByRole('button', { name: 'Save visit' }));
     await screen.findByText('at 6,200 km');
+    const laterStatus = within(
+      screen.getByRole('button', { name: 'Edit Brake check' }).parentElement!,
+    ).getByText('Later');
+    expect(laterStatus.className).toBe('sr-only');
+    expect(laterStatus.getAttribute('aria-hidden')).toBeNull();
     expect(
-      within(screen.getByRole('button', { name: 'Edit Brake check' }).parentElement!).getByText(
-        'Later',
-      ),
-    ).toBeDefined();
+      screen
+        .getByRole('button', { name: 'Edit Brake check' })
+        .parentElement!.querySelector('.status-pill'),
+    ).toBeNull();
     expect(screen.getByText(/1,200 km current odometer/)).toBeDefined();
     const { createRepository } = await import('../lib/repository');
     const saved = await createRepository(authenticated ? account().id : undefined).load();
