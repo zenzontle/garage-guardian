@@ -225,14 +225,17 @@ export function GarageContent({ children }: { children: ReactNode }) {
               const result = await perform(async () => {
                 await repository!.saveCar(car);
                 if (starter)
-                  for (const item of makeStarterSchedules(car.id, [
-                    t('starter.oil'),
-                    t('starter.rotation'),
-                    t('starter.tires'),
-                    t('starter.engineFilter'),
-                    t('starter.cabinFilter'),
-                    t('starter.service'),
-                  ]))
+                  for (const item of makeStarterSchedules(
+                    car.id,
+                    [
+                      t('starter.oil'),
+                      t('starter.rotation'),
+                      t('starter.tires'),
+                      t('starter.engineFilter'),
+                      t('starter.cabinFilter'),
+                    ],
+                    car.distanceUnit,
+                  ))
                     await repository!.saveSchedule(item);
               });
               if (result.refreshed && !modal.item && currentPath.current === pathname)

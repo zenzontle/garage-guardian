@@ -66,27 +66,29 @@ export type Snapshot = {
 
 export const EMPTY_SNAPSHOT: Snapshot = { cars: [], schedules: [], visits: [] };
 
-export const STARTER_TASKS = [
-  'Oil change',
-  'Tire rotation',
-  'Tire replacement',
-  'Engine air filter',
-  'Cabin air filter',
-  'Scheduled service',
+const STARTER_DEFAULTS = [
+  { name: 'Oil change', months: 12, miles: 7500, kilometers: 12000 },
+  { name: 'Tire rotation', months: 6, miles: 6000, kilometers: 10000 },
+  { name: 'Tire replacement', months: 60, miles: 50000, kilometers: 80000 },
+  { name: 'Engine air filter', months: 18, miles: 20000, kilometers: 30000 },
+  { name: 'Cabin air filter', months: 12, miles: 15000, kilometers: 25000 },
 ];
+
+export const STARTER_TASKS = STARTER_DEFAULTS.map((task) => task.name);
 
 export const newId = () => crypto.randomUUID();
 
 export function makeStarterSchedules(
   carId: string,
   names: readonly string[] = STARTER_TASKS,
+  distanceUnit: DistanceUnit = 'miles',
 ): ScheduleItem[] {
-  return names.map((name) => ({
+  return names.map((name, index) => ({
     id: newId(),
     carId,
     name,
-    intervalMiles: null,
-    intervalMonths: null,
+    intervalMiles: STARTER_DEFAULTS[index]?.[distanceUnit] ?? null,
+    intervalMonths: STARTER_DEFAULTS[index]?.months ?? null,
     firstDueMiles: null,
     firstDueDate: null,
     sourceNote: '',

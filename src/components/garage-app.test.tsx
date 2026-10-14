@@ -94,6 +94,11 @@ describe.each([
       plate: 'AbC-123',
     });
     expect(created.schedules.map((task) => task.name)).toContain('Cambio de aceite');
+    expect(created.schedules).toHaveLength(5);
+    expect(created.schedules.find((task) => task.name === 'Cambio de aceite')).toMatchObject({
+      intervalMonths: 12,
+      intervalMiles: 12000,
+    });
     await user.click(screen.getByRole('button', { name: 'Añadir tarea' }));
     const task = within(screen.getByRole('dialog'));
     await user.type(task.getByLabelText('Nombre de la tarea'), 'User-owned task');
@@ -222,11 +227,11 @@ describe.each([
       expect(local.cars).toEqual([]);
       expect(await get('garage-guardian:local:v1')).toBeUndefined();
       expect([...cloud.tables.get('cars')!.values()][0].name).toBe('Updated driver');
-      expect([...cloud.tables.get('schedule_items')!.values()]).toHaveLength(6);
+      expect([...cloud.tables.get('schedule_items')!.values()]).toHaveLength(5);
       expect(screen.queryByText('Stored in Supabase')).toBeNull();
     } else {
       expect(local.cars[0].name).toBe('Updated driver');
-      expect(local.schedules).toHaveLength(6);
+      expect(local.schedules).toHaveLength(5);
       if (configured)
         expect(cloud.from.mock.calls.every(([table]) => table.startsWith('vehicle_'))).toBe(true);
       else expect(cloud.from).not.toHaveBeenCalled();
@@ -509,7 +514,11 @@ describe.each([
     await user.selectOptions(dialog.getByLabelText('Choose scheduled task'), taskOption.value);
     await user.click(dialog.getByRole('button', { name: 'Save visit' }));
     await screen.findByText('at 6,200 km');
-    expect(screen.getByText('Later')).toBeDefined();
+    expect(
+      within(screen.getByRole('button', { name: 'Edit Brake check' }).parentElement!).getByText(
+        'Later',
+      ),
+    ).toBeDefined();
     expect(screen.getByText(/1,200 km current odometer/)).toBeDefined();
     const { createRepository } = await import('../lib/repository');
     const saved = await createRepository(authenticated ? account().id : undefined).load();
