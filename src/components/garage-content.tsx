@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
-import Link from 'next/link';
+import Link from './guarded-link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, LogOut, X } from 'lucide-react';
@@ -19,10 +19,12 @@ import { GarageTopbar } from './garage-topbar';
 import { GarageMobileNavigation } from './garage-mobile-navigation';
 import { AccountSettingsDialog } from './account-settings-dialog';
 import { AccountRecoveryScreen } from './account-recovery-screen';
+import { useInteractions } from './interaction-provider';
 
 export function GarageContent({ children }: { children: ReactNode }) {
   const t = useTranslations();
   const garage = useGarage();
+  const interactions = useInteractions();
   const {
     repository,
     snapshot,
@@ -116,7 +118,27 @@ export function GarageContent({ children }: { children: ReactNode }) {
             {!loading && <LocaleSelector />}
             <h1>{transferring ? t('app.moving') : t('app.opening')}</h1>
             {loading ? (
-              <p role="status">{transferring ? t('app.uploading') : t('app.loading')}</p>
+              <p role="status">
+                {transferring && garage.transferProgress
+                  ? t(
+                      (
+                        {
+                          records: 'interactions.transferRecords',
+                          uploading: 'interactions.transferUploading',
+                          verifyingPhoto: 'interactions.transferVerifyingPhoto',
+                          verifying: 'interactions.transferVerifying',
+                          cleanup: 'interactions.transferCleanup',
+                        } as const
+                      )[garage.transferProgress.phase],
+                      {
+                        current: garage.transferProgress.current ?? 0,
+                        total: garage.transferProgress.total ?? 0,
+                      },
+                    )
+                  : transferring
+                    ? t('app.uploading')
+                    : t('app.loading')}
+              </p>
             ) : (
               <>
                 <p className="error-text" role="alert">
@@ -238,6 +260,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
                   ))
                     await repository!.saveSchedule(item);
               });
+              interactions?.notify('interactions.carSaved');
               if (result.refreshed && !modal.item && currentPath.current === pathname)
                 router.push(carPath(car.id));
             }}
@@ -253,6 +276,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
             onClose={() => setModal(null)}
             onSave={async (item) => {
               await perform(() => repository!.saveSchedule(item));
+              interactions?.notify('interactions.taskSaved');
             }}
           />
         )}
@@ -264,9 +288,11 @@ export function GarageContent({ children }: { children: ReactNode }) {
             visits={visits}
             schedules={snapshot.schedules}
             repository={repository!}
+            cloud={Boolean(user)}
             onClose={() => setModal(null)}
             onSave={async (item) => {
               await perform(() => repository!.saveVisit(item));
+              interactions?.notify('interactions.visitSaved');
             }}
           />
         )}

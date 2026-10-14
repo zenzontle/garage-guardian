@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import Link from 'next/link';
+import Link from './guarded-link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { CarFront } from 'lucide-react';
@@ -11,9 +11,11 @@ import { CarsPage } from './cars-page';
 import { EmptyPanel } from './empty-panel';
 import { PageHeading } from './page-heading';
 import { useGarage } from './garage-provider';
+import { useInteractions } from './interaction-provider';
 
 export function CarsScreen({ carId }: { carId?: string }) {
   const t = useTranslations();
+  const interactions = useInteractions();
   const { snapshot, visits, allDue, user, repository, setModal, perform, currentPath } =
     useGarage();
   const router = useRouter();
@@ -64,23 +66,27 @@ export function CarsScreen({ carId }: { carId?: string }) {
       onAddSchedule={(id) => setModal({ kind: 'schedule', carId: id })}
       onEditSchedule={(item) => setModal({ kind: 'schedule', carId: item.carId, item })}
       onAddVisit={(id) => setModal({ kind: 'visit', carId: id })}
-      onDeleteCar={async (car) => {
-        if (!confirm(t('car.confirmDelete', { name: car.name }))) return;
-        try {
-          const result = await perform(() => repository!.deleteCar(car.id));
-          if (result.refreshed && currentPath.current === pathname) router.replace('/cars');
-        } catch {
-          /* The session displays the failure; retain the requested vehicle. */
-        }
-      }}
-      onDeleteSchedule={async (item) => {
-        if (!confirm(t('car.confirmDeleteTask', { name: item.name }))) return;
-        try {
-          await perform(() => repository!.deleteSchedule(item.id));
-        } catch {
-          /* The session displays the failure. */
-        }
-      }}
+      onDeleteCar={(car) =>
+        interactions?.confirmDelete({
+          title: t('interactions.deleteTitle', { name: car.name }),
+          description: t('interactions.deleteCar'),
+          success: 'interactions.carDeleted',
+          onDelete: async () => {
+            const result = await perform(() => repository!.deleteCar(car.id));
+            if (result.refreshed && currentPath.current === pathname) router.replace('/cars');
+          },
+        })
+      }
+      onDeleteSchedule={(item) =>
+        interactions?.confirmDelete({
+          title: t('interactions.deleteTitle', { name: item.name }),
+          description: t('interactions.deleteTask'),
+          success: 'interactions.taskDeleted',
+          onDelete: async () => {
+            await perform(() => repository!.deleteSchedule(item.id));
+          },
+        })
+      }
     />
   );
 }

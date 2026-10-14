@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { newId, type DistanceUnit, type ScheduleItem } from '@/lib/model';
 import { failureOf, type AppFailure } from '@/lib/app-error';
 import { Modal } from './modal';
+import { useFormInteraction } from './use-form-interaction';
 import { stepDistanceInput } from './step-distance-input';
 
 export function ScheduleModal({
@@ -30,8 +31,14 @@ export function ScheduleModal({
   const [isActive, setIsActive] = useState(item?.isActive ?? true);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<AppFailure | null>(null);
+  const interaction = useFormInteraction(
+    { name, intervalMiles, intervalMonths, firstDueMiles, firstDueDate, sourceNote, isActive },
+    { busy },
+  );
+  const close = () => interaction.request(onClose);
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!interaction.begin()) return;
     setBusy(true);
     setFormError(null);
     try {
@@ -47,9 +54,11 @@ export function ScheduleModal({
         isActive,
         createdAt: item?.createdAt ?? new Date().toISOString(),
       });
+      interaction.accept();
     } catch (cause) {
       setFormError(failureOf(cause, 'save'));
     } finally {
+      interaction.end();
       setBusy(false);
     }
   }
@@ -57,112 +66,115 @@ export function ScheduleModal({
     <Modal
       title={item ? t('schedule.edit') : t('schedule.add')}
       subtitle={t('schedule.subtitle')}
-      onClose={onClose}
+      onClose={close}
+      busy={busy}
     >
-      <form onSubmit={submit}>
-        <div className="modal-body form-stack">
-          <label>
-            {t('schedule.name')}
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              placeholder={t('schedule.example')}
-              maxLength={80}
-            />
-          </label>
-          <div className="form-grid">
+      <form onSubmit={submit} aria-busy={busy}>
+        <fieldset className="interaction-fields" disabled={busy}>
+          <div className="modal-body form-stack">
             <label>
-              <span className="field-label">
-                {t('schedule.firstDistance', { unit: t(`units.${distanceUnit}`) })}{' '}
-                <span className="optional">{t('shared.optional')}</span>
-              </span>
+              {t('schedule.name')}
               <input
-                type="number"
-                min="0"
-                step="1"
-                value={firstDueMiles}
-                onKeyDown={(e) => stepDistanceInput(e, 5000, setFirstDueMiles)}
-                onChange={(e) => setFirstDueMiles(e.target.value)}
-                placeholder={t('schedule.distanceExample')}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+                placeholder={t('schedule.example')}
+                maxLength={80}
               />
             </label>
+            <div className="form-grid">
+              <label>
+                <span className="field-label">
+                  {t('schedule.firstDistance', { unit: t(`units.${distanceUnit}`) })}{' '}
+                  <span className="optional">{t('shared.optional')}</span>
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={firstDueMiles}
+                  onKeyDown={(e) => stepDistanceInput(e, 5000, setFirstDueMiles)}
+                  onChange={(e) => setFirstDueMiles(e.target.value)}
+                  placeholder={t('schedule.distanceExample')}
+                />
+              </label>
+              <label>
+                <span className="field-label">
+                  {t('schedule.firstDate')} <span className="optional">{t('shared.optional')}</span>
+                </span>
+                <input
+                  type="date"
+                  value={firstDueDate}
+                  onChange={(e) => setFirstDueDate(e.target.value)}
+                />
+              </label>
+            </div>
+            <div className="form-grid">
+              <label>
+                <span className="field-label">
+                  {t('schedule.repeatDistance', { unit: t(`units.${distanceUnit}`) })}{' '}
+                  <span className="optional">{t('shared.optional')}</span>
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={intervalMiles}
+                  onKeyDown={(e) => stepDistanceInput(e, 5000, setIntervalMiles)}
+                  onChange={(e) => setIntervalMiles(e.target.value)}
+                  placeholder={t('schedule.intervalExample')}
+                />
+              </label>
+              <label>
+                <span className="field-label">
+                  {t('schedule.repeatMonths')}{' '}
+                  <span className="optional">{t('shared.optional')}</span>
+                </span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={intervalMonths}
+                  onChange={(e) => setIntervalMonths(e.target.value)}
+                  placeholder={t('schedule.monthsExample')}
+                />
+              </label>
+            </div>
+            <p className="field-help">{t('schedule.hint')}</p>
             <label>
               <span className="field-label">
-                {t('schedule.firstDate')} <span className="optional">{t('shared.optional')}</span>
+                {t('schedule.source')} <span className="optional">{t('shared.optional')}</span>
               </span>
               <input
-                type="date"
-                value={firstDueDate}
-                onChange={(e) => setFirstDueDate(e.target.value)}
+                value={sourceNote}
+                onChange={(e) => setSourceNote(e.target.value)}
+                placeholder={t('schedule.sourceExample')}
+                maxLength={180}
               />
             </label>
+            <label className="checkbox-line">
+              <input
+                type="checkbox"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+              />
+              {t('schedule.active')}
+            </label>
+            {formError && (
+              <p className="error-text" role="alert">
+                {t(`errors.${formError.code}`, formError.values)}
+              </p>
+            )}
           </div>
-          <div className="form-grid">
-            <label>
-              <span className="field-label">
-                {t('schedule.repeatDistance', { unit: t(`units.${distanceUnit}`) })}{' '}
-                <span className="optional">{t('shared.optional')}</span>
-              </span>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={intervalMiles}
-                onKeyDown={(e) => stepDistanceInput(e, 5000, setIntervalMiles)}
-                onChange={(e) => setIntervalMiles(e.target.value)}
-                placeholder={t('schedule.intervalExample')}
-              />
-            </label>
-            <label>
-              <span className="field-label">
-                {t('schedule.repeatMonths')}{' '}
-                <span className="optional">{t('shared.optional')}</span>
-              </span>
-              <input
-                type="number"
-                min="1"
-                step="1"
-                value={intervalMonths}
-                onChange={(e) => setIntervalMonths(e.target.value)}
-                placeholder={t('schedule.monthsExample')}
-              />
-            </label>
+          <div className="modal-footer">
+            <button type="button" className="button secondary" onClick={close}>
+              {t('shared.cancel')}
+            </button>
+            <button className="button primary" disabled={busy}>
+              {busy ? t('shared.saving') : t('schedule.save')}
+            </button>
           </div>
-          <p className="field-help">{t('schedule.hint')}</p>
-          <label>
-            <span className="field-label">
-              {t('schedule.source')} <span className="optional">{t('shared.optional')}</span>
-            </span>
-            <input
-              value={sourceNote}
-              onChange={(e) => setSourceNote(e.target.value)}
-              placeholder={t('schedule.sourceExample')}
-              maxLength={180}
-            />
-          </label>
-          <label className="checkbox-line">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => setIsActive(e.target.checked)}
-            />
-            {t('schedule.active')}
-          </label>
-          {formError && (
-            <p className="error-text" role="alert">
-              {t(`errors.${formError.code}`, formError.values)}
-            </p>
-          )}
-        </div>
-        <div className="modal-footer">
-          <button type="button" className="button secondary" onClick={onClose}>
-            {t('shared.cancel')}
-          </button>
-          <button className="button primary" disabled={busy}>
-            {busy ? t('shared.saving') : t('schedule.save')}
-          </button>
-        </div>
+        </fieldset>
       </form>
     </Modal>
   );

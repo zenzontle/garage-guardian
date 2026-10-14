@@ -14,6 +14,8 @@ import { getAllDue } from '@/lib/due';
 import { useGarageSession } from '@/lib/use-garage-session';
 import type { Car, ScheduleItem, Visit } from '@/lib/model';
 import { todayISO } from '@/lib/today-iso';
+import { useInteractions } from './interaction-provider';
+import { useFormInteraction } from './use-form-interaction';
 
 type ModalState =
   | { kind: 'car'; item?: Car }
@@ -24,6 +26,8 @@ type ModalState =
 
 function useGarageState() {
   const garage = useGarageSession();
+  useFormInteraction(null, { busy: garage.transferring && garage.loading });
+  const interactions = useInteractions();
   const pathname = usePathname();
   const currentPath = useRef(pathname);
   currentPath.current = pathname;
@@ -31,6 +35,10 @@ function useGarageState() {
   const [notice, setNotice] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountEmail, setAccountEmail] = useState('');
+  const identity = garage.user?.id;
+  useEffect(() => {
+    interactions?.clear();
+  }, [identity, garage.recovering, interactions]);
 
   useEffect(() => {
     setModal(null);
@@ -82,6 +90,14 @@ function useGarageState() {
     accountEmail,
     setAccountEmail,
     perform,
+    signOut: (onStarted?: () => void) => {
+      const action = () => {
+        onStarted?.();
+        void garage.signOut();
+      };
+      if (interactions) interactions.request(action);
+      else action();
+    },
   };
 }
 

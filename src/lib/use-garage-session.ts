@@ -10,6 +10,7 @@ import {
   registerSignup,
   transferSignupData,
   withSignupTransferLock,
+  type TransferProgress,
 } from './signup-transfer';
 import { recordDiagnostic } from './bug-reports/diagnostics';
 import {
@@ -35,6 +36,7 @@ export function useGarageSession() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [transferring, setTransferring] = useState(false);
+  const [transferProgress, setTransferProgress] = useState<TransferProgress | null>(null);
   const [error, setError] = useState<AppFailure | null>(null);
   const [refreshError, setRefreshError] = useState<AppFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -94,6 +96,7 @@ export function useGarageSession() {
       setRefreshing(false);
       setLoading(true);
       setTransferring(false);
+      setTransferProgress(null);
       transferBlocked.current = Boolean(nextUser);
 
       // The auth callback only schedules work; Supabase calls happen after it returns.
@@ -110,7 +113,10 @@ export function useGarageSession() {
               setTransferring(pending?.userId === nextUser.id);
               transferBlocked.current = pending?.userId === nextUser.id;
               if (pending?.userId === nextUser.id) failureContext = 'transfer';
-              await transferSignupData(supabase, project, nextUser.id, assertActive);
+              await transferSignupData(supabase, project, nextUser.id, assertActive, (progress) => {
+                assertActive();
+                setTransferProgress(progress);
+              });
               failureContext = 'load';
             }
             assertActive();
@@ -136,6 +142,7 @@ export function useGarageSession() {
             setSnapshot(data);
             setRepository(guarded);
             setTransferring(false);
+            setTransferProgress(null);
             transferBlocked.current = false;
           } catch (cause) {
             if (active && sessionGeneration.current === version)
@@ -506,6 +513,7 @@ export function useGarageSession() {
     user,
     loading,
     transferring,
+    transferProgress,
     error,
     setError,
     refreshError,

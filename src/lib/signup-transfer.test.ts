@@ -31,6 +31,25 @@ async function seedLocal(withPhoto = true) {
 }
 
 describe('signup transfer', () => {
+  it('reports upload and verification stages without changing transfer completion', async () => {
+    const { local } = await seedLocal();
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    await registerSignup(project, account(), true);
+    const progress = vi.fn();
+    await transferSignupData(cloud.client, project, account().id, () => {}, progress);
+    expect(progress.mock.calls.map(([value]) => value.phase)).toEqual([
+      'records',
+      'uploading',
+      'verifyingPhoto',
+      'records',
+      'verifying',
+      'cleanup',
+    ]);
+    expect(progress).toHaveBeenCalledWith({ phase: 'uploading', current: 1, total: 1 });
+    expect(await pendingTransfer(project)).toBeUndefined();
+    expect((await local.load()).cars).toEqual([]);
+  });
   it.each(['none', 'metadata', 'due point', 'new task'] as const)(
     'cleans up legacy uploaded defaults across days without removing guest changes (%s)',
     async (edit) => {

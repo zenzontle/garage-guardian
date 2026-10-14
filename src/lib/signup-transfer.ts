@@ -14,6 +14,11 @@ type Transfer = {
   snapshot?: Snapshot;
   baselineDate?: string;
 };
+export type TransferProgress = {
+  phase: 'records' | 'uploading' | 'verifyingPhoto' | 'verifying' | 'cleanup';
+  current?: number;
+  total?: number;
+};
 const transferKey = (project: string) => `garage-guardian:signup-transfer:v1:${project}`;
 export function pendingTransfer(project: string): Promise<Transfer | undefined> {
   return get<Transfer>(transferKey(project));
@@ -55,8 +60,11 @@ export async function transferSignupData(
   project: string,
   userId: string,
   assertActive: () => void = () => {},
+  onProgress?: (progress: TransferProgress) => void,
 ) {
-  await withSignupTransferLock(project, () => runTransfer(client, project, userId, assertActive));
+  await withSignupTransferLock(project, () =>
+    runTransfer(client, project, userId, assertActive, onProgress),
+  );
 }
 
 async function runTransfer(
@@ -64,6 +72,7 @@ async function runTransfer(
   project: string,
   userId: string,
   assertActive: () => void,
+  onProgress?: (progress: TransferProgress) => void,
 ) {
   let transfer = await pendingTransfer(project);
   assertActive();
@@ -92,6 +101,9 @@ async function runTransfer(
       normalizeSnapshot(structuredClone(snapshot)),
       baselineDate,
     );
+    onProgress?.({ phase: 'records' });
+    const total = expected.visits.reduce((sum, visit) => sum + visit.photos.length, 0);
+    let completed = 0;
     // Each await is a cancellation boundary: never continue under another session.
     for (const car of expected.cars) {
       assertActive();
@@ -107,11 +119,13 @@ async function runTransfer(
         const file = await local.readPhoto(photo);
         const path = `${userId}/${visit.id}/${photo.id}.webp`;
         assertActive();
+        onProgress?.({ phase: 'uploading', current: completed + 1, total });
         const { error } = await client.storage
           .from('visit-photos')
           .upload(path, file, { contentType: photo.contentType, upsert: true });
         if (error) throw error;
         assertActive();
+        onProgress?.({ phase: 'verifyingPhoto', current: completed + 1, total });
         const { data: uploaded, error: readError } = await client.storage
           .from('visit-photos')
           .download(path);
@@ -126,11 +140,14 @@ async function runTransfer(
           throw new AppError('photoVerification');
         }
         photo.path = path;
+        completed++;
       }
       assertActive();
+      onProgress?.({ phase: 'records' });
       await cloud.saveVisit(visit);
     }
     assertActive();
+    onProgress?.({ phase: 'verifying' });
     const saved = await cloud.load();
     for (const key of ['cars', 'schedules', 'visits'] as const) {
       for (const item of expected[key]) {
@@ -149,6 +166,7 @@ async function runTransfer(
     await set(transferKey(project), { ...transfer, status: 'uploaded' } satisfies Transfer);
   }
   assertActive();
+  onProgress?.({ phase: 'cleanup' });
   // Match defaults from frozen inputs without changing the original local photo references.
   const initializedSchedules = transfer.baselineDate
     ? initializeSnapshotSchedules(snapshot, transfer.baselineDate).schedules

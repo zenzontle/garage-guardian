@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
 import { Modal } from './modal';
+import { useInteractions } from './interaction-provider';
 import { AccountSettingsForm } from './account-settings-form';
 import { useGarage } from './garage-provider';
 import { NotificationPreferencesForm } from './notification-preferences-form';
@@ -10,6 +11,7 @@ import { NotificationPreferencesForm } from './notification-preferences-form';
 export function AccountSettingsDialog({ section }: { section?: 'security' }) {
   const t = useTranslations();
   const garage = useGarage();
+  const interactions = useInteractions();
   const notificationsHeadingId = useId();
   const securityHeadingId = useId();
   const [notificationBusy, setNotificationBusy] = useState(false);
@@ -19,7 +21,10 @@ export function AccountSettingsDialog({ section }: { section?: 'security' }) {
       title={t(section === 'security' ? 'account.security' : 'account.settings')}
       busy={garage.accountBusy || notificationBusy}
       onClose={() => {
-        if (!garage.accountBusy && !notificationBusy) garage.setModal(null);
+        if (!garage.accountBusy && !notificationBusy) {
+          if (interactions) interactions.request(() => garage.setModal(null), 'account-settings');
+          else garage.setModal(null);
+        }
       }}
     >
       <div className="modal-body form-stack">

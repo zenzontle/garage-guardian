@@ -7,10 +7,12 @@ import { isCloudConfigured } from '@/lib/repository';
 import { accountPath, type AccountMode } from '@/lib/garage-routes';
 import { AccountForm } from './account-form';
 import { useGarage } from './garage-provider';
+import { useGuardedRouter } from './guarded-link';
 
 export function AccountScreen({ mode, returnTo }: { mode: AccountMode; returnTo: string }) {
   const garage = useGarage();
   const router = useRouter();
+  const navigation = useGuardedRouter();
   const params = useSearchParams();
   const t = useTranslations();
 
@@ -25,8 +27,8 @@ export function AccountScreen({ mode, returnTo }: { mode: AccountMode; returnTo:
       mode={mode}
       email={garage.accountEmail}
       onEmailChange={garage.setAccountEmail}
-      onMode={(next) => router.replace(accountPath(next, returnTo))}
-      onClose={() => router.replace(returnTo)}
+      onMode={(next) => navigation.replace(accountPath(next, returnTo))}
+      onClose={() => navigation.replace(returnTo)}
       onRecovery={garage.requestRecovery}
       onResend={garage.resendConfirmation}
       resendUntil={garage.resendUntil}

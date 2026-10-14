@@ -10,6 +10,8 @@ Repeat intervals alone are enough. With no first due point, a distance interval 
 
 ## Navigation
 
+Forms protect unsaved work, uploads report their current stage, and saves/deletes provide accessible confirmations. See [interaction states and verification](docs/interaction-states.md) for dismissal, retry, and browser-navigation behavior.
+
 Dashboard lives at `/`, Vehicles at `/cars`, individual vehicles at `/cars/[carId]`,
 Service history at `/history`, and Reports at `/reports`. Vehicles opens the first car
 and replaces `/cars` with its detail URL, or shows the empty garage when no cars exist.

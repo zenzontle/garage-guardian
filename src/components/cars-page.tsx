@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from './guarded-link';
 import { carPath } from '@/lib/garage-routes';
 import { useTranslations } from 'next-intl';
 import { CarFront, ClipboardList, Gauge, Plus, Settings2, Trash2, Wrench } from 'lucide-react';

@@ -17,6 +17,7 @@ import { useVehicleCatalog } from '@/lib/use-vehicle-catalog';
 import { normalizeVehicleKey } from '@/lib/vehicle-catalog';
 import { failureOf, type AppFailure } from '@/lib/app-error';
 import { Modal } from './modal';
+import { useFormInteraction } from './use-form-interaction';
 import { stepDistanceInput } from './step-distance-input';
 
 export function CarModal({
@@ -51,6 +52,11 @@ export function CarModal({
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<AppFailure | null>(null);
   const catalog = useVehicleCatalog(isCloudConfigured, make);
+  const interaction = useFormInteraction(
+    { distanceUnit, name, year, make, model, vin, plate, odometer, reminderDays, reminderMiles },
+    { busy },
+  );
+  const close = () => interaction.request(onClose);
   async function submit(event: FormEvent) {
     event.preventDefault();
     setFormError(null);
@@ -59,6 +65,7 @@ export function CarModal({
       setFormError({ code: 'odometer' });
       return;
     }
+    if (!interaction.begin()) return;
     setBusy(true);
     try {
       await onSave(
@@ -78,9 +85,11 @@ export function CarModal({
         },
         !item,
       );
+      interaction.accept();
     } catch (cause) {
       setFormError(failureOf(cause, 'save'));
     } finally {
+      interaction.end();
       setBusy(false);
     }
   }
@@ -88,187 +97,190 @@ export function CarModal({
     <Modal
       title={item ? t('car.edit') : t('shared.addCar')}
       subtitle={t('car.modalSubtitle')}
-      onClose={onClose}
+      onClose={close}
+      busy={busy}
     >
-      <form onSubmit={submit}>
-        <div className="modal-body form-stack">
-          <label>
-            {t('car.nickname')}
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t('car.nicknameExample')}
-              required
-              maxLength={60}
-            />
-          </label>
-          <div className="form-grid three">
+      <form onSubmit={submit} aria-busy={busy}>
+        <fieldset className="interaction-fields" disabled={busy}>
+          <div className="modal-body form-stack">
             <label>
-              {t('car.year')}
+              {t('car.nickname')}
               <input
-                type="number"
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-                min="1980"
-                max={new Date().getFullYear() + 1}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={t('car.nicknameExample')}
                 required
+                maxLength={60}
               />
             </label>
-            {isCloudConfigured ? (
-              <EditableCombobox
-                label={t('car.make')}
-                value={make}
-                onChange={setMake}
-                placeholder="Toyota"
-                suggestions={catalog.makes.entries}
-                loading={catalog.makes.loading}
-                failed={catalog.makes.failed}
-                onRetry={catalog.retry}
-              />
-            ) : (
+            <div className="form-grid three">
               <label>
-                {t('car.make')}
+                {t('car.year')}
                 <input
+                  type="number"
+                  value={year}
+                  onChange={(e) => setYear(e.target.value)}
+                  min="1980"
+                  max={new Date().getFullYear() + 1}
+                  required
+                />
+              </label>
+              {isCloudConfigured ? (
+                <EditableCombobox
+                  label={t('car.make')}
                   value={make}
-                  onChange={(e) => setMake(e.target.value)}
+                  onChange={setMake}
                   placeholder="Toyota"
-                  required
-                  maxLength={50}
+                  suggestions={catalog.makes.entries}
+                  loading={catalog.makes.loading}
+                  failed={catalog.makes.failed}
+                  onRetry={catalog.retry}
                 />
-              </label>
-            )}
-            {isCloudConfigured ? (
-              <EditableCombobox
-                key={normalizeVehicleKey(make)}
-                label={t('car.model')}
-                value={model}
-                onChange={setModel}
-                placeholder="RAV4"
-                suggestions={catalog.models.entries}
-                loading={catalog.models.loading}
-                failed={catalog.models.failed}
-                onRetry={catalog.retry}
-              />
-            ) : (
-              <label>
-                {t('car.model')}
-                <input
+              ) : (
+                <label>
+                  {t('car.make')}
+                  <input
+                    value={make}
+                    onChange={(e) => setMake(e.target.value)}
+                    placeholder="Toyota"
+                    required
+                    maxLength={50}
+                  />
+                </label>
+              )}
+              {isCloudConfigured ? (
+                <EditableCombobox
+                  key={normalizeVehicleKey(make)}
+                  label={t('car.model')}
                   value={model}
-                  onChange={(e) => setModel(e.target.value)}
+                  onChange={setModel}
                   placeholder="RAV4"
-                  required
-                  maxLength={50}
+                  suggestions={catalog.models.entries}
+                  loading={catalog.models.loading}
+                  failed={catalog.models.failed}
+                  onRetry={catalog.retry}
+                />
+              ) : (
+                <label>
+                  {t('car.model')}
+                  <input
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder="RAV4"
+                    required
+                    maxLength={50}
+                  />
+                </label>
+              )}
+            </div>
+            <label>
+              {t('car.distanceUnit')}
+              {item ? (
+                <input
+                  value={distanceUnit === 'kilometers' ? t('shared.kilometers') : t('shared.miles')}
+                  readOnly
+                />
+              ) : (
+                <select
+                  value={distanceUnit}
+                  onChange={(e) => changeDistanceUnit(e.target.value as DistanceUnit)}
+                >
+                  <option value="miles">{t('shared.miles')}</option>
+                  <option value="kilometers">{t('shared.kilometers')}</option>
+                </select>
+              )}
+            </label>
+            <label>
+              {t('car.odometerInput', { unit: t(`units.${distanceUnit}`) })}
+              <input
+                type="number"
+                value={odometer}
+                onChange={(e) => setOdometer(e.target.value)}
+                min="0"
+                step="1"
+                required
+              />
+            </label>
+            <div className="form-grid">
+              <label>
+                <span className="field-label">
+                  VIN <span className="optional">{t('shared.optional')}</span>
+                </span>
+                <input
+                  value={vin}
+                  onChange={(e) => setVin(e.target.value)}
+                  maxLength={17}
+                  placeholder={t('car.vinExample')}
                 />
               </label>
-            )}
-          </div>
-          <label>
-            {t('car.distanceUnit')}
-            {item ? (
-              <input
-                value={distanceUnit === 'kilometers' ? t('shared.kilometers') : t('shared.miles')}
-                readOnly
-              />
-            ) : (
-              <select
-                value={distanceUnit}
-                onChange={(e) => changeDistanceUnit(e.target.value as DistanceUnit)}
-              >
-                <option value="miles">{t('shared.miles')}</option>
-                <option value="kilometers">{t('shared.kilometers')}</option>
-              </select>
-            )}
-          </label>
-          <label>
-            {t('car.odometerInput', { unit: t(`units.${distanceUnit}`) })}
-            <input
-              type="number"
-              value={odometer}
-              onChange={(e) => setOdometer(e.target.value)}
-              min="0"
-              step="1"
-              required
-            />
-          </label>
-          <div className="form-grid">
-            <label>
-              <span className="field-label">
-                VIN <span className="optional">{t('shared.optional')}</span>
-              </span>
-              <input
-                value={vin}
-                onChange={(e) => setVin(e.target.value)}
-                maxLength={17}
-                placeholder={t('car.vinExample')}
-              />
-            </label>
-            <label>
-              <span className="field-label">
-                {t('car.licensePlate')}
-                <span className="optional">{t('shared.optional')}</span>
-              </span>
-              <input
-                value={plate}
-                onChange={(e) => setPlate(e.target.value)}
-                placeholder={t('car.plateExample')}
-              />
-            </label>
-          </div>
-          <div className="form-grid">
-            <label>
-              {t('car.reminderDays')}
-              <input
-                type="number"
-                min="0"
-                max="365"
-                step="1"
-                value={reminderDays}
-                onChange={(e) => setReminderDays(e.target.value)}
-                required
-              />
-            </label>
-            <label>
-              {t('car.reminderDistance', { unit: t(`units.${distanceUnit}`) })}
-              <input
-                type="number"
-                min="0"
-                max="10000"
-                step="1"
-                value={reminderMiles}
-                onKeyDown={(e) =>
-                  stepDistanceInput(e, 500, (value) => {
-                    setReminderMiles(value);
-                    setReminderCustomized(true);
-                  })
-                }
-                onChange={(e) => {
-                  setReminderMiles(e.target.value);
-                  setReminderCustomized(true);
-                }}
-                required
-              />
-            </label>
-          </div>
-          {!item && (
-            <div className="info-callout">
-              <ClipboardList size={18} />
-              <span>{t('car.starterHint')}</span>
+              <label>
+                <span className="field-label">
+                  {t('car.licensePlate')}
+                  <span className="optional">{t('shared.optional')}</span>
+                </span>
+                <input
+                  value={plate}
+                  onChange={(e) => setPlate(e.target.value)}
+                  placeholder={t('car.plateExample')}
+                />
+              </label>
             </div>
-          )}
-          {formError && (
-            <p className="error-text" role="alert">
-              {t(`errors.${formError.code}`, formError.values)}
-            </p>
-          )}
-        </div>
-        <div className="modal-footer">
-          <button type="button" className="button secondary" onClick={onClose}>
-            {t('shared.cancel')}
-          </button>
-          <button className="button primary" disabled={busy}>
-            {busy ? t('shared.saving') : item ? t('shared.saveChanges') : t('car.saveNew')}
-          </button>
-        </div>
+            <div className="form-grid">
+              <label>
+                {t('car.reminderDays')}
+                <input
+                  type="number"
+                  min="0"
+                  max="365"
+                  step="1"
+                  value={reminderDays}
+                  onChange={(e) => setReminderDays(e.target.value)}
+                  required
+                />
+              </label>
+              <label>
+                {t('car.reminderDistance', { unit: t(`units.${distanceUnit}`) })}
+                <input
+                  type="number"
+                  min="0"
+                  max="10000"
+                  step="1"
+                  value={reminderMiles}
+                  onKeyDown={(e) =>
+                    stepDistanceInput(e, 500, (value) => {
+                      setReminderMiles(value);
+                      setReminderCustomized(true);
+                    })
+                  }
+                  onChange={(e) => {
+                    setReminderMiles(e.target.value);
+                    setReminderCustomized(true);
+                  }}
+                  required
+                />
+              </label>
+            </div>
+            {!item && (
+              <div className="info-callout">
+                <ClipboardList size={18} />
+                <span>{t('car.starterHint')}</span>
+              </div>
+            )}
+            {formError && (
+              <p className="error-text" role="alert">
+                {t(`errors.${formError.code}`, formError.values)}
+              </p>
+            )}
+          </div>
+          <div className="modal-footer">
+            <button type="button" className="button secondary" onClick={close}>
+              {t('shared.cancel')}
+            </button>
+            <button className="button primary" disabled={busy}>
+              {busy ? t('shared.saving') : item ? t('shared.saveChanges') : t('car.saveNew')}
+            </button>
+          </div>
+        </fieldset>
       </form>
     </Modal>
   );

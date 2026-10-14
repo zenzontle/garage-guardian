@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { isTopDialog, useDialogFocus } from './dialog-focus';
 import { useTranslations } from 'next-intl';
 import { X } from 'lucide-react';
 
@@ -12,6 +14,9 @@ export function Modal({
   busy = false,
   variant = 'modal',
   id,
+  role = 'dialog',
+  initialFocus,
+  descriptionId,
 }: {
   title: string;
   subtitle?: string;
@@ -20,42 +25,38 @@ export function Modal({
   busy?: boolean;
   variant?: 'modal' | 'drawer';
   id?: string;
+  role?: 'dialog' | 'alertdialog';
+  initialFocus?: string;
+  descriptionId?: string;
 }) {
   const t = useTranslations();
   const dialog = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    (
-      dialog.current?.querySelector<HTMLElement>(
-        variant === 'drawer'
-          ? 'button:not(:disabled)'
-          : '.modal-body input, .modal-body select, .modal-body textarea',
-      ) ?? dialog.current
-    )?.focus();
-    return () => {
-      if (previous?.isConnected) previous.focus();
-    };
-  }, [variant]);
-  useEffect(() => {
-    if (variant !== 'drawer') return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [variant]);
+  useDialogFocus(
+    dialog,
+    true,
+    initialFocus ??
+      (variant === 'drawer'
+        ? 'button:not(:disabled)'
+        : '.modal-body input:not(:disabled), .modal-body select:not(:disabled), .modal-body textarea:not(:disabled)'),
+  );
+  const close = () => {
+    if (!busy && isTopDialog(dialog.current)) onClose();
+  };
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.defaultPrevented) onClose();
+      if (event.key === 'Escape' && !event.defaultPrevented && isTopDialog(dialog.current)) {
+        event.preventDefault();
+        close();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
-  return (
+  });
+  return createPortal(
     <div
       className={`modal-backdrop${variant === 'drawer' ? ' drawer-backdrop' : ''}`}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) close();
       }}
     >
       <div
@@ -63,11 +64,13 @@ export function Modal({
         id={id}
         tabIndex={-1}
         className={`modal${variant === 'drawer' ? ' profile-drawer' : ''}`}
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-label={title}
+        aria-describedby={descriptionId}
+        aria-busy={busy}
         onKeyDown={(event) => {
-          if (event.key !== 'Tab') return;
+          if (event.key !== 'Tab' || !isTopDialog(dialog.current)) return;
           const controls = dialog.current?.querySelectorAll<HTMLElement>(
             'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]',
           );
@@ -93,7 +96,8 @@ export function Modal({
           <button
             className="icon-button"
             disabled={busy}
-            onClick={onClose}
+            type="button"
+            onClick={close}
             aria-label={t('shared.close')}
           >
             <X size={20} />
@@ -102,6 +106,7 @@ export function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

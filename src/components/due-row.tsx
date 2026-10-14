@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from './guarded-link';
 import { useTranslations } from 'next-intl';
 import { ArrowRight } from 'lucide-react';
 import { type DueItem } from '@/lib/due';

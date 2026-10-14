@@ -395,20 +395,40 @@ it('retains a vehicle after failed edit/delete, and replaces the URL only after 
   await within(screen.getByRole('dialog')).findByRole('alert');
   expect(testRouter.url).toBe(carPath(car.id));
   await user.click(screen.getByRole('button', { name: 'Cancel' }));
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
   vi.spyOn(LocalRepository.prototype, 'deleteCar').mockRejectedValueOnce(
     new Error('failed delete'),
   );
   await user.click(screen.getByRole('button', { name: 'Delete car and records' }));
-  await screen.findByRole('alert');
+  await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
+  await within(screen.getByRole('alertdialog')).findByRole('alert');
   expect(testRouter.url).toBe(carPath(car.id));
   expect(screen.getByRole('heading', { name: car.name })).toBeDefined();
-  await user.click(screen.getByRole('button', { name: 'Delete car and records' }));
+  await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
   await screen.findByRole('heading', { name: 'Second vehicle' });
   expect(testRouter.entries).toEqual(['/cars/second']);
   await user.click(screen.getByRole('button', { name: 'Delete car and records' }));
+  await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
   await screen.findByText('No cars yet');
   expect(testRouter.entries).toEqual(['/cars']);
+});
+
+it('restores page interactivity when discarding closes both the confirmation and its form', async () => {
+  await seed();
+  testRouter.reset(carPath(car.id));
+  const App = await loadGarageTestApp();
+  const app = render(<App />);
+  const user = userEvent.setup();
+  await user.click(await screen.findByRole('button', { name: 'Edit car' }));
+  fireEvent.change(screen.getByLabelText('Nickname'), { target: { value: 'Unsaved nickname' } });
+  await user.keyboard('{Escape}');
+  expect(app.container.inert).toBe(true);
+  await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.queryByRole('alertdialog')).toBeNull();
+  expect(app.container.inert).toBe(false);
+  expect(document.body.style.overflow).toBe('');
+  await user.click(screen.getByRole('button', { name: 'Edit car' }));
+  expect(screen.getByLabelText('Nickname')).toHaveProperty('value', car.name);
 });
 
 it.each([false, true])(
@@ -428,9 +448,11 @@ it.each([false, true])(
         await original.call(this, id);
         load.mockRejectedValueOnce(new Error('Refresh failed'));
       });
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Delete car and records' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+    );
     await screen.findByRole('alert');
     expect(testRouter.url).toBe(carPath(car.id));
     expect(testRouter.replace).not.toHaveBeenCalled();
@@ -458,6 +480,7 @@ it('returns from account screens to a bookmark, preserves email between modes an
   await user.click(screen.getByRole('button', { name: 'Sign in' }));
   await screen.findByRole('alert');
   await user.click(screen.getByRole('button', { name: 'Create an account' }));
+  await user.click(screen.getByRole('button', { name: 'Discard changes' }));
   expect(testRouter.url).toBe(accountPath('signup', '/cars/second'));
   expect(screen.getByLabelText('Email')).toHaveProperty('value', 'me@example.com');
   expect(screen.getByLabelText('Password')).toHaveProperty('value', '');
@@ -576,12 +599,12 @@ it('does not redirect away from a new screen when a vehicle deletion finishes', 
     await gate;
     return original.call(this, id);
   });
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
   testRouter.reset(carPath(car.id));
   const App = await loadGarageTestApp();
   render(<App />);
   const user = userEvent.setup();
   await user.click(await screen.findByRole('button', { name: 'Delete car and records' }));
+  await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
   act(() => testRouter.push('/reports'));
   release();
   await waitFor(() => expect(screen.getByText('1 vehicle')).toBeDefined());
@@ -608,9 +631,15 @@ it('keeps the requested vehicle and does not restart a signup transfer on naviga
   render(<App />);
   await screen.findByRole('heading', { name: 'Moving your garage to Supabase' });
   await waitFor(() => expect(cloud.execute).toHaveBeenCalledOnce());
+  const unloading = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(unloading);
+  expect(unloading.defaultPrevented).toBe(true);
   act(() => testRouter.push('/cars/second'));
   expect(cloud.execute).toHaveBeenCalledOnce();
   release();
   await screen.findByRole('heading', { name: 'Second vehicle' });
   expect(testRouter.url).toBe('/cars/second');
+  const completed = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(completed);
+  expect(completed.defaultPrevented).toBe(false);
 });
