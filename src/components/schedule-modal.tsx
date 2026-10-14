@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { newId, type DistanceUnit, type ScheduleItem } from '@/lib/model';
 import { failureOf, type AppFailure } from '@/lib/app-error';
 import { Modal } from './modal';
+import { stepDistanceInput } from './step-distance-input';
 
 export function ScheduleModal({
   item,
@@ -81,6 +82,7 @@ export function ScheduleModal({
                 min="0"
                 step="1"
                 value={firstDueMiles}
+                onKeyDown={(e) => stepDistanceInput(e, 5000, setFirstDueMiles)}
                 onChange={(e) => setFirstDueMiles(e.target.value)}
                 placeholder={t('schedule.distanceExample')}
               />
@@ -107,6 +109,7 @@ export function ScheduleModal({
                 min="1"
                 step="1"
                 value={intervalMiles}
+                onKeyDown={(e) => stepDistanceInput(e, 5000, setIntervalMiles)}
                 onChange={(e) => setIntervalMiles(e.target.value)}
                 placeholder={t('schedule.intervalExample')}
               />

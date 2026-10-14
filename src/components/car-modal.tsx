@@ -17,6 +17,7 @@ import { useVehicleCatalog } from '@/lib/use-vehicle-catalog';
 import { normalizeVehicleKey } from '@/lib/vehicle-catalog';
 import { failureOf, type AppFailure } from '@/lib/app-error';
 import { Modal } from './modal';
+import { stepDistanceInput } from './step-distance-input';
 
 export function CarModal({
   item,
@@ -234,6 +235,12 @@ export function CarModal({
                 max="10000"
                 step="1"
                 value={reminderMiles}
+                onKeyDown={(e) =>
+                  stepDistanceInput(e, 500, (value) => {
+                    setReminderMiles(value);
+                    setReminderCustomized(true);
+                  })
+                }
                 onChange={(e) => {
                   setReminderMiles(e.target.value);
                   setReminderCustomized(true);
