@@ -64,6 +64,42 @@ async function openVisit(user: ReturnType<typeof userEvent.setup>, files = 1) {
 }
 
 describe.each(['local', 'cloud'] as const)('%s save recovery', (mode) => {
+  it('announces photo counts, blocks dismissal, and submits once while uploads are pending', async () => {
+    const { prototype, user } = await setup(mode);
+    const original = prototype.uploadPhoto;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const upload = vi.spyOn(prototype, 'uploadPhoto').mockImplementationOnce(async function (
+      this: Repository,
+      ...args
+    ) {
+      await gate;
+      return original.apply(this, args);
+    });
+    const save = vi.spyOn(prototype, 'saveVisit');
+    const dialog = await openVisit(user, 2);
+    await dialog.findByText('receipt-1.webp');
+    await user.click(dialog.getByRole('button', { name: 'Save visit' }));
+    expect(dialog.getByRole('status').textContent).toContain(
+      `${mode === 'cloud' ? 'Uploading' : 'Saving'} photo 1 of 2`,
+    );
+    expect(dialog.getByRole('progressbar').getAttribute('value')).toBe('0');
+    await user.keyboard('{Escape}');
+    fireEvent.mouseDown(screen.getByRole('dialog').parentElement!);
+    fireEvent.submit(screen.getByRole('dialog').querySelector('form')!);
+    expect(upload).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(
+      (dialog.getByRole('button', { name: 'Cancel' }) as HTMLButtonElement).matches(':disabled'),
+    ).toBe(true);
+    await act(async () => release());
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenCalledOnce();
+    expect(screen.getByText('Service visit saved.')).toBeDefined();
+  }, 15000);
   it('keeps committed photos after refresh failure and offers a translated read-only retry', async () => {
     const { backend, prototype, user } = await setup(mode);
     const load = vi.spyOn(prototype, 'load');

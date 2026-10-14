@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from './guarded-link';
 import { useTranslations } from 'next-intl';
 import { accountPath } from '@/lib/garage-routes';
 import { isCloudConfigured } from '@/lib/repository';

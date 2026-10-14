@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { notificationRequest } from '@/lib/notification-client';
 import type { NotificationPreferences } from '@/lib/notification-preferences';
 import { failureOf, type AppFailure } from '@/lib/app-error';
+import { useFormInteraction } from './use-form-interaction';
 
 export function NotificationPreferencesForm({
   userId,
@@ -26,6 +27,19 @@ export function NotificationPreferencesForm({
   const [reload, setReload] = useState(0);
   const controller = useRef<AbortController | null>(null);
   const initialLanguage = useRef(locale);
+  const savedPreferences = useRef<NotificationPreferences | null>(null);
+  const editable = (value: NotificationPreferences | null) =>
+    value && { enabled: value.enabled, weekday: value.weekday, emailLanguage: value.emailLanguage };
+  const interaction = useFormInteraction(editable(preferences), {
+    busy: saving,
+    enabled: Boolean(preferences),
+    group: 'account-settings',
+    onDiscard: () => {
+      setPreferences(savedPreferences.current);
+      setSaved(false);
+    },
+  });
+  const accept = interaction.accept;
   const Heading = headingLevel === 2 ? 'h2' : headingLevel === 4 ? 'h4' : 'h3';
 
   useEffect(() => {
@@ -36,26 +50,28 @@ export function NotificationPreferencesForm({
     setSaved(false);
     notificationRequest(userId, abort.signal)
       .then((value) => {
-        if (!abort.signal.aborted)
-          setPreferences(
-            value ?? {
-              enabled: false,
-              weekday: 1,
-              emailLanguage: initialLanguage.current,
-              nextScheduledAt: null,
-            },
-          );
+        if (!abort.signal.aborted) {
+          const loaded = value ?? {
+            enabled: false,
+            weekday: 1,
+            emailLanguage: initialLanguage.current,
+            nextScheduledAt: null,
+          };
+          savedPreferences.current = loaded;
+          accept(editable(loaded));
+          setPreferences(loaded);
+        }
       })
       .catch((cause) => {
         if (!abort.signal.aborted) setError(failureOf(cause, 'notificationSave'));
       });
     return () => abort.abort();
-  }, [userId, reload]);
+  }, [userId, reload, accept]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const abort = controller.current;
-    if (!preferences || !abort || saving) return;
+    if (!preferences || !abort || disabled || !interaction.begin()) return;
     setSaving(true);
     onBusyChange?.(true);
     setSaved(false);
@@ -67,12 +83,15 @@ export function NotificationPreferencesForm({
         emailLanguage: preferences.emailLanguage,
       });
       if (!abort.signal.aborted) {
+        savedPreferences.current = result;
+        interaction.accept(editable(result));
         setPreferences(result);
         setSaved(true);
       }
     } catch (cause) {
       if (!abort.signal.aborted) setError(failureOf(cause, 'notificationSave'));
     } finally {
+      interaction.end();
       if (!abort.signal.aborted) {
         setSaving(false);
         onBusyChange?.(false);

@@ -1,0 +1,15 @@
+$ vitest run "src/components/interaction-provider.test.tsx" "src/lib/history-guard.test.ts"
+
+ RUN  v3.2.7 C:/Users/zenzo/.codex/worktrees/d8a6/garage-guardian
+
+ ✓ src/lib/history-guard.test.ts (2 tests) 322ms
+   ✓ restores a dirty history traversal before asking and replays it only on discard  318ms
+ ✓ src/components/interaction-provider.test.tsx (6 tests) 1918ms
+   ✓ protects independent forms, reverts, and announces confirmations in en  809ms
+   ✓ protects independent forms, reverts, and announces confirmations in es  567ms
+
+ Test Files  2 passed (2)
+      Tests  8 passed (8)
+   Start at  11:06:18
+   Duration  8.20s (transform 388ms, setup 2.32s, collect 1.68s, tests 2.24s, environment 4.42s, prepare 1.13s)
+

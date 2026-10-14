@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { failureOf, type AppFailure } from '@/lib/app-error';
 import { AccountPasswordFields } from './account-password-fields';
 import { useGarage } from './garage-provider';
+import { useFormInteraction } from './use-form-interaction';
 
 export function AccountSettingsForm({
   kind,
@@ -27,8 +28,22 @@ export function AccountSettingsForm({
   const [pendingEmail, setPendingEmail] = useState('');
   const title = kind === 'email' ? 'changeEmail' : 'changePassword';
   const Heading = headingLevel === 2 ? 'h2' : headingLevel === 4 ? 'h4' : 'h3';
+  const interaction = useFormInteraction(
+    { currentPassword, email, password, confirmation },
+    {
+      busy: garage.accountBusy,
+      group: 'account-settings',
+      onDiscard: () => {
+        setCurrentPassword('');
+        setEmail('');
+        setPassword('');
+        setConfirmation('');
+      },
+    },
+  );
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (disabled || !interaction.begin()) return;
     setError(null);
     try {
       if (kind === 'email') {
@@ -36,13 +51,22 @@ export function AccountSettingsForm({
         setPendingEmail(email.trim());
       } else {
         await garage.changePassword(currentPassword, password, confirmation);
+        interaction.accept({ currentPassword: '', email: '', password: '', confirmation: '' });
         router.replace('/signin');
       }
+      interaction.accept({
+        currentPassword: '',
+        email: kind === 'email' ? email : '',
+        password: '',
+        confirmation: '',
+      });
       setCurrentPassword('');
       setPassword('');
       setConfirmation('');
     } catch (cause) {
       setError(failureOf(cause, 'auth'));
+    } finally {
+      interaction.end();
     }
   }
   const pending = garage.user?.new_email ?? pendingEmail;

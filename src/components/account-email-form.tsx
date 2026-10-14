@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
+import { useFormInteraction } from './use-form-interaction';
 import { failureOf, type AppFailure } from '@/lib/app-error';
 
 export function AccountEmailForm({
@@ -34,18 +35,22 @@ export function AccountEmailForm({
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, [resendUntil]);
+  const interaction = useFormInteraction(email, { busy, onDiscard: () => onEmailChange('') });
   const seconds = Math.max(0, Math.ceil((resendUntil - now) / 1000));
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!interaction.begin()) return;
     setBusy(true);
     setError(null);
     setSent(false);
     try {
       await onSubmit(email.trim());
+      interaction.accept();
       setSent(true);
     } catch (cause) {
       setError(failureOf(cause, 'auth'));
     } finally {
+      interaction.end();
       setBusy(false);
     }
   }
@@ -84,7 +89,12 @@ export function AccountEmailForm({
         {mode === 'resend' && seconds > 0 && (
           <p role="status">{t('account.cooldown', { seconds })}</p>
         )}
-        <button type="button" className="text-link" disabled={busy} onClick={onBack}>
+        <button
+          type="button"
+          className="text-link"
+          disabled={busy}
+          onClick={() => interaction.request(onBack)}
+        >
           {t('account.backSignin')}
         </button>
       </form>

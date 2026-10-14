@@ -1,0 +1,86 @@
+$ vitest run "src/components/account-management.test.tsx" "src/components/garage-navigation.test.tsx" "src/components/garage-app.test.tsx"
+
+ RUN  v3.2.7 C:/Users/zenzo/.codex/worktrees/d8a6/garage-guardian
+
+ ✓ src/components/account-management.test.tsx (22 tests) 27297ms
+   ✓ en account workflows > opens the profile drawer, traps focus, and connects security, notifications and sign-out  3739ms
+   ✓ en account workflows > shows a guest initial and offers sign-in from the account page  1005ms
+   ✓ en account workflows > opens registration from the guest drawer and returns to account settings after signup  1571ms
+   ✓ en account workflows > shows only the current email on the account page and restores pages with browser history  1207ms
+   ✓ en account workflows > preserves entered email through recovery/resend, announces generic copy, and enforces cooldown  922ms
+   ✓ en account workflows > allows resend after an unconfirmed-email error and from the signup notice  1688ms
+   ✓ en account workflows > opens accessible settings even after cloud loading fails, validates mismatch, and traps/restores keyboard focus  1468ms
+   ✓ en account workflows > handles recovery sessions independently of cloud loading and returns to sign-in after reset  1087ms
+   ✓ en account workflows > cancels recovery with local sign-out and clears its marker  721ms
+   ✓ en account workflows > preserves a replacement login while recovery cancellation waits for the auth lock  862ms
+   ✓ es account workflows > opens the profile drawer, traps focus, and connects security, notifications and sign-out  1706ms
+   ✓ es account workflows > shows a guest initial and offers sign-in from the account page  879ms
+   ✓ es account workflows > opens registration from the guest drawer and returns to account settings after signup  1358ms
+   ✓ es account workflows > shows only the current email on the account page and restores pages with browser history  1239ms
+   ✓ es account workflows > preserves entered email through recovery/resend, announces generic copy, and enforces cooldown  914ms
+   ✓ es account workflows > allows resend after an unconfirmed-email error and from the signup notice  1605ms
+   ✓ es account workflows > opens accessible settings even after cloud loading fails, validates mismatch, and traps/restores keyboard focus  1458ms
+   ✓ es account workflows > handles recovery sessions independently of cloud loading and returns to sign-in after reset  1350ms
+   ✓ es account workflows > cancels recovery with local sign-out and clears its marker  539ms
+   ✓ es account workflows > preserves a replacement login while recovery cancellation waits for the auth lock  582ms
+   ✓ disables all account forms during an in-flight request and retains drafts on network failure  780ms
+   ✓ shows a revocation failure when Supabase clears the recovery session on a failed sign-out  615ms
+ ✓ src/components/garage-navigation.test.tsx (32 tests) 29550ms
+   ✓ returns from email notification settings through sign-in and loads the account form  3503ms
+   ✓ does not offer an email opt-in for a local-only garage  577ms
+   ✓ keeps local-only account and security menu entries disabled in en  951ms
+   ✓ keeps local-only account and security menu entries disabled in es  1011ms
+   ✓ returns to account settings after signing in from a direct visit  1364ms
+   ✓ returns to security settings after signing in from a direct visit  1253ms
+   ✓ classifies notification settings without activating workspace links in en  691ms
+   ✓ classifies notification settings without activating workspace links in es  584ms
+   ✓ moves vehicle-link focus without navigating until Enter and retains native Tab stops  947ms
+   ✓ announces drawer state, focuses its active link, and closes on Escape, blur and desktop resize  897ms
+   ✓ retraces screens and vehicles with Back/Forward without reloading the garage, and restores a bookmark  1159ms
+   ✓ loads and reloads /history directly  730ms
+   ✓ loads and reloads /reports directly  837ms
+   ✓ waits for garage loading before canonicalizing /cars and leaves no extra Back stop  653ms
+   ✓ keeps an empty Vehicles URL and shows missing bookmarks without substituting a car  611ms
+   ✓ closes dialogs and the mobile menu on browser navigation  946ms
+   ✓ closes the mobile drawer when its active link is selected at /  853ms
+   ✓ closes the mobile drawer when its active link is selected at /cars  759ms
+   ✓ closes the mobile drawer when its active link is selected at /history  816ms
+   ✓ closes the mobile drawer when its active link is selected at /reports  756ms
+   ✓ retains a vehicle after failed edit/delete, and replaces the URL only after successful deletion  1176ms
+   ✓ retains the vehicle URL after a committed delete fails to refresh (only car=false)  694ms
+   ✓ retains the vehicle URL after a committed delete fails to refresh (only car=true)  747ms
+   ✓ returns from account screens to a bookmark, preserves email between modes and clears password/error  1614ms
+   ✓ signs in to the original screen, retains it on sign-out, and offers sign-in for unavailable cloud bookmarks  1581ms
+   ✓ bypasses account screens for prototype or signed-in users (cloud=false)  432ms
+   ✓ bypasses account screens for prototype or signed-in users (cloud=true)  487ms
+   ✓ keeps deep URLs through cloud recovery and retry  507ms
+   ✓ returns confirmation-pending signup to the original screen and keeps its notice  1006ms
+   ✓ reloads a direct sign-in route and sends an invalid return destination to Dashboard  473ms
+   ✓ does not redirect away from a new screen when a vehicle deletion finishes  548ms
+   ✓ keeps the requested vehicle and does not restart a signup transfer on navigation  384ms
+ ✓ src/components/garage-app.test.tsx (19 tests) 40001ms
+   ✓ prototype Spanish workflows > saves canonical car/task/visit values, preserves drafts and errors, and keeps exports and calculations unchanged  5984ms
+   ✓ guest Spanish workflows > saves canonical car/task/visit values, preserves drafts and errors, and keeps exports and calculations unchanged  3442ms
+   ✓ cloud Spanish workflows > saves canonical car/task/visit values, preserves drafts and errors, and keeps exports and calculations unchanged  3244ms
+   ✓ local prototype application access > opens the app, saves and edits a car, survives reload, and deletes it  3476ms
+   ✓ configured guest application access > opens the app, saves and edits a car, survives reload, and deletes it  3002ms
+   ✓ authenticated cloud application access > opens the app, saves and edits a car, survives reload, and deletes it  2690ms
+   ✓ preserves free text in add/edit, scopes models after make changes, and dismisses suggestions before the modal  2825ms
+   ✓ a catalog outage allows guest save and a later retry without altering saved edit values  1220ms
+   ✓ guest plate workflow > creates, edits, clears, and reloads a plate while preserving unrelated fields  2433ms
+   ✓ authenticated cloud plate workflow > creates, edits, clears, and reloads a plate while preserving unrelated fields  2173ms
+   ✓ switches creation defaults while preserving typed odometer readings and customized reminder windows  803ms
+   ✓ guest kilometer workflow > persists the unit, cascades it to tasks and visits, and keeps it read-only after reload  1981ms
+   ✓ cloud kilometer workflow > persists the unit, cascades it to tasks and visits, and keeps it read-only after reload  1621ms
+   ✓ sorts mixed-unit history by equivalent distance and refreshes a new visit reading when switching vehicles  902ms
+   ✓ lets guests leave the auth form and shows confirmation-pending signup feedback  1071ms
+   ✓ offers retry and sign-out after an authenticated cloud load failure  391ms
+   ✓ updates an existing missing-photo error when the language changes  643ms
+   ✓ localizes a recognized auth failure and confirmation notice while preserving account drafts  1424ms
+   ✓ hides language selection during a transfer, allows it in recovery, and retains the choice on logout  670ms
+
+ Test Files  3 passed (3)
+      Tests  73 passed (73)
+   Start at  11:05:01
+   Duration  46.43s (transform 2.67s, setup 3.61s, collect 3.86s, tests 96.85s, environment 7.84s, prepare 1.79s)
+

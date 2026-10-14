@@ -222,3 +222,50 @@
     grid-row: 2;
   }
 }
+/* Shared form and mutation states use the existing surface and accent tokens. */
+.interaction-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.success-toast {
+  position: fixed;
+  z-index: 150;
+  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: max-content;
+  max-width: calc(100vw - 2rem);
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.5rem;
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.success-toast > svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.upload-status p {
+  margin: 0;
+}
+.upload-status progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.modal-backdrop:has([role='alertdialog']) {
+  z-index: 300;
+}
+.button.danger {
+  background: var(--orange-soft);
+  color: var(--orange);
+  border: 1px solid var(--orange);
+}
+.button.danger:hover {
+  background: var(--surface-raised);
+}

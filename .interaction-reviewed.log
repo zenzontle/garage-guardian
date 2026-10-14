@@ -1,0 +1,97 @@
+$ vitest run "src/components/garage-navigation.test.tsx" "src/components/account-management.test.tsx" "src/components/interaction-provider.test.tsx" "src/components/bug-reporter.test.tsx"
+
+ RUN  v3.2.7 C:/Users/zenzo/.codex/worktrees/d8a6/garage-guardian
+
+ ✓ src/components/interaction-provider.test.tsx (6 tests) 1795ms
+   ✓ protects independent forms, reverts, and announces confirmations in en  694ms
+   ✓ protects independent forms, reverts, and announces confirmations in es  568ms
+ ✓ src/components/account-management.test.tsx (24 tests) 22861ms
+   ✓ en account workflows > retains a password draft after saving email preferences and guards leaving security settings  2333ms
+   ✓ en account workflows > opens the profile drawer, traps focus, and connects security, notifications and sign-out  1263ms
+   ✓ en account workflows > shows a guest initial and offers sign-in from the account page  676ms
+   ✓ en account workflows > opens registration from the guest drawer and returns to account settings after signup  1084ms
+   ✓ en account workflows > shows only the current email on the account page and restores pages with browser history  1052ms
+   ✓ en account workflows > preserves entered email through recovery/resend, announces generic copy, and enforces cooldown  749ms
+   ✓ en account workflows > allows resend after an unconfirmed-email error and from the signup notice  1429ms
+   ✓ en account workflows > opens accessible settings even after cloud loading fails, validates mismatch, and traps/restores keyboard focus  1304ms
+   ✓ en account workflows > handles recovery sessions independently of cloud loading and returns to sign-in after reset  949ms
+   ✓ en account workflows > cancels recovery with local sign-out and clears its marker  453ms
+   ✓ en account workflows > preserves a replacement login while recovery cancellation waits for the auth lock  487ms
+   ✓ es account workflows > retains a password draft after saving email preferences and guards leaving security settings  646ms
+   ✓ es account workflows > opens the profile drawer, traps focus, and connects security, notifications and sign-out  1165ms
+   ✓ es account workflows > shows a guest initial and offers sign-in from the account page  665ms
+   ✓ es account workflows > opens registration from the guest drawer and returns to account settings after signup  1046ms
+   ✓ es account workflows > shows only the current email on the account page and restores pages with browser history  996ms
+   ✓ es account workflows > preserves entered email through recovery/resend, announces generic copy, and enforces cooldown  808ms
+   ✓ es account workflows > allows resend after an unconfirmed-email error and from the signup notice  1478ms
+   ✓ es account workflows > opens accessible settings even after cloud loading fails, validates mismatch, and traps/restores keyboard focus  1259ms
+   ✓ es account workflows > handles recovery sessions independently of cloud loading and returns to sign-in after reset  937ms
+   ✓ es account workflows > cancels recovery with local sign-out and clears its marker  468ms
+   ✓ es account workflows > preserves a replacement login while recovery cancellation waits for the auth lock  468ms
+   ✓ disables all account forms during an in-flight request and retains drafts on network failure  621ms
+   ✓ shows a revocation failure when Supabase clears the recovery session on a failed sign-out  524ms
+ ✓ src/components/garage-navigation.test.tsx (33 tests) 23400ms
+   ✓ returns from email notification settings through sign-in and loads the account form  2753ms
+   ✓ does not offer an email opt-in for a local-only garage  420ms
+   ✓ keeps local-only account and security menu entries disabled in en  698ms
+   ✓ keeps local-only account and security menu entries disabled in es  640ms
+   ✓ returns to account settings after signing in from a direct visit  1146ms
+   ✓ returns to security settings after signing in from a direct visit  1216ms
+   ✓ classifies notification settings without activating workspace links in en  451ms
+   ✓ classifies notification settings without activating workspace links in es  450ms
+   ✓ moves vehicle-link focus without navigating until Enter and retains native Tab stops  792ms
+   ✓ announces drawer state, focuses its active link, and closes on Escape, blur and desktop resize  743ms
+   ✓ retraces screens and vehicles with Back/Forward without reloading the garage, and restores a bookmark  782ms
+   ✓ loads and reloads /history directly  393ms
+   ✓ loads and reloads /reports directly  414ms
+   ✓ waits for garage loading before canonicalizing /cars and leaves no extra Back stop  391ms
+   ✓ keeps an empty Vehicles URL and shows missing bookmarks without substituting a car  407ms
+   ✓ closes dialogs and the mobile menu on browser navigation  595ms
+   ✓ closes the mobile drawer when its active link is selected at /  552ms
+   ✓ closes the mobile drawer when its active link is selected at /cars  558ms
+   ✓ closes the mobile drawer when its active link is selected at /history  620ms
+   ✓ closes the mobile drawer when its active link is selected at /reports  561ms
+   ✓ retains a vehicle after failed edit/delete, and replaces the URL only after successful deletion  1025ms
+   ✓ restores page interactivity when discarding closes both the confirmation and its form  681ms
+   ✓ retains the vehicle URL after a committed delete fails to refresh (only car=false)  594ms
+   ✓ retains the vehicle URL after a committed delete fails to refresh (only car=true)  610ms
+   ✓ returns from account screens to a bookmark, preserves email between modes and clears password/error  1253ms
+   ✓ signs in to the original screen, retains it on sign-out, and offers sign-in for unavailable cloud bookmarks  1166ms
+   ✓ bypasses account screens for prototype or signed-in users (cloud=false)  357ms
+   ✓ bypasses account screens for prototype or signed-in users (cloud=true)  432ms
+   ✓ keeps deep URLs through cloud recovery and retry  422ms
+   ✓ returns confirmation-pending signup to the original screen and keeps its notice  876ms
+   ✓ reloads a direct sign-in route and sends an invalid return destination to Dashboard  430ms
+   ✓ does not redirect away from a new screen when a vehicle deletion finishes  530ms
+   ✓ keeps the requested vehicle and does not restart a signup transfer on navigation  440ms
+ ✓ src/components/bug-reporter.test.tsx (29 tests) 39031ms
+   ✓ authenticated public bug reporter > protects report drafts on Escape and clears them only after explicit discard  812ms
+   ✓ authenticated public bug reporter > previews notification settings with its own route and screen  1613ms
+   ✓ authenticated public bug reporter > previews a vehicle route template without exposing the ID or URL parameters  1554ms
+   ✓ authenticated public bug reporter > hides language selection while loading and restores it in recovery without losing the draft  501ms
+   ✓ authenticated public bug reporter > keeps oversized reports reviewable and blocks publication until diagnostics are removed  1087ms
+   ✓ authenticated public bug reporter > previews diagnostics and screen state, requires acknowledgment, and uses a bearer session  1775ms
+   ✓ authenticated public bug reporter > keeps the same draft across transport failures and checks status instead of reposting  1768ms
+   ✓ authenticated public bug reporter > unfreezes the reviewed draft when the initial session lookup is missing before fetch  1768ms
+   ✓ authenticated public bug reporter > unfreezes the reviewed draft when the initial session lookup is rejected before fetch  1757ms
+   ✓ authenticated public bug reporter > keeps uncertain submissions frozen when the status session lookup is missing before fetch  1785ms
+   ✓ authenticated public bug reporter > keeps uncertain submissions frozen when the status session lookup is rejected before fetch  1788ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write AUTH_UNAVAILABLE response  1808ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write IP_UNAVAILABLE response  1837ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write NOT_CONFIGURED response  1714ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write LIMITER_UNAVAILABLE response  1770ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write SUBMISSION_NOT_STARTED response  1754ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with network  1722ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with non-json  1782ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with disabled  1768ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with http-error  1722ms
+   ✓ authenticated public bug reporter > never invites a new POST when a previously uncertain receipt disappears  1720ms
+   ✓ authenticated public bug reporter > keeps an uncertain submission frozen through status errors and unlocks only an explicit failed receipt  2350ms
+   ✓ authenticated public bug reporter > translates open drafts, validation, provider errors and statuses when switching languages  1941ms
+   ✓ authenticated public bug reporter > clears the open draft and diagnostics on an account remount/sign-out  338ms
+
+ Test Files  4 passed (4)
+      Tests  92 passed (92)
+   Start at  11:18:42
+   Duration  45.70s (transform 2.36s, setup 4.69s, collect 5.11s, tests 87.09s, environment 10.40s, prepare 2.53s)
+

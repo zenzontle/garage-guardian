@@ -8,6 +8,7 @@ import { AccountCard } from './account-card';
 import { AccountEmailForm } from './account-email-form';
 import { AccountPasswordFields } from './account-password-fields';
 import { useGarage } from './garage-provider';
+import { useFormInteraction } from './use-form-interaction';
 
 export function AccountRecoveryScreen() {
   const t = useTranslations();
@@ -17,6 +18,17 @@ export function AccountRecoveryScreen() {
   const [confirmation, setConfirmation] = useState('');
   const [error, setError] = useState<AppFailure | null>(null);
   const [requesting, setRequesting] = useState(false);
+  const interaction = useFormInteraction(
+    { password, confirmation },
+    {
+      busy: garage.accountBusy,
+      enabled: !requesting,
+      onDiscard: () => {
+        setPassword('');
+        setConfirmation('');
+      },
+    },
+  );
   async function cancel() {
     try {
       if (garage.recovering) await garage.cancelRecovery();
@@ -27,12 +39,18 @@ export function AccountRecoveryScreen() {
   }
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!interaction.begin()) return;
     setError(null);
     try {
       await garage.resetPassword(password, confirmation);
+      interaction.accept();
+      setPassword('');
+      setConfirmation('');
       router.replace('/signin');
     } catch (cause) {
       setError(failureOf(cause, 'auth'));
+    } finally {
+      interaction.end();
     }
   }
   return (
@@ -67,7 +85,11 @@ export function AccountRecoveryScreen() {
               <button className="button primary full">
                 {t(garage.accountBusy ? 'account.wait' : 'account.resetPassword')}
               </button>
-              <button type="button" className="text-link" onClick={() => void cancel()}>
+              <button
+                type="button"
+                className="text-link"
+                onClick={() => interaction.request(() => void cancel())}
+              >
                 {t('account.backSignin')}
               </button>
             </fieldset>
@@ -82,7 +104,7 @@ export function AccountRecoveryScreen() {
           <button className="button primary full" onClick={() => setRequesting(true)}>
             {t('account.requestAnother')}
           </button>
-          <button className="text-link" onClick={() => void cancel()}>
+          <button className="text-link" onClick={() => interaction.request(() => void cancel())}>
             {t('account.backSignin')}
           </button>
         </>

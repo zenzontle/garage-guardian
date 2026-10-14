@@ -1,0 +1,115 @@
+$ vitest run "src/components/form-protection.test.tsx" "src/components/bug-reporter.test.tsx" "src/components/garage-save-recovery.test.tsx" "src/lib/signup-transfer.test.ts"
+
+ RUN  v3.2.7 C:/Users/zenzo/.codex/worktrees/d8a6/garage-guardian
+
+ ❯ src/lib/signup-transfer.test.ts (30 tests | 1 failed) 2108ms
+   × signup transfer > reports upload and verification stages without changing transfer completion 48ms
+     → Not authenticated
+   ✓ signup transfer > cleans up legacy uploaded defaults across days without removing guest changes (none) 204ms
+   ✓ signup transfer > cleans up legacy uploaded defaults across days without removing guest changes (metadata) 109ms
+   ✓ signup transfer > cleans up legacy uploaded defaults across days without removing guest changes (due point) 111ms
+   ✓ signup transfer > cleans up legacy uploaded defaults across days without removing guest changes (new task) 106ms
+   ✓ signup transfer > cleans up initialized guest schedules after retry (guest edit: none) 177ms
+   ✓ signup transfer > cleans up initialized guest schedules after retry (guest edit: metadata) 240ms
+   ✓ signup transfer > cleans up initialized guest schedules after retry (guest edit: due point) 199ms
+   ✓ signup transfer > keeps legacy transfer due dates fixed across failed uploads and later-day reload retries 184ms
+   ✓ signup transfer > resumes interval-only schedules from a frozen legacy upload (interrupted: false) 32ms
+   ✓ signup transfer > resumes interval-only schedules from a frozen legacy upload (interrupted: true) 32ms
+   ✓ signup transfer > resumes a legacy pending transfer and cleans up equivalent guest records 39ms
+   ✓ signup transfer > resumes a legacy uploading transfer and cleans up equivalent guest records 17ms
+   ✓ signup transfer > resumes a legacy uploaded transfer and cleans up equivalent guest records 8ms
+   ✓ signup transfer > preserves a saved plate through a failed upload and a reload retry 154ms
+   ✓ signup transfer > keeps a legacy pending snapshot frozen and preserves a concurrent guest plate edit 17ms
+   ✓ signup transfer > retains a populated plate when cloud verification returns a different value 16ms
+   ✓ signup transfer > preserves kilometer units, readings, and maintenance intervals during signup transfer 27ms
+   ✓ signup transfer > uploads the whole garage and photo blobs, preserves relationships, and clears the browser copy 22ms
+   ✓ signup transfer > retains all local data on a partial failure and retries without duplicate rows or photos 41ms
+   ✓ signup transfer > keeps records when a referenced local photo is missing 24ms
+   ✓ signup transfer > retains browser data when cloud verification fails 12ms
+   ✓ signup transfer > keeps the local photo if uploaded bytes are corrupted without changing the file size 21ms
+   ✓ signup transfer > retries cleanup without overwriting cloud edits or requiring already-deleted local photos 27ms
+   ✓ signup transfer > does not transfer on ordinary sign-in, to another account, or to another project 14ms
+   ✓ signup transfer > does not authorize an existing-account signup response or replace another pending account 9ms
+   ✓ signup transfer > serializes duplicate transfer attempts 19ms
+   ✓ signup transfer > takes a browser lock so transfers in separate tabs cannot run concurrently 172ms
+   ✓ signup transfer > stops after a session change and keeps the local copy for retry 12ms
+   ✓ signup transfer > preserves guest edits and photo references made after the frozen transfer started 12ms
+ ✓ src/components/form-protection.test.tsx (4 tests) 4497ms
+   ✓ guards all dismissal paths for a changed car and allows reverting  1852ms
+   ✓ guards all dismissal paths for a changed schedule and allows reverting  1128ms
+   ✓ guards all dismissal paths for a changed visit and allows reverting  1356ms
+ ❯ src/components/garage-save-recovery.test.tsx (11 tests | 1 failed) 19858ms
+   × local save recovery > announces photo counts, blocks dismissal, and submits once while uploads are pending 5284ms
+     → Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+   ✓ local save recovery > keeps committed photos after refresh failure and offers a translated read-only retry  2559ms
+   ✓ local save recovery > keeps a failed-save draft and removes only its new uploads, then allows saving again  1721ms
+   ✓ local save recovery > cleans up earlier uploads when a later upload fails without saving  1301ms
+   ✓ local save recovery > closes an edited visit when old-photo cleanup fails and preserves its new photos  1188ms
+   ✓ cloud save recovery > announces photo counts, blocks dismissal, and submits once while uploads are pending  1125ms
+   ✓ cloud save recovery > keeps committed photos after refresh failure and offers a translated read-only retry  1843ms
+   ✓ cloud save recovery > keeps a failed-save draft and removes only its new uploads, then allows saving again  1335ms
+   ✓ cloud save recovery > cleans up earlier uploads when a later upload fails without saving  970ms
+   ✓ cloud save recovery > closes an edited visit when old-photo cleanup fails and preserves its new photos  1120ms
+   ✓ stays on the current page when a new car saves but refresh fails  1408ms
+ ✓ src/components/bug-reporter.test.tsx (28 tests) 44745ms
+   ✓ authenticated public bug reporter > protects report drafts on Escape and clears them only after explicit discard  1709ms
+   ✓ authenticated public bug reporter > previews notification settings with its own route and screen  3235ms
+   ✓ authenticated public bug reporter > previews a vehicle route template without exposing the ID or URL parameters  1884ms
+   ✓ authenticated public bug reporter > hides language selection while loading and restores it in recovery without losing the draft  592ms
+   ✓ authenticated public bug reporter > keeps oversized reports reviewable and blocks publication until diagnostics are removed  2031ms
+   ✓ authenticated public bug reporter > previews diagnostics and screen state, requires acknowledgment, and uses a bearer session  2018ms
+   ✓ authenticated public bug reporter > keeps the same draft across transport failures and checks status instead of reposting  1984ms
+   ✓ authenticated public bug reporter > unfreezes the reviewed draft when the initial session lookup is missing before fetch  2058ms
+   ✓ authenticated public bug reporter > unfreezes the reviewed draft when the initial session lookup is rejected before fetch  1909ms
+   ✓ authenticated public bug reporter > keeps uncertain submissions frozen when the status session lookup is missing before fetch  1795ms
+   ✓ authenticated public bug reporter > keeps uncertain submissions frozen when the status session lookup is rejected before fetch  1740ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write AUTH_UNAVAILABLE response  1872ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write IP_UNAVAILABLE response  1890ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write NOT_CONFIGURED response  1824ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write LIMITER_UNAVAILABLE response  1727ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write SUBMISSION_NOT_STARTED response  1844ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with network  1868ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with non-json  1801ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with disabled  1789ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with http-error  1781ms
+   ✓ authenticated public bug reporter > never invites a new POST when a previously uncertain receipt disappears  1813ms
+   ✓ authenticated public bug reporter > keeps an uncertain submission frozen through status errors and unlocks only an explicit failed receipt  2718ms
+   ✓ authenticated public bug reporter > translates open drafts, validation, provider errors and statuses when switching languages  1933ms
+   ✓ authenticated public bug reporter > clears the open draft and diagnostics on an account remount/sign-out  408ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/components/garage-save-recovery.test.tsx > local save recovery > announces photo counts, blocks dismissal, and submits once while uploads are pending
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/components/garage-save-recovery.test.tsx:67:3
+     65| 
+     66| describe.each(['local', 'cloud'] as const)('%s save recovery', (mode) …
+     67|   it('announces photo counts, blocks dismissal, and submits once while…
+       |   ^
+     68|     const { prototype, user } = await setup(mode);
+     69|     const original = prototype.uploadPhoto;
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/lib/signup-transfer.test.ts > signup transfer > reports upload and verification stages without changing transfer completion
+Error: Not authenticated
+ ❯ src/test/fake-supabase.ts:55:46
+     53|         };
+     54|       }
+     55|       if (!user) return { data: null, error: new Error('Not authentica…
+       |                                              ^
+     56|       if (operation === 'upsert') {
+     57|         if (row?.user_id !== user.id)
+ ❯ Object.then src/test/fake-supabase.ts:123:9
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 2 passed (4)
+      Tests  2 failed | 71 passed (73)
+   Start at  11:09:32
+   Duration  58.54s (transform 6.93s, setup 10.23s, collect 9.86s, tests 71.21s, environment 22.96s, prepare 3.75s)
+
+[ELIFECYCLE] Test failed. See above for more details.

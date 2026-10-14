@@ -63,7 +63,14 @@ vi.mock('next/navigation', async () => {
 vi.mock('next/link', async () => {
   const { createElement } = await import('react');
   return {
-    default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) =>
+    default: ({
+      href,
+      children,
+      onNavigate,
+      ...props
+    }: React.AnchorHTMLAttributes<HTMLAnchorElement> & {
+      onNavigate?: (event: { preventDefault: () => void }) => void;
+    }) =>
       createElement(
         'a',
         {
@@ -82,7 +89,13 @@ vi.mock('next/link', async () => {
             )
               return;
             event.preventDefault();
-            testRouter.push(href!);
+            let blocked = false;
+            onNavigate?.({
+              preventDefault: () => {
+                blocked = true;
+              },
+            });
+            if (!blocked) testRouter.push(href!);
           },
         },
         children,

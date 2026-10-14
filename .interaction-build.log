@@ -1,0 +1,44 @@
+$ next build
+   ▲ Next.js 15.5.26
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully in 9.2s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/15) ...
+   Generating static pages (3/15) 
+   Generating static pages (7/15) 
+   Generating static pages (11/15) 
+ ✓ Generating static pages (15/15)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                                 Size  First Load JS
+┌ ○ /                                    3.37 kB         234 kB
+├ ○ /_not-found                            988 B         103 kB
+├ ƒ /api/account                           136 B         103 kB
+├ ƒ /api/bug-reports                       136 B         103 kB
+├ ƒ /api/bug-reports/[submissionId]        136 B         103 kB
+├ ƒ /api/bug-reports/config                136 B         103 kB
+├ ƒ /api/notification-preferences          136 B         103 kB
+├ ƒ /api/reminders                       3.25 kB         130 kB
+├ ○ /auth/recovery                       1.19 kB         238 kB
+├ ○ /cars                                  136 B         234 kB
+├ ƒ /cars/[carId]                          136 B         234 kB
+├ ○ /history                             4.43 kB         231 kB
+├ ○ /icon.svg                                0 B            0 B
+├ ○ /reports                             2.42 kB         229 kB
+├ ○ /settings/account                    1.74 kB         232 kB
+├ ○ /settings/notifications              2.26 kB         233 kB
+├ ○ /settings/security                   1.74 kB         232 kB
+├ ƒ /signin                              1.83 kB         242 kB
+└ ƒ /signup                              1.83 kB         242 kB
++ First Load JS shared by all             102 kB
+  ├ chunks/6e8bd58a-b44f74d165e106a3.js  54.2 kB
+  ├ chunks/809-de8c50b4d455455c.js       46.2 kB
+  └ other shared chunks (total)             2 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
+import Link from './guarded-link';
 import { usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Bell, LogOut, Shield, UserRound, UserRoundPlus } from 'lucide-react';
@@ -77,8 +77,7 @@ export function GarageProfile() {
                 className="profile-option profile-signout"
                 disabled={garage.accountBusy}
                 onClick={() => {
-                  close();
-                  void garage.signOut();
+                  garage.signOut(close);
                 }}
               >
                 <LogOut size={19} aria-hidden="true" />

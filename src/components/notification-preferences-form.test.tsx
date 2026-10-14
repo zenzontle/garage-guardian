@@ -1,3 +1,4 @@
+import { testRouter } from '../test/garage-router';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NextIntlClientProvider } from 'next-intl';
@@ -7,6 +8,8 @@ import { notificationRequest } from '@/lib/notification-client';
 import type { NotificationPreferences } from '@/lib/notification-preferences';
 import en from '../../messages/en.json';
 import es from '../../messages/es.json';
+import { InteractionProvider } from './interaction-provider';
+import Link from './guarded-link';
 
 vi.mock('@/lib/notification-client', () => ({ notificationRequest: vi.fn() }));
 const defaults: NotificationPreferences = {
@@ -19,10 +22,37 @@ beforeEach(() => vi.mocked(notificationRequest).mockResolvedValue(null));
 function view(locale: 'en' | 'es' = 'en', userId = 'alice') {
   return (
     <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : es} timeZone="UTC">
-      <NotificationPreferencesForm key={userId} userId={userId} />
+      <InteractionProvider>
+        <NotificationPreferencesForm key={userId} userId={userId} />
+        <Link href="/reports">Leave</Link>
+      </InteractionProvider>
     </NextIntlClientProvider>
   );
 }
+
+it('protects failed-save edits, clears the guard on save, and treats loaded or reverted preferences as clean', async () => {
+  testRouter.reset('/settings/notifications');
+  const user = userEvent.setup();
+  render(view());
+  await screen.findByRole('checkbox');
+  await user.selectOptions(screen.getByLabelText(en.notifications.weekday), '5');
+  await user.selectOptions(screen.getByLabelText(en.notifications.weekday), '1');
+  await user.click(screen.getByText('Leave'));
+  expect(testRouter.url).toBe('/reports');
+  expect(screen.queryByRole('alertdialog')).toBeNull();
+  await user.click(screen.getByRole('checkbox'));
+  vi.mocked(notificationRequest).mockRejectedValueOnce(new Error('offline'));
+  await user.click(screen.getByText(en.notifications.save));
+  await screen.findByRole('alert');
+  await user.click(screen.getByText('Leave'));
+  expect(screen.getByRole('alertdialog')).toBeDefined();
+  await user.click(screen.getByText(en.interactions.keepEditing));
+  vi.mocked(notificationRequest).mockResolvedValueOnce({ ...defaults, enabled: true });
+  await user.click(screen.getByText(en.notifications.save));
+  await screen.findByText(en.notifications.saved);
+  await user.click(screen.getByText('Leave'));
+  expect(screen.queryByRole('alertdialog')).toBeNull();
+});
 
 it.each(['en', 'es'] as const)(
   'opts in explicitly and saves translated preferences in %s',

@@ -30,6 +30,59 @@ describe.each([
   ['en', en],
   ['es', es],
 ] as const)('%s account workflows', (locale, copy) => {
+  it('retains a password draft after saving email preferences and guards leaving security settings', async () => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    testRouter.reset('/settings/security');
+    cloud.emit(account());
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) =>
+        url === '/api/account' ? Response.json({ ok: true }) : Response.json({ enabled: false }),
+      ),
+    );
+    const App = await loadGarageTestApp();
+    const user = userEvent.setup();
+    render(<App />);
+    const email = within(await screen.findByRole('form', { name: copy.account.changeEmail }));
+    const password = within(screen.getByRole('form', { name: copy.account.changePassword }));
+    fireEvent.change(email.getByLabelText(copy.account.currentPassword), {
+      target: { value: 'current-password' },
+    });
+    fireEvent.change(email.getByLabelText(copy.account.newEmail), {
+      target: { value: 'changed@example.com' },
+    });
+    fireEvent.change(password.getByLabelText(copy.account.newPassword), {
+      target: { value: 'unfinished-password' },
+    });
+    await user.click(email.getByRole('button', { name: copy.account.changeEmail }));
+    await email.findByRole('status');
+    expect(password.getByLabelText(copy.account.newPassword)).toHaveProperty(
+      'value',
+      'unfinished-password',
+    );
+    await user.click(
+      within(screen.getByRole('navigation', { name: copy.app.mainNavigation })).getByRole('link', {
+        name: copy.navigation.reports,
+      }),
+    );
+    expect(screen.getByRole('alertdialog')).toBeDefined();
+    expect(testRouter.url).toBe('/settings/security');
+    await user.click(screen.getByText(copy.interactions.keepEditing));
+    await user.click(screen.getByRole('button', { name: copy.account.openMenu }));
+    await user.click(screen.getByRole('button', { name: copy.account.signOut }));
+    expect(screen.getByRole('alertdialog')).toBeDefined();
+    expect(cloud.auth.signOut).not.toHaveBeenCalled();
+    await user.click(screen.getByText(copy.interactions.keepEditing));
+    expect(document.activeElement?.textContent).toBe(copy.account.signOut);
+    await user.keyboard('{Escape}');
+    fireEvent.change(password.getByLabelText(copy.account.newPassword), { target: { value: '' } });
+    await user.click(
+      within(screen.getByRole('navigation', { name: copy.app.mainNavigation })).getByRole('link', {
+        name: copy.navigation.reports,
+      }),
+    );
+    expect(testRouter.url).toBe('/reports');
+  });
   it('opens the profile drawer, traps focus, and connects security, notifications and sign-out', async () => {
     localStorage.setItem('garage-guardian:locale', locale);
     testRouter.reset('/');
@@ -216,12 +269,15 @@ describe.each([
       target: { value: 'owner@example.com' },
     });
     await user.click(screen.getByRole('button', { name: copy.account.forgotPassword }));
+    await user.click(screen.getByRole('button', { name: copy.interactions.discard }));
     expect(document.activeElement).toBe(screen.getByLabelText(copy.account.email));
     expect(screen.queryByLabelText(copy.account.password)).toBeNull();
     await user.click(screen.getByRole('button', { name: copy.account.sendRecovery }));
     expect((await screen.findByRole('status')).textContent).toBe(copy.account.emailSent);
     await user.click(screen.getByRole('button', { name: copy.account.backSignin }));
     await user.click(screen.getByRole('button', { name: copy.account.resendConfirmation }));
+    const discard = screen.queryByRole('button', { name: copy.interactions.discard });
+    if (discard) await user.click(discard);
     expect((screen.getByLabelText(copy.account.email) as HTMLInputElement).value).toBe(
       'owner@example.com',
     );
@@ -251,6 +307,8 @@ describe.each([
     await user.click(screen.getByRole('button', { name: copy.account.signIn }));
     expect((await screen.findByRole('alert')).textContent).toBe(copy.errors.emailNotConfirmed);
     await user.click(screen.getByRole('button', { name: copy.account.resendConfirmation }));
+    const discard = screen.queryByRole('button', { name: copy.interactions.discard });
+    if (discard) await user.click(discard);
     expect((screen.getByLabelText(copy.account.email) as HTMLInputElement).value).toBe(
       'owner@example.com',
     );
@@ -302,6 +360,8 @@ describe.each([
       within(dialog).getByRole('button', { name: copy.shared.close }),
     );
     await user.keyboard('{Escape}');
+    expect(screen.getByRole('alertdialog')).toBeDefined();
+    await user.click(screen.getByRole('button', { name: copy.interactions.discard }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(trigger);
   });

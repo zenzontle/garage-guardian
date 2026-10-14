@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BugReporter } from './bug-reporter';
 import { LocaleProvider } from './locale-provider';
+import { InteractionProvider } from './interaction-provider';
 import { metadata, oversizedReport } from '@/lib/bug-reports/fixtures.test-helper';
 import { recordDiagnostic } from '@/lib/bug-reports/diagnostics';
 import { workspaceScreen } from '@/lib/garage-routes';
@@ -22,7 +23,13 @@ beforeEach(() => {
   Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:screenshot'), revokeObjectURL: vi.fn() });
 });
 function render(ui: ReactNode) {
-  return renderUI(ui, { wrapper: LocaleProvider });
+  return renderUI(ui, {
+    wrapper: ({ children }) => (
+      <LocaleProvider>
+        <InteractionProvider>{children}</InteractionProvider>
+      </LocaleProvider>
+    ),
+  });
 }
 async function openReport() {
   const user = userEvent.setup();
@@ -44,6 +51,19 @@ function failSessionLookup(failure: 'missing' | 'rejected') {
   else auth.getSession.mockResolvedValueOnce({ data: { session: null } });
 }
 describe('authenticated public bug reporter', () => {
+  it('protects report drafts on Escape and clears them only after explicit discard', async () => {
+    const user = await openReport();
+    await user.type(screen.getByLabelText('Title'), 'Unsaved report');
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('alertdialog')).toBeDefined();
+    await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+    expect(screen.getByLabelText('Title')).toHaveProperty('value', 'Unsaved report');
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Report a bug' }));
+    expect(screen.getByLabelText('Title')).toHaveProperty('value', '');
+  });
   it('previews notification settings with its own route and screen', async () => {
     window.history.replaceState(null, '', '/settings/notifications');
     try {
@@ -464,6 +484,27 @@ describe('authenticated public bug reporter', () => {
     await user.keyboard('{Escape}');
     expect(screen.getByRole('dialog').getAttribute('aria-label')).toBe('Existing dialog');
     expect(document.activeElement).toBe(launcher);
+  });
+  it('returns focus to the replacement launcher when an underlying form closes', async () => {
+    const user = userEvent.setup();
+    const app = render(
+      <>
+        <div className="modal" role="dialog" aria-label="Existing dialog">
+          <button>Underlying close</button>
+        </div>
+        <BugReporter userId="account" screen="cars" dialog="add-car" />
+      </>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Report a bug' }));
+    app.rerender(
+      <>
+        <div />
+        <BugReporter userId="account" screen="cars" dialog="none" />
+      </>,
+    );
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Report a bug' }));
   });
   it('clears the open draft and diagnostics on an account remount/sign-out', async () => {
     const user = userEvent.setup();

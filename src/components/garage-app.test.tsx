@@ -248,8 +248,10 @@ describe.each([
     expect((screen.getByLabelText('Model') as HTMLInputElement).value).toBe('RAV4');
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
     await user.click(screen.getAllByRole('link', { name: 'My cars' })[0]);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     await user.click(screen.getByRole('button', { name: 'Delete car and records' }));
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }),
+    );
     await screen.findByText('No cars yet');
     expect((await new LocalRepository().load()).cars).toEqual([]);
     expect(cloud.tables.get('cars')?.size ?? 0).toBe(0);
@@ -684,6 +686,7 @@ it('localizes a recognized auth failure and confirmation notice while preserving
   expect(screen.getByLabelText('Contraseña')).toHaveProperty('value', 'password');
   expect(cloud.auth.signInWithPassword).toHaveBeenCalledOnce();
   await user.click(screen.getByRole('button', { name: 'Crear una cuenta' }));
+  await user.click(screen.getByRole('button', { name: 'Descartar cambios' }));
   cloud.requireConfirmation();
   await user.type(screen.getByLabelText('Contraseña'), 'password');
   await user.click(screen.getByRole('button', { name: 'Crear cuenta' }));

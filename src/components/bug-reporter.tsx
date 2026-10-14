@@ -7,6 +7,8 @@ import { useLocale, useTranslations } from 'next-intl';
 import { reportPath } from '@/lib/garage-routes';
 import en from '../../messages/en.json';
 import { LocaleSelector } from './locale-selector';
+import { useFormInteraction } from './use-form-interaction';
+import { isTopDialog, useDialogFocus } from './dialog-focus';
 import { BugReportFields } from './bug-report-fields';
 import { BugReportPreview } from './bug-report-preview';
 import { BugReportScreenshots, type Screenshot } from './bug-report-screenshots';
@@ -79,6 +81,7 @@ export function BugReporter({
   dialog: ReportContext['dialog'];
 }) {
   const t = useTranslations('bugReports');
+  const shared = useTranslations('interactions');
   const locale = useLocale();
   const [metadata, setMetadata] = useState<PublicMetadata | null>(null);
   const [open, setOpen] = useState(false);
@@ -90,6 +93,7 @@ export function BugReporter({
   const [acknowledged, setAcknowledged] = useState(false);
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState<keyof typeof en.bugReports.statuses | null>(null);
   const [error, setError] = useState<ReporterProblem | null>(null);
   const [issueUrl, setIssueUrl] = useState('');
@@ -132,36 +136,26 @@ export function BugReporter({
     },
     [],
   );
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const siblings = [...document.body.children].filter(
-      (element) => element !== portalRef.current,
-    ) as HTMLElement[];
-    const inert = siblings.map((element) => element.inert);
-    siblings.forEach((element) => {
-      element.inert = true;
-    });
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    (
-      dialogRef.current?.querySelector<HTMLElement>('input:not(:disabled)') ?? dialogRef.current
-    )?.focus();
-    return () => {
-      siblings.forEach((element, index) => {
-        element.inert = inert[index];
-      });
-      document.body.style.overflow = overflow;
-      if (previous?.isConnected) previous.focus();
-      else document.querySelector<HTMLElement>('.bug-report-launcher')?.focus();
-    };
-  }, [open]);
+  useDialogFocus(dialogRef, open, 'input:not(:disabled)', '.bug-report-launcher');
+  const interaction = useFormInteraction(
+    {
+      title,
+      description,
+      screenshots: screenshots.map(({ file }) => ({
+        name: file.name,
+        size: file.size,
+        modified: file.lastModified,
+      })),
+    },
+    { busy, enabled: !issueUrl, onDiscard: reset },
+  );
 
   if (!metadata || !userId) return null;
   const close = () => {
-    if (!busy) setOpen(false);
+    interaction.request(() => setOpen(false));
   };
   function reset() {
+    interaction.accept({ title: '', description: '', screenshots: [] });
     screenshots.forEach((item) => URL.revokeObjectURL(item.url));
     setScreenshots([]);
     setTitle('');
@@ -174,6 +168,7 @@ export function BugReporter({
     setError(null);
   }
   function keyboard(event: KeyboardEvent) {
+    if (!isTopDialog(dialogRef.current)) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
@@ -240,9 +235,11 @@ export function BugReporter({
       setError({ code: 'ISSUE_TOO_LARGE' });
       return;
     }
+    if (!interaction.begin()) return;
     setBusy(true);
     setError(null);
     const checking = check || sent;
+    setChecking(checking);
     try {
       const data = new FormData();
       data.append('report', JSON.stringify(draft));
@@ -296,6 +293,7 @@ export function BugReporter({
         isRepositoryIssueUrl(result.issueUrl, metadata!.repository)
       ) {
         setIssueUrl(result.issueUrl);
+        interaction.accept();
         setStatus('published');
       } else if (result.state === 'failed') {
         setSent(false);
@@ -315,6 +313,7 @@ export function BugReporter({
           : { code: 'SUBMIT_FAILED' },
       );
     } finally {
+      interaction.end();
       setBusy(false);
     }
   }
@@ -338,13 +337,21 @@ export function BugReporter({
       {launcherTarget ? createPortal(launcher, launcherTarget) : launcher}
       {open &&
         createPortal(
-          <div ref={portalRef} className="modal-backdrop bug-report-backdrop" onKeyDown={keyboard}>
+          <div
+            ref={portalRef}
+            className="modal-backdrop bug-report-backdrop"
+            onKeyDown={keyboard}
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && isTopDialog(dialogRef.current)) close();
+            }}
+          >
             <div
               ref={dialogRef}
               tabIndex={-1}
               className="modal bug-report-modal"
               role="dialog"
               aria-modal="true"
+              aria-busy={busy}
               aria-labelledby="bug-report-title"
             >
               <div className="modal-header">
@@ -363,65 +370,74 @@ export function BugReporter({
                 </button>
               </div>
               <div className="modal-body form-stack">
-                <p className="info-callout">{t('publicWarning')}</p>
-                {!draft ? (
-                  <BugReportFields
-                    title={title}
-                    description={description}
-                    onTitleChange={setTitle}
-                    onDescriptionChange={setDescription}
-                    onChooseFiles={chooseFiles}
-                  />
-                ) : (
-                  <BugReportPreview
-                    draft={draft}
-                    screenshotCount={screenshots.length}
-                    disabled={sent || busy}
-                    onDraftChange={(next) => {
-                      setDraft(next);
+                <fieldset className="interaction-fields" disabled={busy}>
+                  <p className="info-callout">{t('publicWarning')}</p>
+                  {!draft ? (
+                    <BugReportFields
+                      title={title}
+                      description={description}
+                      onTitleChange={setTitle}
+                      onDescriptionChange={setDescription}
+                      onChooseFiles={chooseFiles}
+                    />
+                  ) : (
+                    <BugReportPreview
+                      draft={draft}
+                      screenshotCount={screenshots.length}
+                      disabled={sent || busy}
+                      onDraftChange={(next) => {
+                        setDraft(next);
+                        setAcknowledged(false);
+                      }}
+                    />
+                  )}
+                  <BugReportScreenshots
+                    screenshots={screenshots}
+                    sent={sent}
+                    busy={busy}
+                    onRemove={(index) => {
+                      URL.revokeObjectURL(screenshots[index].url);
+                      setScreenshots(screenshots.filter((_, position) => position !== index));
+                      if (draft) setDraft({ ...draft, submissionId: crypto.randomUUID() });
                       setAcknowledged(false);
                     }}
                   />
-                )}
-                <BugReportScreenshots
-                  screenshots={screenshots}
-                  sent={sent}
-                  busy={busy}
-                  onRemove={(index) => {
-                    URL.revokeObjectURL(screenshots[index].url);
-                    setScreenshots(screenshots.filter((_, position) => position !== index));
-                    if (draft) setDraft({ ...draft, submissionId: crypto.randomUUID() });
-                    setAcknowledged(false);
-                  }}
-                />
-                {draft && (
-                  <label className="checkbox-line">
-                    <input
-                      type="checkbox"
-                      checked={acknowledged}
-                      disabled={sent || busy}
-                      onChange={(event) => setAcknowledged(event.target.checked)}
-                    />
-                    {t('acknowledgment')}
-                  </label>
-                )}
-                {error && (
-                  <p className="error-text" role="alert">
-                    {t(`errors.${error.code}`)}
-                    {error.retryAfter ? ` ${t('retryAfter', { count: error.retryAfter })}` : ''}
-                  </p>
-                )}
-                {status && <p role="status">{t(`statuses.${status}`)}</p>}
-                {issueUrl && (
-                  <a
-                    className="text-link"
-                    href={issueUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {t('issueLink')}
-                  </a>
-                )}
+                  {draft && (
+                    <label className="checkbox-line">
+                      <input
+                        type="checkbox"
+                        checked={acknowledged}
+                        disabled={sent || busy}
+                        onChange={(event) => setAcknowledged(event.target.checked)}
+                      />
+                      {t('acknowledgment')}
+                    </label>
+                  )}
+                  {error && (
+                    <p className="error-text" role="alert">
+                      {t(`errors.${error.code}`)}
+                      {error.retryAfter ? ` ${t('retryAfter', { count: error.retryAfter })}` : ''}
+                    </p>
+                  )}
+                  {busy && (
+                    <p role="status">
+                      {checking
+                        ? shared('reportChecking')
+                        : shared('reportSubmitting', { count: screenshots.length })}
+                    </p>
+                  )}
+                  {status && <p role="status">{t(`statuses.${status}`)}</p>}
+                  {issueUrl && (
+                    <a
+                      className="text-link"
+                      href={issueUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {t('issueLink')}
+                    </a>
+                  )}
+                </fieldset>
               </div>
               <div className="modal-footer">
                 {!draft ? (

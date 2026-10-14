@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowRight } from 'lucide-react';
 import { AccountCard } from './account-card';
+import { useFormInteraction } from './use-form-interaction';
 import { AccountEmailForm } from './account-email-form';
 import { failureOf, type AppFailure } from '@/lib/app-error';
 
@@ -39,16 +40,29 @@ export function AccountForm({
   const [emailMode, setEmailMode] = useState<'recovery' | 'resend' | null>(
     initialResend ? 'resend' : null,
   );
+  const interaction = useFormInteraction(
+    { email, password },
+    {
+      busy,
+      enabled: !emailMode,
+      onDiscard: () => {
+        setPassword('');
+      },
+    },
+  );
   const signup = mode === 'signup';
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (!interaction.begin()) return;
     setBusy(true);
     setError(null);
     try {
       await onSubmit(email.trim(), password);
+      interaction.accept();
     } catch (cause) {
       setError(failureOf(cause, 'auth'));
     } finally {
+      interaction.end();
       setBusy(false);
     }
   }
@@ -107,18 +121,26 @@ export function AccountForm({
           {busy ? t('account.wait') : signup ? t('account.create') : t('account.signIn')}
           <ArrowRight size={17} />
         </button>
-        <button type="button" className="button secondary" disabled={busy} onClick={onClose}>
+        <button
+          type="button"
+          className="button secondary"
+          disabled={busy}
+          onClick={() => interaction.request(onClose)}
+        >
           {t('account.continueGuest')}
         </button>
         <button
           type="button"
           className="text-link"
           disabled={busy}
-          onClick={() => {
-            setError(null);
-            setPassword('');
-            onMode(signup ? 'signin' : 'signup');
-          }}
+          onClick={() =>
+            interaction.request(() => {
+              interaction.accept({ email, password: '' });
+              setError(null);
+              setPassword('');
+              onMode(signup ? 'signin' : 'signup');
+            })
+          }
         >
           {signup ? t('account.existingAccount') : t('account.createLink')}
         </button>
@@ -128,10 +150,13 @@ export function AccountForm({
               type="button"
               className="text-link"
               disabled={busy}
-              onClick={() => {
-                setPassword('');
-                setEmailMode('recovery');
-              }}
+              onClick={() =>
+                interaction.request(() => {
+                  interaction.accept({ email, password: '' });
+                  setPassword('');
+                  setEmailMode('recovery');
+                })
+              }
             >
               {t('account.forgotPassword')}
             </button>
@@ -139,10 +164,13 @@ export function AccountForm({
               type="button"
               className="text-link"
               disabled={busy}
-              onClick={() => {
-                setPassword('');
-                setEmailMode('resend');
-              }}
+              onClick={() =>
+                interaction.request(() => {
+                  interaction.accept({ email, password: '' });
+                  setPassword('');
+                  setEmailMode('resend');
+                })
+              }
             >
               {t('account.resendConfirmation')}
             </button>

@@ -1,0 +1,60 @@
+
+ RUN  v3.2.7 C:/Users/zenzo/.codex/worktrees/d8a6/garage-guardian
+
+ ❯ src/components/interaction-provider.test.tsx (6 tests | 1 failed | 5 skipped) 218ms
+   ↓ protects independent forms, reverts, and announces confirmations in en
+   ↓ protects independent forms, reverts, and announces confirmations in es
+   ↓ discards once, resets the draft, and guards unload only while dirty or busy
+   × blocks every modal dismissal and navigation while a mutation is pending 216ms
+     → expected "spy" to not be called at all, but actually been called 2 times
+
+Received: 
+
+  1st spy call:
+
+    Array []
+
+  2nd spy call:
+
+    Array []
+
+
+Number of calls: 2
+
+   ↓ retains failed deletes for retry and prevents duplicate requests
+   ↓ pauses the success timeout on hover, focus and a hidden document
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/components/interaction-provider.test.tsx > blocks every modal dismissal and navigation while a mutation is pending
+AssertionError: expected "spy" to not be called at all, but actually been called 2 times
+
+Received: 
+
+  1st spy call:
+
+    Array []
+
+  2nd spy call:
+
+    Array []
+
+
+Number of calls: 2
+
+ ❯ src/components/interaction-provider.test.tsx:137:21
+    135|   fireEvent.mouseDown(screen.getByRole('dialog').parentElement!);
+    136|   await user.click(screen.getByText('Leave'));
+    137|   expect(close).not.toHaveBeenCalled();
+       |                     ^
+    138|   expect(leave).not.toHaveBeenCalled();
+    139|   const event = new Event('beforeunload', { cancelable: true });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 skipped (6)
+   Start at  11:22:02
+   Duration  5.55s (transform 267ms, setup 887ms, collect 1.01s, tests 218ms, environment 2.09s, prepare 623ms)
+

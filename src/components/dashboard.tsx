@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from './guarded-link';
 import { carPath } from '@/lib/garage-routes';
 import { useTranslations } from 'next-intl';
 import {

@@ -1,0 +1,241 @@
+$ vitest run "--maxWorkers=3"
+
+ RUN  v3.2.7 C:/Users/zenzo/.codex/worktrees/d8a6/garage-guardian
+
+ ✓ src/components/garage-navigation.test.tsx (33 tests) 31302ms
+   ✓ returns from email notification settings through sign-in and loads the account form  2579ms
+   ✓ does not offer an email opt-in for a local-only garage  534ms
+   ✓ keeps local-only account and security menu entries disabled in en  769ms
+   ✓ keeps local-only account and security menu entries disabled in es  715ms
+   ✓ returns to account settings after signing in from a direct visit  1238ms
+   ✓ returns to security settings after signing in from a direct visit  1229ms
+   ✓ classifies notification settings without activating workspace links in en  513ms
+   ✓ classifies notification settings without activating workspace links in es  536ms
+   ✓ moves vehicle-link focus without navigating until Enter and retains native Tab stops  860ms
+   ✓ announces drawer state, focuses its active link, and closes on Escape, blur and desktop resize  1079ms
+   ✓ retraces screens and vehicles with Back/Forward without reloading the garage, and restores a bookmark  1355ms
+   ✓ loads and reloads /history directly  632ms
+   ✓ loads and reloads /reports directly  691ms
+   ✓ waits for garage loading before canonicalizing /cars and leaves no extra Back stop  633ms
+   ✓ keeps an empty Vehicles URL and shows missing bookmarks without substituting a car  616ms
+   ✓ closes dialogs and the mobile menu on browser navigation  1013ms
+   ✓ closes the mobile drawer when its active link is selected at /  837ms
+   ✓ closes the mobile drawer when its active link is selected at /cars  809ms
+   ✓ closes the mobile drawer when its active link is selected at /history  821ms
+   ✓ closes the mobile drawer when its active link is selected at /reports  743ms
+   ✓ retains a vehicle after failed edit/delete, and replaces the URL only after successful deletion  1402ms
+   ✓ restores page interactivity when discarding closes both the confirmation and its form  974ms
+   ✓ retains the vehicle URL after a committed delete fails to refresh (only car=false)  939ms
+   ✓ retains the vehicle URL after a committed delete fails to refresh (only car=true)  1009ms
+   ✓ returns from account screens to a bookmark, preserves email between modes and clears password/error  1766ms
+   ✓ signs in to the original screen, retains it on sign-out, and offers sign-in for unavailable cloud bookmarks  1723ms
+   ✓ bypasses account screens for prototype or signed-in users (cloud=false)  507ms
+   ✓ bypasses account screens for prototype or signed-in users (cloud=true)  603ms
+   ✓ keeps deep URLs through cloud recovery and retry  655ms
+   ✓ returns confirmation-pending signup to the original screen and keeps its notice  1192ms
+   ✓ reloads a direct sign-in route and sends an invalid return destination to Dashboard  758ms
+   ✓ does not redirect away from a new screen when a vehicle deletion finishes  852ms
+   ✓ keeps the requested vehicle and does not restart a signup transfer on navigation  717ms
+ ✓ src/components/bug-reporter.test.tsx (29 tests) 42711ms
+   ✓ authenticated public bug reporter > protects report drafts on Escape and clears them only after explicit discard  841ms
+   ✓ authenticated public bug reporter > previews notification settings with its own route and screen  1629ms
+   ✓ authenticated public bug reporter > previews a vehicle route template without exposing the ID or URL parameters  1598ms
+   ✓ authenticated public bug reporter > hides language selection while loading and restores it in recovery without losing the draft  528ms
+   ✓ authenticated public bug reporter > keeps oversized reports reviewable and blocks publication until diagnostics are removed  1105ms
+   ✓ authenticated public bug reporter > previews diagnostics and screen state, requires acknowledgment, and uses a bearer session  1792ms
+   ✓ authenticated public bug reporter > keeps the same draft across transport failures and checks status instead of reposting  1827ms
+   ✓ authenticated public bug reporter > unfreezes the reviewed draft when the initial session lookup is missing before fetch  1891ms
+   ✓ authenticated public bug reporter > unfreezes the reviewed draft when the initial session lookup is rejected before fetch  1849ms
+   ✓ authenticated public bug reporter > keeps uncertain submissions frozen when the status session lookup is missing before fetch  2019ms
+   ✓ authenticated public bug reporter > keeps uncertain submissions frozen when the status session lookup is rejected before fetch  1785ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write AUTH_UNAVAILABLE response  1848ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write IP_UNAVAILABLE response  1894ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write NOT_CONFIGURED response  1867ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write LIMITER_UNAVAILABLE response  2079ms
+   ✓ authenticated public bug reporter > allows the same reviewed draft to retry after a pre-write SUBMISSION_NOT_STARTED response  1873ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with network  1885ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with non-json  1929ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with disabled  1850ms
+   ✓ authenticated public bug reporter > unfreezes PREVIEW_CHANGED drafts even when metadata refresh fails with http-error  1939ms
+   ✓ authenticated public bug reporter > never invites a new POST when a previously uncertain receipt disappears  1923ms
+   ✓ authenticated public bug reporter > keeps an uncertain submission frozen through status errors and unlocks only an explicit failed receipt  3001ms
+   ✓ authenticated public bug reporter > translates open drafts, validation, provider errors and statuses when switching languages  2471ms
+   ✓ authenticated public bug reporter > clears the open draft and diagnostics on an account remount/sign-out  523ms
+ ✓ src/components/garage-app.test.tsx (19 tests) 44992ms
+   ✓ prototype Spanish workflows > saves canonical car/task/visit values, preserves drafts and errors, and keeps exports and calculations unchanged  4389ms
+   ✓ guest Spanish workflows > saves canonical car/task/visit values, preserves drafts and errors, and keeps exports and calculations unchanged  2800ms
+   ✓ cloud Spanish workflows > saves canonical car/task/visit values, preserves drafts and errors, and keeps exports and calculations unchanged  3241ms
+   ✓ local prototype application access > opens the app, saves and edits a car, survives reload, and deletes it  3114ms
+   ✓ configured guest application access > opens the app, saves and edits a car, survives reload, and deletes it  3163ms
+   ✓ authenticated cloud application access > opens the app, saves and edits a car, survives reload, and deletes it  2937ms
+   ✓ preserves free text in add/edit, scopes models after make changes, and dismisses suggestions before the modal  3005ms
+   ✓ a catalog outage allows guest save and a later retry without altering saved edit values  1627ms
+   ✓ guest plate workflow > creates, edits, clears, and reloads a plate while preserving unrelated fields  3016ms
+   ✓ authenticated cloud plate workflow > creates, edits, clears, and reloads a plate while preserving unrelated fields  3138ms
+   ✓ switches creation defaults while preserving typed odometer readings and customized reminder windows  1074ms
+   ✓ guest kilometer workflow > persists the unit, cascades it to tasks and visits, and keeps it read-only after reload  2351ms
+   ✓ cloud kilometer workflow > persists the unit, cascades it to tasks and visits, and keeps it read-only after reload  2666ms
+   ✓ sorts mixed-unit history by equivalent distance and refreshes a new visit reading when switching vehicles  1306ms
+   ✓ lets guests leave the auth form and shows confirmation-pending signup feedback  1753ms
+   ✓ offers retry and sign-out after an authenticated cloud load failure  749ms
+   ✓ updates an existing missing-photo error when the language changes  1313ms
+   ✓ localizes a recognized auth failure and confirmation notice while preserving account drafts  2356ms
+   ✓ hides language selection during a transfer, allows it in recovery, and retains the choice on logout  989ms
+stderr | src/lib/use-garage-session.test.tsx > bootstraps a recovery callback processed by the SDK before the hook subscribes
+GoTrueClient@sb-garage-auth-token:0 (2.117.1) 2026-10-14T18:26:33.765Z The "lock" option is deprecated and will be removed in v3. The client now coordinates session refreshes without a lock, so most apps can drop the option. See https://github.com/supabase/supabase-js/blob/master/packages/core/auth-js/migrations/lockless-coordination.md
+
+ ✓ src/lib/use-garage-session.test.tsx (43 tests) 11073ms
+   ✓ bootstraps a recovery callback processed by the SDK before the hook subscribes  399ms
+   ✓ suspends signup transfer during recovery after closing the tab and resumes after ordinary sign-in  458ms
+   ✓ holds the transfer lock across signup’s auth event and marker registration  462ms
+   ✓ retries failed recovery revocation after closing the tab without repeating the password update  373ms
+   ✓ does not sign out a replacement account while recovery completion waits for the auth lock  311ms
+   ✓ opens configured guests locally and restores guest data after ordinary sign-in and logout  343ms
+   ✓ moves guest data after immediate signup, then uses only cloud storage and logs out to a fresh garage  357ms
+   ✓ keeps confirmation-pending signup local across reload and transfers after the matching account signs in  357ms
+   ✓ leaves failed transfers blocked for retry and resumes after reload  344ms
+   ✓ cancels an in-flight transfer after logout and leaves guest data usable  354ms
+ ✓ src/components/garage-save-recovery.test.tsx (11 tests) 16997ms
+   ✓ local save recovery > announces photo counts, blocks dismissal, and submits once while uploads are pending  2801ms
+   ✓ local save recovery > keeps committed photos after refresh failure and offers a translated read-only retry  1993ms
+   ✓ local save recovery > keeps a failed-save draft and removes only its new uploads, then allows saving again  1618ms
+   ✓ local save recovery > cleans up earlier uploads when a later upload fails without saving  1306ms
+   ✓ local save recovery > closes an edited visit when old-photo cleanup fails and preserves its new photos  1414ms
+   ✓ cloud save recovery > announces photo counts, blocks dismissal, and submits once while uploads are pending  1226ms
+   ✓ cloud save recovery > keeps committed photos after refresh failure and offers a translated read-only retry  1446ms
+   ✓ cloud save recovery > keeps a failed-save draft and removes only its new uploads, then allows saving again  1049ms
+   ✓ cloud save recovery > cleans up earlier uploads when a later upload fails without saving  939ms
+   ✓ cloud save recovery > closes an edited visit when old-photo cleanup fails and preserves its new photos  1400ms
+   ✓ stays on the current page when a new car saves but refresh fails  1797ms
+ ✓ src/components/account-management.test.tsx (24 tests) 36794ms
+   ✓ en account workflows > retains a password draft after saving email preferences and guards leaving security settings  2944ms
+   ✓ en account workflows > opens the profile drawer, traps focus, and connects security, notifications and sign-out  2371ms
+   ✓ en account workflows > shows a guest initial and offers sign-in from the account page  1034ms
+   ✓ en account workflows > opens registration from the guest drawer and returns to account settings after signup  1632ms
+   ✓ en account workflows > shows only the current email on the account page and restores pages with browser history  1526ms
+   ✓ en account workflows > preserves entered email through recovery/resend, announces generic copy, and enforces cooldown  1498ms
+   ✓ en account workflows > allows resend after an unconfirmed-email error and from the signup notice  3664ms
+   ✓ en account workflows > opens accessible settings even after cloud loading fails, validates mismatch, and traps/restores keyboard focus  1878ms
+   ✓ en account workflows > handles recovery sessions independently of cloud loading and returns to sign-in after reset  1291ms
+   ✓ en account workflows > cancels recovery with local sign-out and clears its marker  928ms
+   ✓ en account workflows > preserves a replacement login while recovery cancellation waits for the auth lock  884ms
+   ✓ es account workflows > retains a password draft after saving email preferences and guards leaving security settings  1479ms
+   ✓ es account workflows > opens the profile drawer, traps focus, and connects security, notifications and sign-out  1983ms
+   ✓ es account workflows > shows a guest initial and offers sign-in from the account page  1201ms
+   ✓ es account workflows > opens registration from the guest drawer and returns to account settings after signup  1506ms
+   ✓ es account workflows > shows only the current email on the account page and restores pages with browser history  1376ms
+   ✓ es account workflows > preserves entered email through recovery/resend, announces generic copy, and enforces cooldown  1028ms
+   ✓ es account workflows > allows resend after an unconfirmed-email error and from the signup notice  2065ms
+   ✓ es account workflows > opens accessible settings even after cloud loading fails, validates mismatch, and traps/restores keyboard focus  1588ms
+   ✓ es account workflows > handles recovery sessions independently of cloud loading and returns to sign-in after reset  1309ms
+   ✓ es account workflows > cancels recovery with local sign-out and clears its marker  769ms
+   ✓ es account workflows > preserves a replacement login while recovery cancellation waits for the auth lock  848ms
+   ✓ disables all account forms during an in-flight request and retains drafts on network failure  1197ms
+   ✓ shows a revocation failure when Supabase clears the recovery session on a failed sign-out  791ms
+ ✓ src/lib/repository.test.ts (42 tests) 3439ms
+ ✓ src/components/form-protection.test.tsx (4 tests) 3312ms
+   ✓ guards all dismissal paths for a changed car and allows reverting  1516ms
+   ✓ guards all dismissal paths for a changed schedule and allows reverting  754ms
+   ✓ guards all dismissal paths for a changed visit and allows reverting  897ms
+ ✓ src/components/interaction-provider.test.tsx (6 tests) 1985ms
+   ✓ protects independent forms, reverts, and announces confirmations in en  838ms
+   ✓ protects independent forms, reverts, and announces confirmations in es  566ms
+ ✓ src/components/history-page.test.tsx (5 tests) 1962ms
+   ✓ shows all visit facts, keeps both presentations sorted by equivalent distance, and shares expansion by visit  699ms
+   ✓ uses the same filters for cards, table, counts, and CSV export  671ms
+ ✓ src/components/notification-preferences-form.test.tsx (7 tests) 1589ms
+   ✓ protects failed-save edits, clears the guard on save, and treats loaded or reverted preferences as clean  826ms
+ ✓ src/components/editable-combobox.test.tsx (3 tests) 1391ms
+   ✓ editable combobox > announces the active option, wraps navigation, selects with Enter without submission, and closes with Escape  567ms
+   ✓ editable combobox > never forces selection on blur, Tab or Enter with no active option and preserves arbitrary text  541ms
+ ✓ src/lib/signup-transfer.test.ts (30 tests) 939ms
+stderr | src/lib/account-session.test.ts > preserves the SDK’s existing storage key and can load its persisted session before cleanup
+GoTrueClient@sb-existing-session-auth-token:0 (2.117.1) 2026-10-14T18:27:15.008Z The "lock" option is deprecated and will be removed in v3. The client now coordinates session refreshes without a lock, so most apps can drop the option. See https://github.com/supabase/supabase-js/blob/master/packages/core/auth-js/migrations/lockless-coordination.md
+
+stderr | src/lib/account-session.test.ts > preserves a replacement account when 'local' cleanup waits for another client’s 'signInWithPassword' lock
+GoTrueClient@sb-signinwithpassword-local-race-auth-token:1 (2.117.1) 2026-10-14T18:27:15.035Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+stderr | src/lib/account-session.test.ts > preserves a replacement account when 'global' cleanup waits for another client’s 'signInWithPassword' lock
+GoTrueClient@sb-signinwithpassword-global-race-auth-token:1 (2.117.1) 2026-10-14T18:27:15.170Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+stderr | src/lib/account-session.test.ts > preserves a replacement account when 'reset' cleanup waits for another client’s 'signInWithPassword' lock
+GoTrueClient@sb-signinwithpassword-reset-race-auth-token:1 (2.117.1) 2026-10-14T18:27:15.308Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+stderr | src/lib/account-session.test.ts > preserves a replacement account when 'local' cleanup waits for another client’s 'signUp' lock
+GoTrueClient@sb-signup-local-race-auth-token:1 (2.117.1) 2026-10-14T18:27:15.443Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+stderr | src/lib/account-session.test.ts > preserves a replacement account when 'global' cleanup waits for another client’s 'signUp' lock
+GoTrueClient@sb-signup-global-race-auth-token:1 (2.117.1) 2026-10-14T18:27:15.583Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+stderr | src/lib/account-session.test.ts > preserves a replacement account when 'reset' cleanup waits for another client’s 'signUp' lock
+GoTrueClient@sb-signup-reset-race-auth-token:1 (2.117.1) 2026-10-14T18:27:15.706Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+stderr | src/lib/account-session.test.ts > holds the shared lock until local removal finishes before another client can sign in
+GoTrueClient@sb-removal-race-auth-token:1 (2.117.1) 2026-10-14T18:27:15.843Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+stderr | src/lib/account-session.test.ts > fails closed for global cleanup when no shared auth lock is configured
+GoTrueClient@sb-no-lock-auth-token:1 (2.117.1) 2026-10-14T18:27:15.940Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+stderr | src/lib/account-session.test.ts > fails closed for reset cleanup when no shared auth lock is configured
+GoTrueClient@sb-no-lock-auth-token:2 (2.117.1) 2026-10-14T18:27:15.943Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+stderr | src/lib/account-session.test.ts > holds the auth lock through the recovery password update before another client can sign in
+GoTrueClient@sb-recovery-update-race-auth-token:1 (2.117.1) 2026-10-14T18:27:15.951Z Multiple GoTrueClient instances detected in the same browser context. It is not an error, but this should be avoided as it may produce undefined behavior when used concurrently under the same storage key.
+
+ ✓ src/lib/account-session.test.ts (21 tests) 1037ms
+ ✓ src/components/guarded-link.test.tsx (2 tests) 901ms
+   ✓ guards links and imperative navigation, preserves destinations, and resumes once  740ms
+ ✓ src/components/visit-modal.test.tsx (3 tests) 777ms
+   ✓ saves an unknown odometer and a zero total from ""  501ms
+ ✓ src/lib/history-guard.test.ts (3 tests) 540ms
+   ✓ restores a dirty history traversal before asking and replays it only on discard  322ms
+ ✓ src/lib/use-vehicle-catalog.test.tsx (3 tests) 449ms
+ ✓ src/components/dashboard.test.tsx (10 tests) 742ms
+   ✓ dashboard setup guidance > explains missing due points and links affected tasks in en  325ms
+ ✓ src/components/distance-keyboard.test.tsx (4 tests) 419ms
+ ✓ src/i18n/config.test.ts (11 tests) 385ms
+   ✓ translation contracts > has matching recursive keys and ICU placeholders and formats every message without errors  376ms
+ ✓ src/components/locale-provider.test.tsx (3 tests) 296ms
+ ✓ src/lib/bug-reports/shared.test.ts (42 tests) 172ms
+ ✓ src/i18n/use-display.test.tsx (2 tests) 111ms
+ ✓ src/lib/reminders/worker.test.ts (16 tests) 118ms
+ ✓ src/lib/account-recovery.test.ts (7 tests) 57ms
+ ✓ src/app/api/notification-preferences/route.test.ts (14 tests) 85ms
+stdout | src/app/api/reminders/route.test.ts > sends without the legacy single-recipient setting and returns aggregate counts
+reminder_run {
+  accepted: 2,
+  failed: 0,
+  unknown: 0,
+  skipped: 0,
+  deferred: 0,
+  errors: 0
+}
+
+stderr | src/app/api/reminders/route.test.ts > reports errors without leaking provider details
+reminder_run_failed
+
+ ✓ src/app/api/reminders/route.test.ts (8 tests) 52ms
+ ✓ src/lib/due.test.ts (13 tests) 36ms
+ ✓ src/lib/reminders/email.test.ts (11 tests) 61ms
+ ✓ src/lib/vehicle-catalog.test.ts (4 tests) 46ms
+ ✓ src/lib/reminders/maintenance.test.ts (9 tests) 38ms
+ ✓ src/lib/garage-routes.test.ts (43 tests) 40ms
+ ✓ src/lib/notification-client.test.ts (2 tests) 31ms
+ ✓ src/lib/app-error.test.ts (10 tests) 22ms
+ ✓ src/lib/schedule-defaults.test.ts (18 tests) 25ms
+ ✓ scripts/generate-vehicle-catalog.test.mjs (3 tests) 19ms
+ ✓ src/lib/model.test.ts (5 tests) 9ms
+ ✓ src/lib/bug-reports/submission.test.ts (29 tests) 534ms
+ ✓ src/app/api/bug-reports/route.test.ts (17 tests) 388ms
+ ✓ src/lib/reports.test.ts (4 tests) 9ms
+ ✓ scripts/smoke-bug-reports.test.mjs (5 tests) 283ms
+ ✓ src/app/api/account/route.test.ts (16 tests) 43ms
+ ✓ src/lib/bug-reports/store.test.ts (16 tests) 54ms
+ ✓ src/lib/bug-reports/github.test.ts (6 tests) 31ms
+ ✓ src/lib/bug-reports/server-config.test.ts (4 tests) 25ms
+
+ Test Files  46 passed (46)
+      Tests  620 passed (620)
+   Start at  11:25:33
+   Duration  148.81s (transform 4.03s, setup 55.90s, collect 32.52s, tests 206.32s, environment 108.11s, prepare 21.55s)
+
