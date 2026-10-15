@@ -9,8 +9,8 @@ import {
   CarFront,
   Check,
   CircleAlert,
-  DollarSign,
   Plus,
+  ReceiptText,
   Settings2,
   Wrench,
 } from 'lucide-react';
@@ -81,19 +81,21 @@ export function Dashboard({
               label={t('shared.dueNow')}
               value={number(due.length)}
               detail={t('dashboard.attentionItems', { count: due.length })}
-              accent={due.length > 0}
+              tone="orange"
             />
             <Stat
               icon={<CalendarDays size={20} />}
               label={t('shared.comingUp')}
               value={number(upcoming.length)}
               detail={t('dashboard.reminderWindows')}
+              tone="yellow"
             />
             <Stat
-              icon={<DollarSign size={20} />}
+              icon={<ReceiptText size={20} />}
               label={t('dashboard.yearSpend')}
               value={money(spendThisYear)}
               detail={t('dashboard.allVehicles')}
+              tone="muted"
             />
           </div>
           <div className="dashboard-grid">

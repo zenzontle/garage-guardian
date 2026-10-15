@@ -35,7 +35,7 @@ export function GarageProfile() {
         aria-controls={open ? 'garage-profile-drawer' : undefined}
         onClick={() => setOpen(true)}
       >
-        {garage.user?.email?.[0]?.toUpperCase() || 'G'}
+        <UserRound size={22} strokeWidth={1.5} aria-hidden="true" />
       </button>
       {open && (
         <Modal

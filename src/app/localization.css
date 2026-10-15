@@ -1,11 +1,19 @@
 .locale-selector {
   display: inline-flex;
+  position: relative;
+  align-items: center;
   flex: none;
+}
+.locale-icon {
+  position: absolute;
+  left: 9px;
+  color: var(--muted);
+  pointer-events: none;
 }
 .locale-selector select {
   min-height: 2.75rem;
   max-width: 130px;
-  padding: 7px 9px;
+  padding: 7px 9px 7px 31px;
   border: 1px solid var(--control-border);
   border-radius: 8px;
   color: var(--text);
@@ -30,6 +38,8 @@
 .auth-card > .locale-selector {
   display: flex;
   justify-content: flex-end;
+  width: fit-content;
+  margin-left: auto;
   margin-bottom: 16px;
 }
 .brand small {
