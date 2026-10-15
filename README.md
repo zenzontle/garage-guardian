@@ -56,6 +56,15 @@ Open `http://localhost:3000`. Without environment variables the app runs in **lo
 
 ## Enable private cloud sync
 
+Search metadata uses Vercel's automatically supplied `VERCEL_PROJECT_PRODUCTION_URL` as its
+base URL. The homepage has a canonical link to that production domain and permits indexing
+only when `VERCEL_ENV=production` and the production URL is available. All other app pages
+use `noindex`, including vehicle records, history, reports, sign-in, signup, and account
+settings. Preview and local pages also use `noindex`. Local metadata falls back to
+`http://localhost:3000`; no additional environment variable is required on Vercel. Keep
+Vercel's **Automatically expose System Environment Variables** setting enabled. Canonical
+links are defined on the homepage rather than inherited by every route.
+
 1. Create a free Supabase project. Run `supabase/migrations/0001_initial.sql` in its SQL editor, or apply it with the Supabase CLI.
 2. Apply `supabase/migrations/0002_signup_photo_transfer.sql` as well. It permits owner-scoped photo updates so interrupted signup transfers can retry safely. In Supabase Auth, enable email/password authentication and **Allow new users to sign up**.
 3. Apply `supabase/migrations/0003_vehicle_distance_units.sql` before deploying the distance-unit update. It adds the unit with a Miles default; existing numeric values are preserved. All distance fields (including legacy `*_miles` columns) use the parent vehicle’s unit. The app writes the 500-mile or 1,000-kilometer reminder default explicitly.
