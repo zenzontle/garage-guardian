@@ -1,10 +1,10 @@
-import { CarFront, ClipboardList, DollarSign, LayoutDashboard } from 'lucide-react';
+import { CarFront, ChartNoAxesColumnIncreasing, ClipboardList, House } from 'lucide-react';
 
 export type { WorkspaceScreen as Page } from '@/lib/garage-routes';
 
 export const navigation = [
-  { id: 'dashboard', icon: LayoutDashboard },
+  { id: 'dashboard', icon: House },
   { id: 'cars', icon: CarFront },
   { id: 'history', icon: ClipboardList },
-  { id: 'reports', icon: DollarSign },
+  { id: 'reports', icon: ChartNoAxesColumnIncreasing },
 ] as const;

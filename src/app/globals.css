@@ -218,6 +218,8 @@ a {
   flex: none;
   border: 1px solid var(--line);
   padding: 0;
+  background: transparent;
+  color: var(--muted);
 }
 .profile-trigger:hover {
   background: var(--surface-raised);
@@ -469,13 +471,21 @@ a {
 .stat-icon {
   width: 33px;
   height: 33px;
-  border-radius: 9px;
+  border-radius: 50%;
   color: var(--accent);
   background: var(--accent-soft);
 }
-.stat-card.alert .stat-icon {
+.stat-orange .stat-icon {
   color: var(--orange);
   background: var(--orange-soft);
+}
+.stat-yellow .stat-icon {
+  color: var(--yellow);
+  background: var(--yellow-soft);
+}
+.stat-muted .stat-icon {
+  color: var(--muted);
+  background: var(--surface-raised);
 }
 .stat-label {
   font-size: 0.875rem;

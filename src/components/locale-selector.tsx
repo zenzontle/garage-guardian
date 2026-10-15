@@ -2,6 +2,7 @@
 
 import { useContext } from 'react';
 import { useTranslations } from 'next-intl';
+import { Globe } from 'lucide-react';
 import { isLocale } from '@/i18n/config';
 import { LocaleContext } from '@/i18n/locale-context';
 
@@ -12,6 +13,7 @@ export function LocaleSelector() {
   return (
     <label className="locale-selector">
       <span className="sr-only">{t('language')}</span>
+      <Globe className="locale-icon" size={16} aria-hidden="true" />
       <select
         value={context.locale}
         onChange={(event) => {

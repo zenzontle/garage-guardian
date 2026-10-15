@@ -95,7 +95,7 @@ describe.each([
     const user = userEvent.setup();
     render(<App />);
     const trigger = await screen.findByRole('button', { name: copy.account.openMenu });
-    expect(trigger.textContent).toBe(account().email![0].toUpperCase());
+    expect(trigger.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
     expect(trigger.closest('header')).not.toBeNull();
     expect(screen.queryByText(account().email!)).toBeNull();
     expect(document.querySelector('.account-line')).toBeNull();
@@ -145,20 +145,19 @@ describe.each([
     await user.click(screen.getByRole('button', { name: copy.account.openMenu }));
     await user.click(screen.getByRole('button', { name: copy.account.signOut }));
     await waitFor(() => expect(cloud.auth.signOut).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: copy.account.openMenu }).textContent).toBe('G'),
-    );
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByRole('button', { name: copy.account.openMenu })).toBeDefined();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
-  it('shows a guest initial and offers sign-in from the account page', async () => {
+  it('shows an account icon for guests and offers sign-in from the account page', async () => {
     localStorage.setItem('garage-guardian:locale', locale);
     testRouter.reset('/history');
     const App = await loadGarageTestApp();
     const user = userEvent.setup();
     render(<App />);
     const trigger = await screen.findByRole('button', { name: copy.account.openMenu });
-    expect(trigger.textContent).toBe('G');
+    expect(trigger.querySelector('svg')?.getAttribute('aria-hidden')).toBe('true');
     await user.click(trigger);
     const drawer = screen.getByRole('dialog', { name: copy.account.settings });
     expect(within(drawer).queryByRole('button', { name: copy.account.signOut })).toBeNull();
