@@ -117,6 +117,8 @@ See [bug reporting setup and verification](docs/bug-reporting.md) and `.env.exam
 
 Vercel Web Analytics is included in the root layout to track page views. Enable **Web Analytics** for the project in the Vercel dashboard, then deploy the app to start collecting data. No additional environment variables are required. See the [Vercel setup guide](https://vercel.com/docs/analytics/quickstart).
 
+Vercel Speed Insights is also included in the root layout to measure performance across all routes. Enable **Speed Insights** for the project in the Vercel dashboard, then deploy the app and visit it to start collecting data. No additional environment variables are required. See the [Speed Insights setup guide](https://vercel.com/docs/speed-insights/quickstart).
+
 ## Account email reminders
 
 In-app due reminders always work. Cloud accounts can opt in to a weekly email digest in Account settings, choosing a weekday and English or Spanish. Emails link directly to each vehicle and notification settings. Apply migration `0007_account_reminders.sql` and follow [reminder setup, delivery semantics, and verification](docs/account-reminders.md) before enabling `REMINDERS_ENABLED`. Sending defaults to disabled; there is no configured single recipient.
