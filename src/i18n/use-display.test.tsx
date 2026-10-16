@@ -4,7 +4,7 @@ import { expect, it } from 'vitest';
 import type { ReactNode } from 'react';
 import { messages, type Locale } from './config';
 import { useDisplay } from './use-display';
-import { getDueItem } from '@/lib/due';
+import { getDueItem } from '@/lib/maintenance/due';
 import { car, schedule } from '@/test/fixtures';
 
 function display(locale: Locale) {

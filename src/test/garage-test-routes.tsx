@@ -1,12 +1,12 @@
-import { validatedReturnTo } from '@/lib/garage-routes';
-export type Screens = typeof import('@/components/dashboard-screen') &
-  typeof import('@/components/cars-screen') &
-  typeof import('@/components/history-screen') &
-  typeof import('@/components/reports-screen') &
-  typeof import('@/components/account-screen') &
-  typeof import('@/components/account-recovery-screen') &
-  typeof import('@/components/notification-settings-screen') &
-  typeof import('@/components/account-settings-screen');
+import { validatedReturnTo } from '@/lib/navigation/garage-routes';
+export type Screens = typeof import('@/components/dashboard/dashboard-screen') &
+  typeof import('@/components/vehicles/cars-screen') &
+  typeof import('@/components/history/history-screen') &
+  typeof import('@/components/reports/reports-screen') &
+  typeof import('@/components/account/account-screen') &
+  typeof import('@/components/account/account-recovery-screen') &
+  typeof import('@/components/notifications/notification-settings-screen') &
+  typeof import('@/components/account/account-settings-screen');
 
 export function TestRoutes({ screens, url }: { screens: Screens; url: string }) {
   const pathname = new URL(url, 'http://localhost').pathname;

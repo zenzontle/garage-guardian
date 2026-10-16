@@ -119,16 +119,16 @@ export function createGarageTestApp(
 }
 
 export async function loadGarageTestApp() {
-  const { GarageApp } = await import('@/components/garage-app');
+  const { GarageApp } = await import('@/components/garage/garage-app');
   const modules = await Promise.all([
-    import('@/components/dashboard-screen'),
-    import('@/components/cars-screen'),
-    import('@/components/history-screen'),
-    import('@/components/reports-screen'),
-    import('@/components/account-screen'),
-    import('@/components/account-recovery-screen'),
-    import('@/components/notification-settings-screen'),
-    import('@/components/account-settings-screen'),
+    import('@/components/dashboard/dashboard-screen'),
+    import('@/components/vehicles/cars-screen'),
+    import('@/components/history/history-screen'),
+    import('@/components/reports/reports-screen'),
+    import('@/components/account/account-screen'),
+    import('@/components/account/account-recovery-screen'),
+    import('@/components/notifications/notification-settings-screen'),
+    import('@/components/account/account-settings-screen'),
   ]);
   const screens = Object.assign({}, ...modules) as Screens;
   return createGarageTestApp(GarageApp, screens);

@@ -1,4 +1,4 @@
-import { CarsScreen } from '@/components/cars-screen';
+import { CarsScreen } from '@/components/vehicles/cars-screen';
 
 export default async function CarPage({ params }: { params: Promise<{ carId: string }> }) {
   const { carId } = await params;

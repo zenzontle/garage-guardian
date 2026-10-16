@@ -1,5 +1,5 @@
-import { AccountScreen } from '@/components/account-screen';
-import { validatedReturnTo } from '@/lib/garage-routes';
+import { AccountScreen } from '@/components/account/account-screen';
+import { validatedReturnTo } from '@/lib/navigation/garage-routes';
 
 export default async function Page({
   searchParams,

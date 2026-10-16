@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { InitializeScheduleDefaultsArgs } from '@/lib/schedule-defaults';
+import type { InitializeScheduleDefaultsArgs } from '@/lib/maintenance/schedule-defaults';
 import { scheduleDefaultsRpc } from '@/test/schedule-defaults-rpc';
 
 type Row = Record<string, unknown>;

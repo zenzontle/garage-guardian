@@ -1,5 +1,5 @@
-import { addMonths } from '@/lib/due';
-import type { InitializeScheduleDefaultsArgs } from '@/lib/schedule-defaults';
+import { addMonths } from '@/lib/maintenance/due';
+import type { InitializeScheduleDefaultsArgs } from '@/lib/maintenance/schedule-defaults';
 
 type Row = Record<string, unknown>;
 

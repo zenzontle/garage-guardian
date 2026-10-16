@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { PreferenceRow } from '@/lib/notification-preferences';
+import type { PreferenceRow } from '@/lib/notifications/notification-preferences';
 import { loadReminderItems } from './maintenance';
 import { renderDigest } from './email';
 

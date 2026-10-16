@@ -1,6 +1,6 @@
-import type { DueItem } from '@/lib/due';
-import { distanceAbbreviation } from '@/lib/model';
-import { carPath } from '@/lib/garage-routes';
+import type { DueItem } from '@/lib/maintenance/due';
+import { distanceAbbreviation } from '@/lib/garage/model';
+import { carPath } from '@/lib/navigation/garage-routes';
 
 const copy = {
   en: {

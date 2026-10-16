@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
-import './globals.css';
-import './localization.css';
-import './usability.css';
+import '../styles/globals.css';
+import '../styles/localization.css';
+import '../styles/usability.css';
 
 const productionUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL;
 
