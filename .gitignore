@@ -5,6 +5,7 @@ node_modules/
 .env.*
 !.env.example
 coverage/
+.codegraph/
 *.tsbuildinfo
 /.interaction-*.log
 dark-theme-preview.jpg
