@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
-import { notificationPatchSchema, preferencesFromRow } from '@/lib/notification-preferences';
+import {
+  notificationPatchSchema,
+  preferencesFromRow,
+} from '@/lib/notifications/notification-preferences';
 
 export const dynamic = 'force-dynamic';
 const reply = (body: object, status = 200) =>

@@ -1,7 +1,7 @@
 import { vi } from 'vitest';
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
-import type { InitializeScheduleDefaultsArgs } from '@/lib/schedule-defaults';
-import type { SaveScheduleWithDefaultsArgs } from '@/lib/repository';
+import type { InitializeScheduleDefaultsArgs } from '@/lib/maintenance/schedule-defaults';
+import type { SaveScheduleWithDefaultsArgs } from '@/lib/garage/repository';
 import { scheduleDefaultsRpc } from './schedule-defaults-rpc';
 
 type Row = Record<string, unknown> & { id: string; user_id?: string };

@@ -125,16 +125,35 @@ In-app due reminders always work. Cloud accounts can opt in to a weekly email di
 
 No paid plan or automatic upgrade is required. Free service quotas and Supabase inactivity pausing can delay an email or make the prototype temporarily unavailable. Check provider usage and export records regularly. The free photo bucket is limited to 1 GB; each visit accepts up to three resized photos of at most 2 MB each.
 
-## Component organization
+## Project organization
 
-UI components live in `src/components`, with each component in its own kebab-case file.
+Files are grouped by responsibility. Components and library modules use feature folders,
+with tests beside the files they cover and shared test support in `src/test`.
+
+| Folder              | Contents                                                                                                                                                          |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app`           | Next.js route pages, layouts, API handlers, and app icon                                                                                                          |
+| `src/components`    | Feature folders for account, bug reports, dashboard, garage shell, history, localization, interactions, maintenance, notifications, reports, vehicles, and visits |
+| `src/components/ui` | Shared controls, dialogs, input helpers, and feedback components                                                                                                  |
+| `src/lib`           | Feature folders for account, bug reports, garage data, maintenance, navigation, notifications, reminders, reports, and vehicle catalog logic                      |
+| `src/lib/utils`     | Shared error, date, and photo preparation helpers                                                                                                                 |
+| `src/i18n`          | Locale configuration, context, and display formatting                                                                                                             |
+| `src/styles`        | Global, localization, and usability styles                                                                                                                        |
+| `src/test`          | Shared fixtures, fake services, routing helpers, and test setup                                                                                                   |
+| `messages`          | English and Spanish translation dictionaries                                                                                                                      |
+| `public`            | Public static assets                                                                                                                                              |
+| `scripts`           | Maintenance and smoke-test scripts with their tests                                                                                                               |
+| `supabase`          | Database migrations, seeds, and SQL verification scripts                                                                                                          |
+| `docs`              | Feature setup guides and verification notes                                                                                                                       |
+
+Each UI component has its own kebab-case file within its feature folder.
 `GarageApp` supplies persistent locale and garage providers through the shared route layout.
 `GarageProvider` owns the session and transient UI state, `GarageContent` renders the shell
 and dialogs, and route screen components connect page components to shared data and actions.
 Pages, account forms, car/task/visit dialogs, navigation
 controls, and bug-report sections import shared UI components directly from their files.
-The locale provider and selector share `src/i18n/locale-context.ts`; date and photo
-preparation helpers live in `src/lib`.
+The locale provider and selector in `src/components/i18n` share
+`src/i18n/locale-context.ts`; date and photo preparation helpers live in `src/lib/utils`.
 
 ## Checks
 

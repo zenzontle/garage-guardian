@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { NextIntlClientProvider } from 'next-intl';
 import en from '../../messages/en.json';
 import es from '../../messages/es.json';
-import { InteractionProvider } from '@/components/interaction-provider';
+import { InteractionProvider } from '@/components/interaction/interaction-provider';
 
 export function InteractionTestProvider({
   children,

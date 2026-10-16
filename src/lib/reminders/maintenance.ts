@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getAllDue } from '@/lib/due';
-import { normalizeCar, type ScheduleItem, type Visit, type Snapshot } from '@/lib/model';
-import { initializeCloudSchedules } from '@/lib/schedule-defaults';
+import { getAllDue } from '@/lib/maintenance/due';
+import { normalizeCar, type ScheduleItem, type Visit, type Snapshot } from '@/lib/garage/model';
+import { initializeCloudSchedules } from '@/lib/maintenance/schedule-defaults';
 
 // Page every owner-scoped table: a user's history may exceed PostgREST's row limit.
 async function rows(db: SupabaseClient, table: string, userId: string) {

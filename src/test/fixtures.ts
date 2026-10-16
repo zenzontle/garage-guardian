@@ -1,4 +1,4 @@
-import type { Car, ScheduleItem, Visit } from '../lib/model';
+import type { Car, ScheduleItem, Visit } from '../lib/garage/model';
 
 export const car: Car = {
   id: '11111111-1111-4111-8111-111111111111',

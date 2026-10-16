@@ -1,4 +1,4 @@
-import { reportPaths } from '../garage-routes';
+import { reportPaths } from '../navigation/garage-routes';
 import { z } from 'zod';
 
 export const REPORT_LIMITS = {

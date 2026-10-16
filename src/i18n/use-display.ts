@@ -1,8 +1,8 @@
 'use client';
 
 import { useFormatter, useTranslations } from 'next-intl';
-import { distanceAbbreviation, type DistanceUnit } from '@/lib/model';
-import type { DueItem } from '@/lib/due';
+import { distanceAbbreviation, type DistanceUnit } from '@/lib/garage/model';
+import type { DueItem } from '@/lib/maintenance/due';
 
 export function useDisplay() {
   const format = useFormatter();
