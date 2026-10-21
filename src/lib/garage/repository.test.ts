@@ -170,6 +170,7 @@ describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
         if (plate === undefined) delete row.plate;
       }
       expect(await repository.load()).toEqual({
+        homeCurrency: 'USD',
         cars: [{ ...car, plate: plate ?? '' }],
         schedules: [schedule],
         visits: [visit],
@@ -232,6 +233,7 @@ describe.each([
     await repository.saveVisit({ ...visit, photos: [photo] });
     const reloaded = createRepository(authenticated ? account().id : undefined);
     expect(await reloaded.load()).toEqual({
+      homeCurrency: 'USD',
       cars: [car],
       schedules: [schedule],
       visits: [{ ...visit, photos: [photo] }],
@@ -265,7 +267,12 @@ describe.each([
     expect(cloud.photos.has(photo.path)).toBe(false);
     await reloaded.deleteSchedule(schedule.id);
     await reloaded.deleteCar(car.id);
-    expect(await reloaded.load()).toEqual({ cars: [], schedules: [], visits: [] });
+    expect(await reloaded.load()).toEqual({
+      homeCurrency: 'USD',
+      cars: [],
+      schedules: [],
+      visits: [],
+    });
   });
 });
 
@@ -280,6 +287,7 @@ it('loads legacy guest records as Miles without rewriting readings or custom win
   const { LocalRepository } = await import('./repository');
   const local = new LocalRepository();
   expect(await local.load()).toEqual({
+    homeCurrency: 'USD',
     cars: [{ ...car, reminderMiles: 123 }],
     schedules: [schedule],
     visits: [visit],

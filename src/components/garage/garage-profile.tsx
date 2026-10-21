@@ -45,17 +45,10 @@ export function GarageProfile() {
           onClose={close}
         >
           <nav className="modal-body profile-options" aria-label={t('account.settings')}>
-            {isCloudConfigured ? (
-              <Link className="profile-option" href="/settings/account" onClick={close}>
-                <UserRound size={19} aria-hidden="true" />
-                {t('account.settings')}
-              </Link>
-            ) : (
-              <button type="button" className="profile-option" disabled>
-                <UserRound size={19} aria-hidden="true" />
-                {t('account.settings')}
-              </button>
-            )}
+            <Link className="profile-option" href="/settings/account" onClick={close}>
+              <UserRound size={19} aria-hidden="true" />
+              {t('account.settings')}
+            </Link>
             <Link className="profile-option" href="/settings/notifications" onClick={close}>
               <Bell size={19} aria-hidden="true" />
               {t('account.notifications')}

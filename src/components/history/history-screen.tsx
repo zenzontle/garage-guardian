@@ -10,11 +10,12 @@ export function HistoryScreen() {
   const t = useTranslations();
   const interactions = useInteractions();
   const display = useDisplay();
-  const { snapshot, visits, repository, setModal, perform } = useGarage();
+  const { snapshot, visits, repository, setModal, perform, homeCurrency } = useGarage();
   return (
     <HistoryPage
       cars={snapshot.cars}
       visits={visits}
+      homeCurrency={homeCurrency}
       repository={repository!}
       onAdd={() => setModal({ kind: 'visit' })}
       onEdit={(item) => setModal({ kind: 'visit', item })}

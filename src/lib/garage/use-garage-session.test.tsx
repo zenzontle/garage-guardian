@@ -77,7 +77,12 @@ it('bootstraps a recovery callback processed by the SDK before the hook subscrib
   expect(hook.result.current.repository).toBeNull();
   expect(hook.result.current.transferring).toBe(false);
   expect(fetch).toHaveBeenCalledTimes(1);
-  expect(await local.load()).toEqual({ cars: [car], schedules: [], visits: [] });
+  expect(await local.load()).toEqual({
+    homeCurrency: 'USD',
+    cars: [car],
+    schedules: [],
+    visits: [],
+  });
   const marker = localStorage.getItem(`garage-guardian:recovery:${project}`)!;
   expect(marker).not.toContain(session.access_token);
   expect(marker).not.toContain(session.refresh_token);
@@ -577,7 +582,7 @@ it('moves guest data after immediate signup, then uses only cloud storage and lo
   });
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.snapshot.cars).toEqual([car]);
-  expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+  expect(await local.load()).toEqual({ homeCurrency: 'USD', cars: [], schedules: [], visits: [] });
   await act(async () => {
     await hook.result.current.run(() =>
       hook.result.current.repository!.saveCar({ ...car, name: 'Cloud change' }),
@@ -829,7 +834,7 @@ it('restores and transfers safely when React Strict Mode mounts effects twice', 
   expect(hook.result.current.snapshot.cars).toEqual([car]);
   expect((await new LocalRepository().load()).cars).toEqual([]);
   expect(cloud.execute.mock.calls.filter(([, operation]) => operation === 'upsert')).toHaveLength(
-    1,
+    2,
   );
 });
 

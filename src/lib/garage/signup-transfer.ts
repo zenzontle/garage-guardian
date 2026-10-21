@@ -7,6 +7,7 @@ import { LocalRepository, SupabaseRepository, sameRecord } from './repository';
 import { normalizeSnapshot, type Snapshot } from './model';
 import { initializeSnapshotSchedules } from '../maintenance/schedule-defaults';
 import { todayISO } from '../utils/today-iso';
+import { CURRENCIES } from '../currency/currency';
 
 type Transfer = {
   userId: string;
@@ -87,7 +88,7 @@ async function runTransfer(
     await set(transferKey(project), transfer);
   }
   if (!transfer.snapshot) throw new AppError('transferResume');
-  const snapshot = transfer.snapshot;
+  const snapshot = normalizeSnapshot(transfer.snapshot);
 
   if (transfer.status !== 'uploaded') {
     // Freeze legacy defaults before any cloud writes; keep the cleanup original unchanged.
@@ -102,6 +103,8 @@ async function runTransfer(
       baselineDate,
     );
     onProgress?.({ phase: 'records' });
+    assertActive();
+    await cloud.saveHomeCurrency(expected.homeCurrency ?? 'USD');
     const total = expected.visits.reduce((sum, visit) => sum + visit.photos.length, 0);
     let completed = 0;
     // Each await is a cancellation boundary: never continue under another session.
@@ -144,11 +147,12 @@ async function runTransfer(
       }
       assertActive();
       onProgress?.({ phase: 'records' });
-      await cloud.saveVisit(visit);
+      await cloud.saveVisit(visit, [...CURRENCIES]);
     }
     assertActive();
     onProgress?.({ phase: 'verifying' });
     const saved = await cloud.load();
+    if (saved.homeCurrency !== expected.homeCurrency) throw new AppError('transferVerification');
     for (const key of ['cars', 'schedules', 'visits'] as const) {
       for (const item of expected[key]) {
         if (

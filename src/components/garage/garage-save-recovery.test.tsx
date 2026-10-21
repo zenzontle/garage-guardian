@@ -107,8 +107,9 @@ describe.each(['local', 'cloud'] as const)('%s save recovery', (mode) => {
     const save = vi.spyOn(prototype, 'saveVisit').mockImplementationOnce(async function (
       this: Repository,
       value,
+      manualTargets = [],
     ) {
-      await originalSave.call(this, value);
+      await originalSave.call(this, value, manualTargets);
       load.mockRejectedValueOnce(new Error('Refresh failed'));
     });
     const upload = vi.spyOn(prototype, 'uploadPhoto');

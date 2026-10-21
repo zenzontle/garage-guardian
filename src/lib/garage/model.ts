@@ -1,4 +1,12 @@
 import { AppError } from '../utils/app-error';
+import {
+  normalizeVisit,
+  currencyOrDefault,
+  type Currency,
+  type Conversions,
+} from '../currency/currency';
+
+export type { Currency } from '../currency/currency';
 
 export type DistanceUnit = 'miles' | 'kilometers';
 
@@ -51,6 +59,8 @@ export type Visit = {
   date: string;
   odometer: number | null;
   totalCostCents: number;
+  currency?: Currency;
+  conversions?: Conversions;
   provider: string;
   notes: string;
   items: VisitItem[];
@@ -59,6 +69,8 @@ export type Visit = {
 };
 
 export type Snapshot = {
+  pendingSyncCount?: number;
+  homeCurrency?: Currency;
   cars: Car[];
   schedules: ScheduleItem[];
   visits: Visit[];
@@ -97,8 +109,12 @@ export function makeStarterSchedules(
   }));
 }
 
-export function money(cents: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+export function money(cents: number, currency: Currency = 'USD'): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'code',
+  }).format(cents / 100);
 }
 
 export function distanceUnitOrDefault(unit?: DistanceUnit | null): DistanceUnit {
@@ -143,7 +159,12 @@ export function normalizePlate(plate?: string | null): string {
 }
 
 export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
-  return { ...snapshot, cars: snapshot.cars.map(normalizeCar) };
+  return {
+    ...snapshot,
+    homeCurrency: currencyOrDefault(snapshot.homeCurrency),
+    cars: snapshot.cars.map(normalizeCar),
+    visits: snapshot.visits.map(normalizeVisit),
+  };
 }
 
 export function displayDate(iso: string): string {

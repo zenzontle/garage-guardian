@@ -20,6 +20,15 @@ import { Modal } from '../ui/modal';
 import { useFormInteraction } from '../interaction/use-form-interaction';
 import { todayISO } from '@/lib/utils/today-iso';
 import { resizePhoto } from '@/lib/utils/resize-photo';
+import {
+  CURRENCIES,
+  currencyOrDefault,
+  normalizeVisit,
+  parseCents,
+  validDate,
+  type Currency,
+} from '@/lib/currency/currency';
+import { useReceiptConversion } from '@/lib/currency/use-receipt-conversion';
 
 type EditVisitItem = VisitItem & { key: string; costInput: string };
 
@@ -33,16 +42,18 @@ export function VisitModal({
   onClose,
   onSave,
   cloud = false,
+  homeCurrency = 'USD',
 }: {
   item?: Visit;
   cloud?: boolean;
+  homeCurrency?: Currency;
   carId?: string;
   cars: Car[];
   visits: Visit[];
   schedules: ScheduleItem[];
   repository: Repository;
   onClose: () => void;
-  onSave: (visit: Visit) => Promise<void>;
+  onSave: (visit: Visit, manualTargets?: Currency[]) => Promise<void>;
 }) {
   const t = useTranslations();
   const photoInput = useRef<HTMLInputElement>(null);
@@ -55,6 +66,10 @@ export function VisitModal({
       : String(initialCar ? latestOdometer(initialCar, visits) : ''),
   );
   const [totalCost, setTotalCost] = useState(item ? (item.totalCostCents / 100).toFixed(2) : '');
+  const [currency, setCurrency] = useState<Currency>(
+    item ? currencyOrDefault(item.currency) : homeCurrency,
+  );
+  const conversion = useReceiptConversion(item, currency, date, totalCost, homeCurrency);
   const [provider, setProvider] = useState(item?.provider ?? '');
   const [notes, setNotes] = useState(item?.notes ?? '');
   const [items, setItems] = useState<EditVisitItem[]>(
@@ -82,6 +97,8 @@ export function VisitModal({
       date,
       odometer,
       totalCost,
+      currency,
+      convertedTotal: conversion.manualInput,
       provider,
       notes,
       items: items.map(({ name, scheduleItemId, costInput }) => ({
@@ -126,12 +143,20 @@ export function VisitModal({
     event.preventDefault();
     setFormError(null);
     const miles = odometer.trim() === '' ? null : Number(odometer),
-      cents = Math.round(Number(totalCost || '0') * 100);
+      cents = parseCents(totalCost);
     if (
       !selectedCarId ||
       (miles !== null && (!Number.isInteger(miles) || miles < 0)) ||
-      !Number.isInteger(cents) ||
-      cents < 0
+      cents === null ||
+      !validDate(date) ||
+      date > todayISO() ||
+      (conversion.manualInput !== null &&
+        conversion.manualInput !== '' &&
+        !conversion.conversion) ||
+      items.some(
+        (entry) =>
+          entry.name.trim() && entry.costInput !== '' && parseCents(entry.costInput) === null,
+      )
     ) {
       setFormError({ code: 'visitFields' });
       return;
@@ -163,18 +188,26 @@ export function VisitModal({
         setProgress({ phase: 'photos', completed: uploaded.length });
       }
       setProgress({ phase: 'saving', completed: files.length });
-      await onSave({
-        id: visitId,
-        carId: selectedCarId,
-        date,
-        odometer: miles,
-        totalCostCents: cents,
-        provider: provider.trim(),
-        notes: notes.trim(),
-        items: cleanItems,
-        photos: [...retainedPhotos, ...uploaded],
-        createdAt: item?.createdAt ?? new Date().toISOString(),
-      });
+      await onSave(
+        normalizeVisit({
+          id: visitId,
+          carId: selectedCarId,
+          date,
+          odometer: miles,
+          totalCostCents: cents,
+          currency,
+          conversions: {
+            ...item?.conversions,
+            ...(conversion.conversion ? { [homeCurrency]: conversion.conversion } : {}),
+          },
+          provider: provider.trim(),
+          notes: notes.trim(),
+          items: cleanItems,
+          photos: [...retainedPhotos, ...uploaded],
+          createdAt: item?.createdAt ?? new Date().toISOString(),
+        }),
+        conversion.manualInput !== null ? [homeCurrency] : [],
+      );
       interaction.accept();
     } catch (cause) {
       setProgress({ phase: 'cleanup', completed: uploaded.length });
@@ -261,6 +294,22 @@ export function VisitModal({
             </div>
             <div className="form-grid">
               <label>
+                {t('currency.receipt')}
+                <select
+                  value={currency}
+                  onChange={(event) => setCurrency(event.target.value as Currency)}
+                >
+                  {CURRENCIES.map((code) => (
+                    <option key={code} value={code}>
+                      {code} — {t(`currency.${code}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="section-hint">{t('currency.linesHint', { currency })}</p>
+            <div className="form-grid">
+              <label>
                 {t('visit.odometerInput', { unit: t(`units.${distanceUnit}`) })}
                 <input
                   type="number"
@@ -271,15 +320,48 @@ export function VisitModal({
                 />
               </label>
               <label>
-                {t('visit.total')}
+                {t('visit.total', { currency })}
                 <MoneyInput
-                  label={t('visit.total')}
+                  label={t('visit.total', { currency })}
                   value={totalCost}
                   onChange={setTotalCost}
                   placeholder="0.00"
                 />
               </label>
             </div>
+            {currency !== homeCurrency && (
+              <div className="form-stack conversion-editor">
+                <label>
+                  {t('currency.converted', { currency: homeCurrency })}
+                  <MoneyInput
+                    label={t('currency.converted', { currency: homeCurrency })}
+                    value={conversion.value}
+                    onChange={conversion.change}
+                    placeholder="0.00"
+                  />
+                </label>
+                <p role="status" aria-live="polite" className="section-hint">
+                  {conversion.conversion?.source === 'automatic'
+                    ? t('currency.estimate', {
+                        rate: conversion.conversion.rate!,
+                        date: conversion.conversion.rateDate!,
+                        base: currency,
+                        target: homeCurrency,
+                      })
+                    : conversion.conversion?.source === 'manual'
+                      ? t('currency.manual')
+                      : t(
+                          conversion.status === 'loading' ? 'currency.loading' : 'currency.pending',
+                        )}
+                </p>
+                <p className="section-hint">{t('currency.overrideHint')}</p>
+                {!conversion.conversion && (
+                  <button type="button" className="text-link" onClick={conversion.retry}>
+                    {t('shared.retry')}
+                  </button>
+                )}
+              </div>
+            )}
             <label>
               <span className="field-label">
                 {t('shared.provider')} <span className="optional">{t('shared.optional')}</span>
@@ -339,7 +421,7 @@ export function VisitModal({
                     maxLength={80}
                   />
                   <MoneyInput
-                    label={t('visit.itemCost')}
+                    label={t('visit.itemCost', { currency })}
                     value={entry.costInput}
                     onChange={(value) =>
                       updateEntry(entry.key, {

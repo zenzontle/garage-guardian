@@ -40,7 +40,7 @@ export function HistoryVisitDetail({
           {visit.items
             .map(
               (item) =>
-                `${item.name}${item.costCents !== null ? ` (${money(item.costCents)})` : ''}`,
+                `${item.name}${item.costCents !== null ? ` (${money(item.costCents, visit.currency ?? 'USD')})` : ''}`,
             )
             .join(' · ') || t('history.noneRecorded')}
         </p>

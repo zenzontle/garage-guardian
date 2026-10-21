@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { CircleAlert, LogOut, X } from 'lucide-react';
 import { isCloudConfigured } from '@/lib/garage/repository';
 import { makeStarterSchedules } from '@/lib/garage/model';
+import { reportingCents } from '@/lib/currency/currency';
 import { accountMode, accountPath, carPath, workspaceScreen } from '@/lib/navigation/garage-routes';
 import { useGarage } from './garage-provider';
 import { BugReporter } from '../bug-reports/bug-reporter';
@@ -54,6 +55,9 @@ export function GarageContent({ children }: { children: ReactNode }) {
     if (garage.recovering && pathname !== '/auth/recovery') router.replace('/auth/recovery');
   }, [garage.recovering, pathname, router]);
   const page = workspaceScreen(pathname);
+  const pendingConversions = snapshot.visits.filter(
+    (visit) => reportingCents(visit, garage.homeCurrency) === null,
+  ).length;
   const reporter = (
     <BugReporter
       key={user?.id ?? 'guest'}
@@ -227,6 +231,35 @@ export function GarageContent({ children }: { children: ReactNode }) {
               </div>
             )}
             {children}
+            {(snapshot.pendingSyncCount ?? 0) > 0 && (
+              <div className="demo-banner" role="status">
+                <span>{t('currency.pendingSync', { count: snapshot.pendingSyncCount! })}</span>
+                <button
+                  type="button"
+                  className="text-link"
+                  disabled={refreshing}
+                  onClick={() => void refresh()}
+                >
+                  {t('shared.retry')}
+                </button>
+              </div>
+            )}
+            {pendingConversions > 0 && (
+              <div className="demo-banner" role="status">
+                <span>
+                  {t('currency.incomplete', { count: pendingConversions })}{' '}
+                  {t(garage.conversions.busy ? 'currency.background' : 'currency.retryHint')}
+                </span>
+                <button
+                  type="button"
+                  className="text-link"
+                  disabled={garage.conversions.busy}
+                  onClick={garage.conversions.retry}
+                >
+                  {t('shared.retry')}
+                </button>
+              </div>
+            )}
             <footer className="app-footer">
               <span>© 2026 Jorge Hernandez</span>
               <a className="text-link" href="https://github.com/zenzontle/garage-guardian">
@@ -289,9 +322,10 @@ export function GarageContent({ children }: { children: ReactNode }) {
             schedules={snapshot.schedules}
             repository={repository!}
             cloud={Boolean(user)}
+            homeCurrency={garage.homeCurrency}
             onClose={() => setModal(null)}
-            onSave={async (item) => {
-              await perform(() => repository!.saveVisit(item));
+            onSave={async (item, manualTargets) => {
+              await perform(() => repository!.saveVisit(item, manualTargets));
               interactions?.notify('interactions.visitSaved');
             }}
           />

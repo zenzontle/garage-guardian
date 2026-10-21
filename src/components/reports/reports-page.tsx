@@ -8,17 +8,27 @@ import { reportTotals } from '@/lib/reports/reports';
 import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
 import { EmptyPanel } from '../ui/empty-panel';
+import type { Currency } from '@/lib/currency/currency';
 
-export function ReportsPage({ cars, visits }: { cars: Car[]; visits: Visit[] }) {
+export function ReportsPage({
+  cars,
+  visits,
+  homeCurrency = 'USD',
+}: {
+  cars: Car[];
+  visits: Visit[];
+  homeCurrency?: Currency;
+}) {
   const t = useTranslations();
-  const { money, month: formatMonth } = useDisplay();
+  const { money: formatMoney, month: formatMonth } = useDisplay();
+  const money = (cents: number) => formatMoney(cents, homeCurrency);
   const [carId, setCarId] = useState('');
   const [year, setYear] = useState('');
   const years = [...new Set(visits.map((visit) => visit.date.slice(0, 4)))].sort().reverse();
   const filtered = visits.filter(
     (visit) => (!carId || visit.carId === carId) && (!year || visit.date.startsWith(year)),
   );
-  const totals = reportTotals(filtered, cars);
+  const totals = reportTotals(filtered, cars, homeCurrency);
   const maxMonth = Math.max(1, ...totals.byMonth.map(([, amount]) => amount));
   return (
     <>
@@ -62,11 +72,16 @@ export function ReportsPage({ cars, visits }: { cars: Car[]; visits: Visit[] }) 
         <div className="report-total">
           <span className="eyebrow">{t('reports.average')}</span>
           <strong>
-            {money(filtered.length ? Math.round(totals.totalCents / filtered.length) : 0)}
+            {money(
+              totals.convertedCount ? Math.round(totals.totalCents / totals.convertedCount) : 0,
+            )}
           </strong>
           <small>{t('reports.loggedVisits')}</small>
         </div>
       </div>
+      {totals.pendingCount > 0 && (
+        <p role="status">{t('currency.incomplete', { count: totals.pendingCount })}</p>
+      )}
       {filtered.length ? (
         <div className="report-grid">
           <section className="panel">

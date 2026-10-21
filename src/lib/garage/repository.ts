@@ -11,6 +11,20 @@ import {
   initializeSnapshotSchedules,
 } from '../maintenance/schedule-defaults';
 import { todayISO } from '../utils/today-iso';
+import { connectionFailure, OfflineReceipts } from '../currency/offline-receipts';
+import {
+  currencyOrDefault,
+  isCurrency,
+  mergeConversions,
+  normalizeVisit,
+  receiptInputs,
+  sameInputs,
+  validConversion,
+  validCents,
+  validDate,
+  type Currency,
+  type Conversion,
+} from '../currency/currency';
 import { createClient, navigatorLock, type SupabaseClient } from '@supabase/supabase-js';
 import {
   EMPTY_SNAPSHOT,
@@ -25,12 +39,14 @@ import {
 } from './model';
 
 export type Repository = {
+  saveHomeCurrency(currency: Currency): Promise<void>;
+  saveConversion(visit: Visit, target: Currency, conversion: Conversion): Promise<void>;
   load(): Promise<Snapshot>;
   saveCar(car: Car): Promise<void>;
   deleteCar(id: string): Promise<void>;
   saveSchedule(item: ScheduleItem): Promise<void>;
   deleteSchedule(id: string): Promise<void>;
-  saveVisit(visit: Visit): Promise<void>;
+  saveVisit(visit: Visit, manualTargets?: Currency[]): Promise<void>;
   deleteVisit(visit: Visit): Promise<void>;
   uploadPhoto(visitId: string, file: File): Promise<Photo>;
   photoUrl(photo: Photo): Promise<string>;
@@ -43,10 +59,55 @@ const clone = <T>(value: T): T => structuredClone(value);
 type LocalSnapshot = Snapshot & { automaticSchedules?: ScheduleItem[] };
 
 function snapshotData(snapshot: Snapshot): Snapshot {
-  return { cars: snapshot.cars, schedules: snapshot.schedules, visits: snapshot.visits };
+  return {
+    homeCurrency: currencyOrDefault(snapshot.homeCurrency),
+    cars: snapshot.cars,
+    schedules: snapshot.schedules,
+    visits: snapshot.visits,
+  };
+}
+
+function checkedVisit(visit: Visit, manualTargets: Currency[]): Visit {
+  if (
+    !validCents(visit.totalCostCents) ||
+    !validDate(visit.date) ||
+    (visit.currency !== undefined && !isCurrency(visit.currency)) ||
+    visit.items.some((item) => item.costCents !== null && !validCents(item.costCents)) ||
+    visit.items.reduce((sum, item) => sum + (item.costCents ?? 0), 0) > visit.totalCostCents
+  )
+    throw new AppError('visitFields');
+  const normalized = normalizeVisit(visit);
+  // A copied snapshot is not a manual edit. Only explicitly edited targets may replace overrides.
+  normalized.conversions = Object.fromEntries(
+    Object.entries(normalized.conversions ?? {}).filter(
+      ([target, conversion]) =>
+        conversion.source !== 'manual' || manualTargets.includes(target as Currency),
+    ),
+  );
+  return normalized;
 }
 
 export class LocalRepository implements Repository {
+  async saveHomeCurrency(currency: Currency) {
+    if (!isCurrency(currency)) throw new AppError('visitFields');
+    await this.write((snapshot) => {
+      snapshot.homeCurrency = currency;
+    });
+  }
+  async saveConversion(visit: Visit, target: Currency, conversion: Conversion) {
+    if (!isCurrency(target) || !validConversion(conversion, receiptInputs(visit)))
+      throw new AppError('visitFields');
+    await this.write((snapshot) => {
+      const current = snapshot.visits.find((entry) => entry.id === visit.id);
+      if (
+        !current ||
+        !sameInputs(receiptInputs(current), receiptInputs(visit)) ||
+        current.conversions?.[target]
+      )
+        return;
+      current.conversions = { ...current.conversions, [target]: conversion };
+    });
+  }
   async load(): Promise<Snapshot> {
     const snapshot = normalizeSnapshot(
       clone(snapshotData((await get<LocalSnapshot>(SNAPSHOT_KEY)) ?? EMPTY_SNAPSHOT)),
@@ -99,10 +160,16 @@ export class LocalRepository implements Repository {
       snapshot.schedules = snapshot.schedules.filter((item) => item.id !== id);
     });
   }
-  async saveVisit(visit: Visit) {
+  async saveVisit(visit: Visit, manualTargets: Currency[] = []) {
+    visit = checkedVisit(visit, manualTargets);
     const previous = (await this.load()).visits.find((entry) => entry.id === visit.id);
     await this.write((snapshot) => {
-      snapshot.visits = upsert(snapshot.visits, visit);
+      const current = snapshot.visits.find((entry) => entry.id === visit.id);
+      const conversions =
+        current && sameInputs(receiptInputs(current), receiptInputs(visit))
+          ? mergeConversions(current.conversions, visit.conversions)
+          : visit.conversions;
+      snapshot.visits = upsert(snapshot.visits, { ...visit, conversions });
     });
     for (const photo of previous?.photos ?? []) {
       if (!visit.photos.some((entry) => entry.path === photo.path))
@@ -252,6 +319,8 @@ const visitToRow = (visit: Visit, userId: string) => ({
   service_date: visit.date,
   odometer: visit.odometer,
   total_cost_cents: visit.totalCostCents,
+  currency: currencyOrDefault(visit.currency),
+  conversions: visit.conversions ?? {},
   provider: visit.provider,
   notes: visit.notes,
   items: visit.items,
@@ -260,13 +329,70 @@ const visitToRow = (visit: Visit, userId: string) => ({
 });
 
 export class SupabaseRepository implements Repository {
+  private offline: OfflineReceipts | null;
   constructor(
     private client: SupabaseClient,
     private userId: string,
-  ) {}
+    allowOffline = false,
+  ) {
+    this.offline = allowOffline
+      ? new OfflineReceipts(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '', userId)
+      : null;
+  }
+
+  async saveHomeCurrency(currency: Currency) {
+    if (!isCurrency(currency)) throw new AppError('visitFields');
+    const { error } = await this.client
+      .from('garage_settings')
+      .upsert({ user_id: this.userId, home_currency: currency });
+    if (error) throw error;
+  }
+  async saveConversion(visit: Visit, target: Currency, conversion: Conversion) {
+    if (!isCurrency(target) || !validConversion(conversion, receiptInputs(visit)))
+      throw new AppError('visitFields');
+    return this.withReceiptLock(() => this.saveConversionOnline(visit, target, conversion));
+  }
+  private async saveConversionOnline(visit: Visit, target: Currency, conversion: Conversion) {
+    if (this.offline)
+      await this.offline.flush(({ visit, manualTargets }) =>
+        this.saveVisitOnline(visit, manualTargets),
+      );
+    const { error } = await this.client.rpc('save_visit_conversion', {
+      p_visit_id: visit.id,
+      p_currency: currencyOrDefault(visit.currency),
+      p_date: visit.date,
+      p_total: visit.totalCostCents,
+      p_target: target,
+      p_conversion: conversion,
+    });
+    if (error) throw error;
+  }
 
   async load(): Promise<Snapshot> {
-    const [cars, schedules, visits] = await Promise.all([
+    return this.withReceiptLock(() => this.loadWithPending());
+  }
+  private withReceiptLock<T>(action: () => Promise<T>): Promise<T> {
+    return this.offline ? this.offline.withLock(action) : action();
+  }
+  private async loadWithPending(): Promise<Snapshot> {
+    try {
+      if (this.offline)
+        await this.offline.flush(({ visit, manualTargets }) =>
+          this.saveVisitOnline(visit, manualTargets),
+        );
+      const snapshot = await this.loadOnline();
+      return this.offline ? this.offline.remember(snapshot) : snapshot;
+    } catch (cause) {
+      if (this.offline && connectionFailure(cause)) {
+        const cached = await this.offline.cachedSnapshot();
+        if (cached) return cached;
+      }
+      throw cause;
+    }
+  }
+
+  private async loadOnline(): Promise<Snapshot> {
+    const [cars, schedules, visits, settings] = await Promise.all([
       this.client.from('cars').select('*').eq('user_id', this.userId).order('created_at'),
       this.client.from('schedule_items').select('*').eq('user_id', this.userId).order('created_at'),
       this.client
@@ -274,9 +400,11 @@ export class SupabaseRepository implements Repository {
         .select('*')
         .eq('user_id', this.userId)
         .order('service_date', { ascending: false }),
+      this.client.from('garage_settings').select('*').eq('user_id', this.userId).maybeSingle(),
     ]);
-    for (const result of [cars, schedules, visits]) if (result.error) throw result.error;
+    for (const result of [cars, schedules, visits, settings]) if (result.error) throw result.error;
     const snapshot: Snapshot = {
+      homeCurrency: currencyOrDefault(settings.data?.home_currency),
       cars: (cars.data ?? []).map((row) =>
         normalizeCar({
           id: row.id,
@@ -311,6 +439,8 @@ export class SupabaseRepository implements Repository {
         date: row.service_date,
         odometer: row.odometer,
         totalCostCents: row.total_cost_cents,
+        currency: currencyOrDefault(row.currency),
+        conversions: row.conversions ?? {},
         provider: row.provider,
         notes: row.notes,
         items: row.items ?? [],
@@ -327,6 +457,9 @@ export class SupabaseRepository implements Repository {
     if (error) throw error;
   }
   async deleteCar(id: string) {
+    return this.withReceiptLock(() => this.deleteCarOnline(id));
+  }
+  private async deleteCarOnline(id: string) {
     const { data: visits, error: lookupError } = await this.client
       .from('visits')
       .select('photos')
@@ -343,6 +476,7 @@ export class SupabaseRepository implements Repository {
       (visit.photos as Photo[]).map((photo) => photo.path),
     );
     if (paths.length) await this.client.storage.from('visit-photos').remove(paths);
+    await this.offline?.remove(undefined, id);
   }
   async saveSchedule(item: ScheduleItem) {
     if (
@@ -372,7 +506,32 @@ export class SupabaseRepository implements Repository {
       .eq('id', id);
     if (error) throw error;
   }
-  async saveVisit(visit: Visit) {
+  async saveVisit(visit: Visit, manualTargets: Currency[] = []) {
+    return this.withReceiptLock(() => this.saveVisitWithPending(visit, manualTargets));
+  }
+  private async saveVisitWithPending(visit: Visit, manualTargets: Currency[]) {
+    visit = checkedVisit(visit, manualTargets);
+    const pending = (await this.offline?.read())?.pending.find(
+      (entry) => entry.visit.id === visit.id,
+    );
+    if (pending && sameInputs(receiptInputs(pending.visit), receiptInputs(visit))) {
+      visit = {
+        ...visit,
+        conversions: mergeConversions(pending.visit.conversions, visit.conversions),
+      };
+      manualTargets = [...new Set([...pending.manualTargets, ...manualTargets])];
+    }
+    try {
+      await this.saveVisitOnline(visit, manualTargets);
+      if (pending) await this.offline?.acknowledge(pending);
+      await this.offline?.rememberVisit(visit);
+    } catch (cause) {
+      if (!this.offline || !connectionFailure(cause)) throw cause;
+      await this.offline.enqueue(visit, manualTargets);
+    }
+  }
+  private async saveVisitOnline(visit: Visit, manualTargets: Currency[]) {
+    visit = checkedVisit(visit, manualTargets);
     const { data: previous, error: lookupError } = await this.client
       .from('visits')
       .select('photos')
@@ -388,12 +547,16 @@ export class SupabaseRepository implements Repository {
     }
   }
   async deleteVisit(visit: Visit) {
+    return this.withReceiptLock(() => this.deleteVisitOnline(visit));
+  }
+  private async deleteVisitOnline(visit: Visit) {
     const { error } = await this.client
       .from('visits')
       .delete()
       .eq('user_id', this.userId)
       .eq('id', visit.id);
     if (error) throw error;
+    await this.offline?.remove(visit.id);
     if (visit.photos.length)
       await this.client.storage
         .from('visit-photos')
@@ -445,7 +608,7 @@ export const recoveryInitialization = supabase ? bootstrapRecovery(supabase) : P
 
 export function createRepository(userId?: string): Repository {
   if (supabase && userId) {
-    return new SupabaseRepository(supabase, userId);
+    return new SupabaseRepository(supabase, userId, true);
   }
   return new LocalRepository();
 }

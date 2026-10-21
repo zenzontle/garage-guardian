@@ -233,7 +233,7 @@ export function CarsPage({
                             : formatDistance(visit.odometer, car?.distanceUnit)}
                         </small>
                       </span>
-                      <strong>{money(visit.totalCostCents)}</strong>
+                      <strong>{money(visit.totalCostCents, visit.currency ?? 'USD')}</strong>
                     </div>
                   ))}
                 </div>

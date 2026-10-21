@@ -27,6 +27,8 @@ export const schedule: ScheduleItem = {
   createdAt: car.createdAt,
 };
 export const visit: Visit = {
+  currency: 'USD',
+  conversions: {},
   id: '33333333-3333-4333-8333-333333333333',
   carId: car.id,
   date: '2026-09-25',
