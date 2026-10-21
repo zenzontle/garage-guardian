@@ -12,6 +12,8 @@ import {
 import { usePathname } from 'next/navigation';
 import { getAllDue } from '@/lib/maintenance/due';
 import { useGarageSession } from '@/lib/garage/use-garage-session';
+import { currencyOrDefault } from '@/lib/currency/currency';
+import { useBackgroundConversions } from '@/lib/currency/use-background-conversions';
 import type { Car, ScheduleItem, Visit } from '@/lib/garage/model';
 import { todayISO } from '@/lib/utils/today-iso';
 import { useInteractions } from '../interaction/interaction-provider';
@@ -26,6 +28,21 @@ type ModalState =
 
 function useGarageState() {
   const garage = useGarageSession();
+  const homeCurrency = currencyOrDefault(garage.snapshot.homeCurrency);
+  const conversions = useBackgroundConversions(
+    garage.repository,
+    garage.snapshot.visits,
+    homeCurrency,
+    garage.refreshConversions,
+  );
+  const refreshConversions = garage.refreshConversions;
+  useEffect(() => {
+    const online = () => {
+      void refreshConversions();
+    };
+    window.addEventListener('online', online);
+    return () => window.removeEventListener('online', online);
+  }, [refreshConversions]);
   useFormInteraction(null, { busy: garage.transferring && garage.loading });
   const interactions = useInteractions();
   const pathname = usePathname();
@@ -78,6 +95,8 @@ function useGarageState() {
 
   return {
     ...garage,
+    homeCurrency,
+    conversions,
     currentPath,
     allDue,
     visits,

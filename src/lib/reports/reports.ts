@@ -1,28 +1,39 @@
 import { distanceAbbreviation, type Car, type Visit } from '../garage/model';
+import {
+  allocateConverted,
+  currencyOrDefault,
+  reportingCents,
+  type Currency,
+} from '../currency/currency';
 
-export function reportTotals(visits: Visit[], cars: Car[]) {
+export function reportTotals(visits: Visit[], cars: Car[], homeCurrency: Currency = 'USD') {
   const byMonth = new Map<string, number>();
   const byCar = new Map<string, number>();
   const byCategory = new Map<string, number>();
   let unallocatedCents = 0;
+  let totalCents = 0;
+  let pendingCount = 0;
   for (const visit of visits) {
-    byMonth.set(
-      visit.date.slice(0, 7),
-      (byMonth.get(visit.date.slice(0, 7)) ?? 0) + visit.totalCostCents,
-    );
-    byCar.set(visit.carId, (byCar.get(visit.carId) ?? 0) + visit.totalCostCents);
-    let allocated = 0;
-    for (const item of visit.items) {
+    const converted = reportingCents(visit, homeCurrency);
+    if (converted === null) {
+      pendingCount++;
+      continue;
+    }
+    totalCents += converted;
+    byMonth.set(visit.date.slice(0, 7), (byMonth.get(visit.date.slice(0, 7)) ?? 0) + converted);
+    byCar.set(visit.carId, (byCar.get(visit.carId) ?? 0) + converted);
+    const amounts = allocateConverted(visit, converted);
+    for (const [index, item] of visit.items.entries()) {
       if (item.costCents !== null) {
-        allocated += item.costCents;
-        byCategory.set(item.name, (byCategory.get(item.name) ?? 0) + item.costCents);
+        byCategory.set(item.name, (byCategory.get(item.name) ?? 0) + amounts[index]);
       }
     }
-    const unallocated = Math.max(0, visit.totalCostCents - allocated);
-    unallocatedCents += unallocated;
+    unallocatedCents += amounts[amounts.length - 1];
   }
   return {
-    totalCents: visits.reduce((sum, visit) => sum + visit.totalCostCents, 0),
+    totalCents,
+    pendingCount,
+    convertedCount: visits.length - pendingCount,
     byMonth: [...byMonth].sort(([a], [b]) => a.localeCompare(b)),
     byCar: [...byCar].map(([id, amount]) => ({
       id,
@@ -43,7 +54,7 @@ function escapeCsv(value: string | number): string {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-export function visitsToCsv(visits: Visit[], cars: Car[]): string {
+export function visitsToCsv(visits: Visit[], cars: Car[], homeCurrency: Currency = 'USD'): string {
   const headers = [
     'Date',
     'Car',
@@ -51,10 +62,15 @@ export function visitsToCsv(visits: Visit[], cars: Car[]): string {
     'Distance unit',
     'Provider',
     'Items',
-    'Total cost (USD)',
-    'Item costs (USD)',
+    'Original total',
+    'Original item costs',
     'Notes',
     'Photo count',
+    'Original currency',
+    'Reporting currency',
+    'Converted total',
+    'Conversion source',
+    'Rate date',
   ];
   const rows = visits.map((visit) => [
     visit.date,
@@ -72,6 +88,19 @@ export function visitsToCsv(visits: Visit[], cars: Car[]): string {
       .join('; '),
     visit.notes,
     visit.photos.length,
+    currencyOrDefault(visit.currency),
+    homeCurrency,
+    reportingCents(visit, homeCurrency) === null
+      ? ''
+      : (reportingCents(visit, homeCurrency)! / 100).toFixed(2),
+    currencyOrDefault(visit.currency) === homeCurrency
+      ? 'same-currency'
+      : reportingCents(visit, homeCurrency) === null
+        ? ''
+        : (visit.conversions?.[homeCurrency]?.source ?? ''),
+    reportingCents(visit, homeCurrency) === null
+      ? ''
+      : (visit.conversions?.[homeCurrency]?.rateDate ?? ''),
   ]);
   return (
     '\uFEFF' + [headers, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\r\n') + '\r\n'

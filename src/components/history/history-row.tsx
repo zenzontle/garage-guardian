@@ -51,7 +51,7 @@ export function HistoryRow({
         <td>{visit.odometer === null ? '—' : formatDistance(visit.odometer, car?.distanceUnit)}</td>
         <td>{visit.provider || '—'}</td>
         <td>
-          <strong>{money(visit.totalCostCents)}</strong>
+          <strong>{money(visit.totalCostCents, visit.currency ?? 'USD')}</strong>
         </td>
         <td>{visit.photos.length ? number(visit.photos.length) : '—'}</td>
         <td>

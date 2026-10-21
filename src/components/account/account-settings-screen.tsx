@@ -6,6 +6,7 @@ import { accountPath } from '@/lib/navigation/garage-routes';
 import { isCloudConfigured } from '@/lib/garage/repository';
 import { useGarage } from '../garage/garage-provider';
 import { AccountSettingsForm } from './account-settings-form';
+import { HomeCurrencyForm } from './home-currency-form';
 
 export function AccountSettingsScreen({ section }: { section: 'account' | 'security' }) {
   const t = useTranslations();
@@ -13,6 +14,7 @@ export function AccountSettingsScreen({ section }: { section: 'account' | 'secur
   return (
     <div className="form-stack account-settings">
       <h1>{t(section === 'security' ? 'account.security' : 'account.settings')}</h1>
+      {section === 'account' && <HomeCurrencyForm key={`home:${garage.user?.id ?? 'guest'}`} />}
       {garage.user ? (
         <div key={garage.user.id} className="form-stack account-section">
           <p>{t('account.currentEmail', { email: garage.user.email ?? '' })}</p>

@@ -74,7 +74,7 @@ it.each([
   ['en', en],
   ['es', es],
 ] as const)(
-  'keeps local-only account and security menu entries disabled in %s',
+  'offers local home-currency settings while keeping security disabled in %s',
   async (locale, copy) => {
     localStorage.setItem('garage-guardian:locale', locale);
     const App = await loadGarageTestApp();
@@ -84,7 +84,8 @@ it.each([
     const drawer = screen.getByRole('dialog', { name: copy.account.settings });
     expect(within(drawer).queryByRole('button', { name: copy.account.signOut })).toBeNull();
     expect(within(drawer).queryByRole('link', { name: copy.account.create })).toBeNull();
-    for (const name of [copy.account.settings, copy.account.security]) {
+    expect(within(drawer).getByRole('link', { name: copy.account.settings })).toBeDefined();
+    for (const name of [copy.account.security]) {
       expect(within(drawer).queryByRole('link', { name })).toBeNull();
       const option = within(drawer).getByRole('button', { name }) as HTMLButtonElement;
       expect(option.disabled).toBe(true);
@@ -92,6 +93,10 @@ it.each([
       expect(testRouter.url).toBe('/');
     }
     within(drawer).getByRole('button', { name: copy.shared.close }).focus();
+    await user.tab();
+    expect(document.activeElement).toBe(
+      within(drawer).getByRole('link', { name: copy.account.settings }),
+    );
     await user.tab();
     expect(document.activeElement).toBe(
       within(drawer).getByRole('link', { name: copy.account.notifications }),

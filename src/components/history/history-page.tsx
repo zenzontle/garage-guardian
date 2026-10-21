@@ -10,6 +10,7 @@ import { PageHeading } from '../ui/page-heading';
 import { EmptyPanel } from '../ui/empty-panel';
 import { HistoryRow } from './history-row';
 import { HistoryCard } from './history-card';
+import { compareCost, type Currency } from '@/lib/currency/currency';
 
 export function HistoryPage({
   cars,
@@ -18,6 +19,7 @@ export function HistoryPage({
   onAdd,
   onEdit,
   onDelete,
+  homeCurrency = 'USD',
 }: {
   cars: Car[];
   visits: Visit[];
@@ -25,6 +27,7 @@ export function HistoryPage({
   onAdd: () => void;
   onEdit: (visit: Visit) => void;
   onDelete: (visit: Visit) => void;
+  homeCurrency?: Currency;
 }) {
   const t = useTranslations();
   const [carId, setCarId] = useState('');
@@ -54,8 +57,8 @@ export function HistoryPage({
     )
     .sort((a, b) => {
       if (sort === 'oldest') return a.date.localeCompare(b.date);
-      if (sort === 'cost_high') return b.totalCostCents - a.totalCostCents;
-      if (sort === 'cost_low') return a.totalCostCents - b.totalCostCents;
+      if (sort === 'cost_high' || sort === 'cost_low')
+        return compareCost(a, b, homeCurrency, sort === 'cost_high');
       if (sort === 'odometer_high')
         return (
           distanceInMiles(b.odometer ?? -1, cars.find((car) => car.id === b.carId)?.distanceUnit) -
@@ -64,7 +67,9 @@ export function HistoryPage({
       return b.date.localeCompare(a.date);
     });
   function downloadCsv() {
-    const blob = new Blob([visitsToCsv(filtered, cars)], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([visitsToCsv(filtered, cars, homeCurrency)], {
+      type: 'text/csv;charset=utf-8',
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

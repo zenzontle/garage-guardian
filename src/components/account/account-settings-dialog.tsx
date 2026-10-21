@@ -7,6 +7,7 @@ import { useInteractions } from '../interaction/interaction-provider';
 import { AccountSettingsForm } from './account-settings-form';
 import { useGarage } from '../garage/garage-provider';
 import { NotificationPreferencesForm } from '../notifications/notification-preferences-form';
+import { HomeCurrencyForm } from './home-currency-form';
 
 export function AccountSettingsDialog({ section }: { section?: 'security' }) {
   const t = useTranslations();
@@ -28,6 +29,7 @@ export function AccountSettingsDialog({ section }: { section?: 'security' }) {
       }}
     >
       <div className="modal-body form-stack">
+        {section !== 'security' && <HomeCurrencyForm />}
         <p>{t('account.currentEmail', { email: garage.user.email ?? '' })}</p>
         {garage.transferring && <p role="status">{t('account.transferBlocked')}</p>}
         {section !== 'security' && (

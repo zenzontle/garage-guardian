@@ -8,6 +8,8 @@ import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../../test/fake-supabase';
 import { car, visit } from '../../test/fixtures';
 import type { Repository } from '../../lib/garage/repository';
+import en from '../../../messages/en.json';
+import es from '../../../messages/es.json';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 vi.mock('../../lib/utils/resize-photo', () => ({ resizePhoto: async (file: File) => file }));
@@ -26,7 +28,7 @@ beforeEach(async () => {
   );
 });
 
-async function setup(mode: 'local' | 'cloud') {
+async function setup(mode: 'local' | 'cloud', logServiceLabel = 'Log service') {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', mode === 'cloud' ? 'https://garage.supabase.co' : '');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', mode === 'cloud' ? 'test-key' : '');
   if (mode === 'cloud') cloud.emit(account());
@@ -36,7 +38,7 @@ async function setup(mode: 'local' | 'cloud') {
   await backend.saveCar(car);
   const GarageApp = await loadGarageTestApp();
   const app = render(<GarageApp />);
-  await screen.findByRole('button', { name: 'Log service' });
+  await screen.findByRole('button', { name: logServiceLabel });
   const prototype = mode === 'cloud' ? SupabaseRepository.prototype : LocalRepository.prototype;
   return { backend, prototype, app, user: userEvent.setup() };
 }
@@ -62,6 +64,46 @@ async function openVisit(user: ReturnType<typeof userEvent.setup>, files = 1) {
   await dialog.findByText('receipt-0.webp');
   return dialog;
 }
+
+it.each([
+  ['en', en],
+  ['es', es],
+] as const)(
+  'keeps a deleted-vehicle outbox conflict accessible and discardable in %s',
+  async (locale, copy) => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    testRouter.reset('/');
+    const { backend, app, user } = await setup('cloud', copy.shared.logService);
+    app.unmount();
+    const execute = cloud.execute.getMockImplementation()!;
+    cloud.execute.mockRejectedValue(new TypeError('Failed to fetch'));
+    await backend.saveVisit(visit);
+    cloud.tables.get('cars')!.delete(car.id);
+    cloud.execute.mockImplementation(async (...args) => {
+      if (args[0] === 'visits' && args[1] === 'upsert')
+        return {
+          data: null,
+          error: Object.assign(new Error('Missing parent car'), { code: '23503' }),
+        };
+      return execute(...args);
+    });
+    const GarageApp = await loadGarageTestApp();
+    render(<GarageApp />);
+    const notice = copy.currency.syncConflict.replace('{count}', '1');
+    const banner = (await screen.findByText(notice)).closest<HTMLElement>('[role="status"]')!;
+    await user.click(within(banner).getByRole('link', { name: copy.navigation.history }));
+    expect(testRouter.url).toBe('/history');
+    await screen.findAllByText(copy.history.unknown);
+    await user.click(screen.getAllByRole('button', { name: copy.history.delete })[0]);
+    await user.click(
+      within(screen.getByRole('alertdialog')).getByRole('button', {
+        name: copy.interactions.delete,
+      }),
+    );
+    await waitFor(() => expect(screen.queryByText(notice)).toBeNull());
+    expect((await backend.load()).visits).toEqual([]);
+  },
+);
 
 describe.each(['local', 'cloud'] as const)('%s save recovery', (mode) => {
   it('announces photo counts, blocks dismissal, and submits once while uploads are pending', async () => {
@@ -107,8 +149,9 @@ describe.each(['local', 'cloud'] as const)('%s save recovery', (mode) => {
     const save = vi.spyOn(prototype, 'saveVisit').mockImplementationOnce(async function (
       this: Repository,
       value,
+      manualTargets = [],
     ) {
-      await originalSave.call(this, value);
+      await originalSave.call(this, value, manualTargets);
       load.mockRejectedValueOnce(new Error('Refresh failed'));
     });
     const upload = vi.spyOn(prototype, 'uploadPhoto');

@@ -88,6 +88,7 @@ describe('signup transfer', () => {
       await reloaded.transferSignupData(cloud.client, project, account().id);
 
       expect(await local.load()).toEqual({
+        homeCurrency: 'USD',
         cars: edit === 'none' ? [] : [car],
         schedules: edit === 'none' ? [] : edit === 'new task' ? [guest.schedules[1]] : [edited],
         visits: [],
@@ -140,6 +141,7 @@ describe('signup transfer', () => {
       await reloaded.transferSignupData(cloud.client, project, account().id);
 
       expect(await local.load()).toEqual({
+        homeCurrency: 'USD',
         cars: edit === 'none' ? [] : [car],
         schedules: edit === 'none' ? [] : [edited],
         visits: [],
@@ -196,7 +198,12 @@ describe('signup transfer', () => {
     vi.setSystemTime(new Date('2026-10-28T19:00:00Z'));
     await reloaded.transferSignupData(cloud.client, project, account().id);
     expect(cloud.tables.get('schedule_items')!.get(schedule.id)!.first_due_date).toBe('2027-04-13');
-    expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+    expect(await local.load()).toEqual({
+      homeCurrency: 'USD',
+      cars: [],
+      schedules: [],
+      visits: [],
+    });
     expect(await pendingTransfer(project)).toBeUndefined();
   });
 
@@ -238,7 +245,12 @@ describe('signup transfer', () => {
         },
       ]);
       expect(transferred.visits[0].odometer).toBe(71000);
-      expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+      expect(await local.load()).toEqual({
+        homeCurrency: 'USD',
+        cars: [],
+        schedules: [],
+        visits: [],
+      });
       expect(await pendingTransfer(project)).toBeUndefined();
     },
   );
@@ -259,7 +271,12 @@ describe('signup transfer', () => {
       const cloud = fakeSupabase();
       cloud.emit(account());
       await transferSignupData(cloud.client, project, account().id);
-      expect(await new LocalRepository().load()).toEqual({ cars: [], schedules: [], visits: [] });
+      expect(await new LocalRepository().load()).toEqual({
+        homeCurrency: 'USD',
+        cars: [],
+        schedules: [],
+        visits: [],
+      });
       expect(await pendingTransfer(project)).toBeUndefined();
       if (status !== 'uploaded') {
         expect((await new SupabaseRepository(cloud.client, account().id).load()).cars).toEqual([
@@ -289,7 +306,12 @@ describe('signup transfer', () => {
     expect((await new SupabaseRepository(cloud.client, account().id).load()).cars).toEqual([
       plated,
     ]);
-    expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+    expect(await local.load()).toEqual({
+      homeCurrency: 'USD',
+      cars: [],
+      schedules: [],
+      visits: [],
+    });
     expect(await pendingTransfer(project)).toBeUndefined();
   });
 
@@ -348,11 +370,17 @@ describe('signup transfer', () => {
     await registerSignup(project, account(), true);
     await transferSignupData(cloud.client, project, account().id);
     expect(await new SupabaseRepository(cloud.client, account().id).load()).toEqual({
+      homeCurrency: 'USD',
       cars: [metric],
       schedules: [schedule],
       visits: [visit],
     });
-    expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+    expect(await local.load()).toEqual({
+      homeCurrency: 'USD',
+      cars: [],
+      schedules: [],
+      visits: [],
+    });
   });
 
   it('uploads the whole garage and photo blobs, preserves relationships, and clears the browser copy', async () => {
@@ -370,11 +398,21 @@ describe('signup transfer', () => {
     });
     expect(cloud.photos.size).toBe(1);
     expect(await [...cloud.photos.values()][0].text()).toBe('receipt');
-    expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+    expect(await local.load()).toEqual({
+      homeCurrency: 'USD',
+      cars: [],
+      schedules: [],
+      visits: [],
+    });
     expect(await get(`photo:${photo.path}`)).toBeUndefined();
     expect(await pendingTransfer(project)).toBeUndefined();
     const writes = cloud.execute.mock.calls.filter(([, operation]) => operation === 'upsert');
-    expect(writes.map(([table]) => table)).toEqual(['cars', 'schedule_items', 'visits']);
+    expect(writes.map(([table]) => table)).toEqual([
+      'garage_settings',
+      'cars',
+      'schedule_items',
+      'visits',
+    ]);
   });
 
   it('retains all local data on a partial failure and retries without duplicate rows or photos', async () => {
@@ -459,7 +497,12 @@ describe('signup transfer', () => {
     expect(cloud.bucket.upload).not.toHaveBeenCalled();
     expect(cloud.tables.get('cars')?.get(car.id)?.name).toBe('Edited in cloud');
     expect(await get(`photo:${photo.path}`)).toBeUndefined();
-    expect(await local.load()).toEqual({ cars: [], schedules: [], visits: [] });
+    expect(await local.load()).toEqual({
+      homeCurrency: 'USD',
+      cars: [],
+      schedules: [],
+      visits: [],
+    });
   });
 
   it('does not transfer on ordinary sign-in, to another account, or to another project', async () => {

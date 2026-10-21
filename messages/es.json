@@ -238,7 +238,7 @@
     "edit": "Editar visita de servicio",
     "subtitle": "Guarda los detalles juntos, incluso cuando una visita incluya varias tareas.",
     "odometerInput": "Odómetro ({unit})",
-    "total": "Costo total (USD)",
+    "total": "Costo total ({currency})",
     "providerExample": "p. ej., Taller Central",
     "completedItems": "Tareas completadas",
     "addItem": "Añadir tarea",
@@ -246,7 +246,7 @@
     "custom": "Otra / personalizada",
     "itemName": "Nombre de la tarea de servicio",
     "itemPlaceholder": "Tarea de servicio",
-    "itemCost": "Costo de la tarea en dólares",
+    "itemCost": "Costo de la tarea ({currency})",
     "costPlaceholder": "$ opcional",
     "removeItem": "Quitar tarea de servicio",
     "notesExample": "Repuestos usados, recomendaciones o cualquier detalle para recordar",
@@ -453,5 +453,25 @@
     "transferCleanup": "Terminando transferencia…",
     "reportSubmitting": "Enviando reporte con {count, plural, =0 {ninguna captura} one {# captura} other {# capturas}}…",
     "reportChecking": "Consultando el estado del envío…"
+  },
+  "currency": {
+    "home": "Moneda principal",
+    "receipt": "Moneda del recibo",
+    "USD": "Dólar estadounidense",
+    "MXN": "Peso mexicano",
+    "CAD": "Dólar canadiense",
+    "homeHint": "Los informes combinados usan esta moneda. Al cambiarla se conservan las conversiones guardadas y los cargos reales de tu tarjeta.",
+    "linesHint": "Todos los conceptos de servicios y materiales usan {currency}.",
+    "converted": "Total convertido ({currency})",
+    "estimate": "Estimación: 1 {base} = {rate} {target}. Fecha efectiva del tipo de cambio: {date}.",
+    "manual": "Cargo real de tarjeta / conversión manual",
+    "overrideHint": "Puedes reemplazar la estimación con el cargo real de tu tarjeta. Los tipos automáticos son estimaciones de Frankfurter (BCE).",
+    "loading": "Estimando el costo histórico… Puedes guardar mientras está pendiente.",
+    "pending": "Conversión pendiente. No hay tipos disponibles o no tienes conexión. Reintenta o ingresa el total convertido; puedes guardar de todas formas.",
+    "incomplete": "Total incompleto — se excluyeron {count} conversiones pendientes.",
+    "background": "Convirtiendo recibos pendientes…",
+    "retryHint": "Reintenta las conversiones o edita un recibo para ingresar el cargo real.",
+    "pendingSync": "Guardado en este dispositivo — {count} recibos pendientes de sincronizar con tu cuenta.",
+    "syncConflict": "Guardado en este dispositivo — {count} recibos no se pueden sincronizar porque se eliminó su vehículo. Búscalos bajo Desconocido en el historial de servicio para descartarlos."
   }
 }

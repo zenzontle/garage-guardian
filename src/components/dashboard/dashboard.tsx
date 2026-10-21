@@ -20,6 +20,8 @@ import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
 import { Stat } from '../ui/stat';
 import { DueRow } from './due-row';
+import { reportTotals } from '@/lib/reports/reports';
+import type { Currency } from '@/lib/currency/currency';
 
 export function Dashboard({
   cars,
@@ -27,21 +29,25 @@ export function Dashboard({
   allDue,
   onAddCar,
   onAddVisit,
+  homeCurrency = 'USD',
 }: {
   cars: Car[];
   visits: Visit[];
   allDue: DueItem[];
   onAddCar: () => void;
   onAddVisit: () => void;
+  homeCurrency?: Currency;
 }) {
   const t = useTranslations();
   const { number, money, displayDate, formatDistance } = useDisplay();
   const due = allDue.filter((item) => item.status === 'due');
   const upcoming = allDue.filter((item) => item.status === 'upcoming');
   const setup = allDue.filter((item) => item.status === 'setup');
-  const spendThisYear = visits
-    .filter((visit) => visit.date.startsWith(String(new Date().getFullYear())))
-    .reduce((sum, visit) => sum + visit.totalCostCents, 0);
+  const spending = reportTotals(
+    visits.filter((visit) => visit.date.startsWith(String(new Date().getFullYear()))),
+    cars,
+    homeCurrency,
+  );
   return (
     <>
       <PageHeading
@@ -93,8 +99,12 @@ export function Dashboard({
             <Stat
               icon={<ReceiptText size={20} />}
               label={t('dashboard.yearSpend')}
-              value={money(spendThisYear)}
-              detail={t('dashboard.allVehicles')}
+              value={money(spending.totalCents, homeCurrency)}
+              detail={
+                spending.pendingCount
+                  ? t('currency.incomplete', { count: spending.pendingCount })
+                  : t('dashboard.allVehicles')
+              }
               tone="muted"
             />
           </div>
@@ -201,7 +211,7 @@ export function Dashboard({
                         {displayDate(visit.date)}
                       </small>
                     </span>
-                    <strong>{money(visit.totalCostCents)}</strong>
+                    <strong>{money(visit.totalCostCents, visit.currency ?? 'USD')}</strong>
                   </div>
                 ))}
               </div>

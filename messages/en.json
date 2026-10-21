@@ -238,7 +238,7 @@
     "edit": "Edit service visit",
     "subtitle": "Keep the details together, even when one visit covers several tasks.",
     "odometerInput": "Odometer ({unit})",
-    "total": "Total cost (USD)",
+    "total": "Total cost ({currency})",
     "providerExample": "e.g. Downtown Toyota",
     "completedItems": "Completed items",
     "addItem": "Add item",
@@ -246,7 +246,7 @@
     "custom": "Other / custom",
     "itemName": "Service item name",
     "itemPlaceholder": "Service item",
-    "itemCost": "Item cost in dollars",
+    "itemCost": "Item cost ({currency})",
     "costPlaceholder": "$ optional",
     "removeItem": "Remove service item",
     "notesExample": "Parts used, recommendations, or anything to remember",
@@ -453,5 +453,25 @@
     "transferCleanup": "Finishing transfer…",
     "reportSubmitting": "Submitting report with {count, plural, =0 {no screenshots} one {# screenshot} other {# screenshots}}…",
     "reportChecking": "Checking submission status…"
+  },
+  "currency": {
+    "home": "Home currency",
+    "receipt": "Receipt currency",
+    "USD": "US dollar",
+    "MXN": "Mexican peso",
+    "CAD": "Canadian dollar",
+    "homeHint": "Combined reports use this currency. Saved conversions and actual card charges are kept when you switch currencies.",
+    "linesHint": "All service and material line items use {currency}.",
+    "converted": "Converted total ({currency})",
+    "estimate": "Estimate: 1 {base} = {rate} {target}. Effective rate date: {date}.",
+    "manual": "Actual card charge / manual conversion",
+    "overrideHint": "You can replace the estimate with your actual card charge. Automatic rates are estimates from Frankfurter (ECB).",
+    "loading": "Estimating historical cost… You can save while this is pending.",
+    "pending": "Conversion pending. Rates are unavailable or you are offline. Retry or enter a converted total; you can still save.",
+    "incomplete": "Incomplete total — {count} pending conversions excluded.",
+    "background": "Converting pending receipts…",
+    "retryHint": "Retry conversions, or edit a receipt to enter your actual charge.",
+    "pendingSync": "Saved on this device — {count} receipts waiting to sync with your account.",
+    "syncConflict": "Saved on this device — {count} receipts cannot sync because their vehicle was deleted. Find them under Unknown car in service history to discard them."
   }
 }

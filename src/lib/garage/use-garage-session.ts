@@ -310,6 +310,13 @@ export function useGarageSession() {
     }
   }, [repository, reloadSnapshot]);
 
+  const refreshConversions = useCallback(async (): Promise<void> => {
+    const version = generation.current;
+    // Unlike a user refresh, successful background writes must eventually be reflected.
+    await Promise.allSettled([...operations.current]);
+    if (generation.current === version) await reloadSnapshot(version);
+  }, [reloadSnapshot]);
+
   async function signUp(email: string, password: string): Promise<boolean> {
     if (!supabase) throw new AppError('cloudNotConfigured');
     if (signupWork.current) throw new AppError('signupBusy');
@@ -520,6 +527,7 @@ export function useGarageSession() {
     setRefreshError,
     refreshing,
     refresh,
+    refreshConversions,
     run,
     signUp,
     signIn,

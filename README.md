@@ -179,7 +179,7 @@ pnpm run typecheck
 pnpm run build
 ```
 
-The schedule is owner-entered. Starter tasks are names only; no interval is presented as an OEM recommendation. VIN lookup, automatic manufacturer schedules, spreadsheet import, and native apps are future work. Authenticated offline synchronization is not supported.
+The schedule is owner-entered. Starter tasks are names only; no interval is presented as an OEM recommendation. VIN lookup, automatic manufacturer schedules, spreadsheet import, and native apps are future work. Receipts support USD, MXN, and CAD with saved home-currency conversions and account-scoped offline receipt retry; see [multi-currency behavior and migration order](docs/multi-currency.md).
 
 ## License
 

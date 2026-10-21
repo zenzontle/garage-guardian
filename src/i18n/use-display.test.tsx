@@ -27,7 +27,11 @@ it('formats numbers and USD while retaining the date-only calendar day in a nega
   expect(en.displayDate('2026-09-25')).toBe('Sep 25, 2026');
   expect(es.displayDate('2026-09-25')).toContain('25');
   expect(es.money(123456)).toBe(
-    new Intl.NumberFormat('es', { style: 'currency', currency: 'USD' }).format(1234.56),
+    new Intl.NumberFormat('es', {
+      style: 'currency',
+      currency: 'USD',
+      currencyDisplay: 'code',
+    }).format(1234.56),
   );
   expect(es.formatDistance(48250, 'kilometers')).toBe(
     `${new Intl.NumberFormat('es').format(48250)} km`,

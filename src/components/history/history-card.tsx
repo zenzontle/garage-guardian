@@ -26,7 +26,7 @@ export function HistoryCard({
           <time dateTime={visit.date}>{displayDate(visit.date)}</time>
           <strong>{car?.name ?? t('history.unknown')}</strong>
         </div>
-        <strong>{money(visit.totalCostCents)}</strong>
+        <strong>{money(visit.totalCostCents, visit.currency ?? 'USD')}</strong>
       </div>
       <button
         className="table-expand"

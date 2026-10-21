@@ -3,6 +3,14 @@ import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/s
 import type { InitializeScheduleDefaultsArgs } from '@/lib/maintenance/schedule-defaults';
 import type { SaveScheduleWithDefaultsArgs } from '@/lib/garage/repository';
 import { scheduleDefaultsRpc } from './schedule-defaults-rpc';
+import {
+  mergeConversions,
+  receiptInputs,
+  sameInputs,
+  validConversion,
+  type Conversion,
+  type Currency,
+} from '@/lib/currency/currency';
 
 type Row = Record<string, unknown> & { id: string; user_id?: string };
 type Result = { data: unknown; error: Error | null };
@@ -56,9 +64,26 @@ export function fakeSupabase() {
       if (operation === 'upsert') {
         if (row?.user_id !== user.id)
           return { data: null, error: new Error('Owner policy denied write') };
-        if (name !== 'cars' && !getTable('cars').has(row.car_id as string))
+        if (
+          name !== 'cars' &&
+          name !== 'garage_settings' &&
+          !getTable('cars').has(row.car_id as string)
+        )
           return { data: null, error: new Error('Missing parent car') };
-        table.set(row.id, structuredClone(row));
+        const id = name === 'garage_settings' ? row.user_id : row.id;
+        const previous = table.get(id);
+        if (name === 'visits' && previous) {
+          const unchanged =
+            previous.currency === row.currency &&
+            previous.service_date === row.service_date &&
+            previous.total_cost_cents === row.total_cost_cents;
+          if (unchanged)
+            row.conversions = mergeConversions(
+              previous.conversions as never,
+              row.conversions as never,
+            );
+        }
+        table.set(id, structuredClone(row));
         return { data: null, error: null };
       }
       const matches = [...table.values()].filter(
@@ -192,7 +217,49 @@ export function fakeSupabase() {
   });
   const storage = { from: vi.fn(() => bucket) };
   const rpc = vi.fn(
-    async (name: string, args: InitializeScheduleDefaultsArgs | SaveScheduleWithDefaultsArgs) => {
+    async (
+      name: string,
+      args:
+        | InitializeScheduleDefaultsArgs
+        | SaveScheduleWithDefaultsArgs
+        | {
+            p_visit_id: string;
+            p_currency: Currency;
+            p_date: string;
+            p_total: number;
+            p_target: Currency;
+            p_conversion: Conversion;
+          },
+    ) => {
+      if (name === 'save_visit_conversion' && 'p_visit_id' in args) {
+        const row = getTable('visits').get(args.p_visit_id);
+        const inputs = {
+          currency: args.p_currency,
+          date: args.p_date,
+          totalCostCents: args.p_total,
+        };
+        const conversions = (row?.conversions ?? {}) as Partial<Record<Currency, Conversion>>;
+        if (
+          row?.user_id === user?.id &&
+          sameInputs(
+            receiptInputs({
+              currency: row!.currency as Currency,
+              date: row!.service_date as string,
+              totalCostCents: row!.total_cost_cents as number,
+            }),
+            inputs,
+          ) &&
+          !conversions[args.p_target] &&
+          validConversion(args.p_conversion, inputs)
+        ) {
+          row!.conversions = {
+            ...conversions,
+            [args.p_target]: structuredClone(args.p_conversion),
+          };
+        }
+        return { data: null, error: null };
+      }
+      if (!('p_user_id' in args)) throw new Error(`Unexpected RPC: ${name}`);
       if (!user || args.p_user_id !== user.id) return { data: [], error: null };
       let initializeArgs: InitializeScheduleDefaultsArgs;
       if (name === 'save_schedule_with_defaults' && 'p_item' in args) {

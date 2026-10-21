@@ -54,7 +54,7 @@ it('shows all visit facts, keeps both presentations sorted by equivalent distanc
   const entries = cards.getAllByRole('listitem');
   expect(entries[0].textContent).toContain('1,000 mi');
   expect(entries[0].textContent).toContain('Dealer');
-  expect(entries[0].textContent).toContain('$150.00');
+  expect(entries[0].textContent).toContain('USD\u00a0150.00');
   expect(entries[1].textContent).toContain('1,600 km');
   expect(entries[1].textContent).toContain('Service visit');
   expect(table.getAllByRole('row')[1].textContent).toContain('1,000 mi');

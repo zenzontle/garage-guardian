@@ -3,13 +3,14 @@
 import { useFormatter, useTranslations } from 'next-intl';
 import { distanceAbbreviation, type DistanceUnit } from '@/lib/garage/model';
 import type { DueItem } from '@/lib/maintenance/due';
+import type { Currency } from '@/lib/currency/currency';
 
 export function useDisplay() {
   const format = useFormatter();
   const t = useTranslations('due');
   const number = (value: number) => format.number(value);
-  const money = (cents: number) =>
-    format.number(cents / 100, { style: 'currency', currency: 'USD' });
+  const money = (cents: number, currency: Currency = 'USD') =>
+    format.number(cents / 100, { style: 'currency', currency, currencyDisplay: 'code' });
   const displayDate = (iso: string) =>
     format.dateTime(new Date(`${iso}T00:00:00Z`), {
       month: 'short',

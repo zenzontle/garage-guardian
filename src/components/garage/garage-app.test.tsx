@@ -123,10 +123,9 @@ describe.each([
     fireEvent.change(visitDialog.getByRole('textbox', { name: 'Nombre de la tarea de servicio' }), {
       target: { value: 'Unallocated' },
     });
-    fireEvent.change(
-      visitDialog.getByRole('spinbutton', { name: 'Costo de la tarea en dólares' }),
-      { target: { value: '100.25' } },
-    );
+    fireEvent.change(visitDialog.getByRole('spinbutton', { name: 'Costo de la tarea (USD)' }), {
+      target: { value: '100.25' },
+    });
     await user.selectOptions(screen.getByRole('combobox', { name: 'Idioma' }), 'en');
     expect(screen.getByRole('dialog')).toBe(visitElement);
     expect(
@@ -160,7 +159,11 @@ describe.each([
     expect(screen.getByText('Unallocated')).toBeDefined();
     expect(
       screen.getAllByText(
-        new Intl.NumberFormat('es', { style: 'currency', currency: 'USD' }).format(1234.56),
+        new Intl.NumberFormat('es', {
+          style: 'currency',
+          currency: 'USD',
+          currencyDisplay: 'code',
+        }).format(1234.56),
         { normalizer: (value) => value },
       ).length,
     ).toBeGreaterThan(0);
@@ -236,7 +239,10 @@ describe.each([
         expect(cloud.from.mock.calls.every(([table]) => table.startsWith('vehicle_'))).toBe(true);
       else expect(cloud.from).not.toHaveBeenCalled();
       if (configured) expect(screen.getByText('Guest — stored in this browser')).toBeDefined();
-      else expect(screen.getByRole('button', { name: 'Open account menu' }).textContent).toBe('G');
+      else
+        expect(
+          screen.getByRole('button', { name: 'Open account menu' }).querySelector('svg'),
+        ).not.toBeNull();
     }
     app.unmount();
     testRouter.reset();
