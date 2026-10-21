@@ -70,6 +70,7 @@ export type Visit = {
 
 export type Snapshot = {
   pendingSyncCount?: number;
+  syncConflictCount?: number;
   homeCurrency?: Currency;
   cars: Car[];
   schedules: ScheduleItem[];

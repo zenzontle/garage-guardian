@@ -22,6 +22,8 @@ After an authenticated garage has loaded online, receipts can be saved on that d
 
 Receipt flushes, edits, deletes, and background conversions share an account-scoped operation lock, using Web Locks across tabs where available. Queued manual intent is merged into subsequent unrelated edits. Signup transfer uses an online-only repository so a cached record cannot falsely satisfy cloud verification. IndexedDB storage must remain available for device-only work; clearing site data removes unsynced receipts.
 
+If an outbox receipt's vehicle was deleted on another device, its foreign-key conflict does not block loading fresh garage data or syncing other receipts. The receipt and its saved conversions remain on the device. A conflict notice links to service history, where receipts for deleted vehicles appear under “Unknown car” and can be discarded using the existing delete action. Connectivity failures still use the cached garage, and authorization failures remain errors.
+
 ## Reporting and rollout
 
 Dashboard spending, report totals, charts, category breakdowns, averages, and cost sorting use home-currency amounts. Pending conversions are excluded, visibly counted, and sorted last in both cost directions. History and receipt details retain original amounts and explicit currency codes. CSV headers stay in English and include original currency/amounts, reporting currency, converted total, source, and rate date; unavailable conversions are blank.

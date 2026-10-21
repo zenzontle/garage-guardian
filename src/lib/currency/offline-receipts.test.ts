@@ -6,6 +6,68 @@ import { car, visit } from '@/test/fixtures';
 import { receiptInputs, type Currency } from './currency';
 
 beforeEach(async () => clear());
+it('loads fresh cloud data despite a deleted-vehicle conflict, syncs other receipts, and allows discard', async () => {
+  const cloud = fakeSupabase();
+  cloud.emit(account());
+  const repository = new SupabaseRepository(cloud.client, account().id, true);
+  const otherCar = { ...car, id: 'other-car', name: 'Remaining car' };
+  const otherVisit = { ...visit, id: 'other-visit', carId: otherCar.id };
+  await repository.saveCar(car);
+  await repository.saveCar(otherCar);
+  await repository.load();
+  const execute = cloud.execute.getMockImplementation()!;
+  cloud.execute.mockRejectedValue(new TypeError('Failed to fetch'));
+  const manual = {
+    ...receiptInputs(visit),
+    source: 'manual' as const,
+    rate: null,
+    rateDate: null,
+    convertedCents: 20000,
+  };
+  const orphan = { ...visit, conversions: { CAD: manual } };
+  await repository.saveVisit(orphan, ['CAD']);
+  await repository.saveVisit(otherVisit);
+  // Another device deletes the first vehicle before this device reconnects.
+  cloud.tables.get('cars')!.delete(car.id);
+  cloud.execute.mockImplementation(async (...args) => {
+    if (args[0] === 'visits' && args[1] === 'upsert' && args[3]?.car_id === car.id)
+      return {
+        data: null,
+        error: Object.assign(new Error('Vehicle no longer exists'), { code: '23503' }),
+      };
+    return execute(...args);
+  });
+  const saved = await repository.load();
+  expect(saved.cars).toEqual([otherCar]);
+  expect(saved).toMatchObject({ pendingSyncCount: 1, syncConflictCount: 1 });
+  expect(saved.visits).toContainEqual(orphan);
+  expect(cloud.tables.get('visits')!.has(otherVisit.id)).toBe(true);
+  const reopened = new SupabaseRepository(cloud.client, account().id, true);
+  expect((await reopened.load()).visits).toContainEqual(orphan);
+  await reopened.deleteVisit(orphan);
+  const resolved = await reopened.load();
+  expect(resolved.pendingSyncCount).toBeUndefined();
+  expect(resolved.syncConflictCount).toBeUndefined();
+  expect(resolved.visits).toEqual([otherVisit]);
+});
+it('keeps outbox authorization failures visible instead of treating them as vehicle conflicts', async () => {
+  const cloud = fakeSupabase();
+  cloud.emit(account());
+  const repository = new SupabaseRepository(cloud.client, account().id, true);
+  await repository.saveCar(car);
+  await repository.load();
+  const execute = cloud.execute.getMockImplementation()!;
+  cloud.execute.mockRejectedValue(new TypeError('Failed to fetch'));
+  await repository.saveVisit(visit);
+  cloud.execute.mockImplementation(async (...args) => {
+    if (args[0] === 'visits' && args[1] === 'upsert')
+      return { data: null, error: Object.assign(new Error('Access denied'), { code: '42501' }) };
+    return execute(...args);
+  });
+  await expect(repository.load()).rejects.toThrow('Access denied');
+  cloud.execute.mockImplementation(execute);
+  expect((await repository.load()).visits).toEqual([visit]);
+});
 it('persists offline account receipts across reload, isolates accounts, and syncs on retry', async () => {
   const cloud = fakeSupabase();
   cloud.emit(account());

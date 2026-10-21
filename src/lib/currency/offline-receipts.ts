@@ -6,6 +6,8 @@ import { mergeConversions, receiptInputs, sameInputs, type Currency } from './cu
 
 type PendingReceipt = { visit: Visit; manualTargets: Currency[] };
 type CachedGarage = { snapshot: Snapshot; pending: PendingReceipt[] };
+const missingVehicleCount = (snapshot: Snapshot, pending: PendingReceipt[]) =>
+  pending.filter(({ visit }) => !snapshot.cars.some((car) => car.id === visit.carId)).length;
 const operations = new Map<string, Promise<unknown>>();
 export function connectionFailure(error: unknown) {
   const message =
@@ -66,6 +68,7 @@ export class OfflineReceipts {
     await update<CachedGarage>(this.key, (saved) => {
       const pending = saved?.pending ?? [];
       const ids = new Set(pending.map(({ visit }) => visit.id));
+      const syncConflictCount = missingVehicleCount(snapshot, pending);
       merged = {
         ...snapshot,
         visits: [
@@ -73,8 +76,10 @@ export class OfflineReceipts {
           ...pending.map(({ visit }) => visit),
         ],
         pendingSyncCount: pending.length,
+        syncConflictCount,
       };
       if (!pending.length) delete merged.pendingSyncCount;
+      if (!syncConflictCount) delete merged.syncConflictCount;
       return { snapshot: merged, pending };
     });
     return merged;
@@ -121,7 +126,11 @@ export class OfflineReceipts {
       return {
         ...current,
         pending,
-        snapshot: { ...current.snapshot, pendingSyncCount: pending.length },
+        snapshot: {
+          ...current.snapshot,
+          pendingSyncCount: pending.length,
+          syncConflictCount: missingVehicleCount(current.snapshot, pending),
+        },
       };
     });
   }
@@ -135,6 +144,7 @@ export class OfflineReceipts {
           ...current.snapshot,
           visits: current.snapshot.visits.filter(keep),
           pendingSyncCount: pending.length,
+          syncConflictCount: missingVehicleCount(current.snapshot, pending),
         },
         pending,
       };
@@ -143,7 +153,15 @@ export class OfflineReceipts {
   async flush(save: (receipt: PendingReceipt) => Promise<void>) {
     const pending = (await this.read())?.pending ?? [];
     for (const receipt of pending) {
-      await save(receipt);
+      try {
+        await save(receipt);
+      } catch (cause) {
+        // A vehicle deleted on another device must not lock its owner out of the garage.
+        // Keep the receipt for history/discard, and continue syncing unrelated receipts.
+        if (cause && typeof cause === 'object' && 'code' in cause && cause.code === '23503')
+          continue;
+        throw cause;
+      }
       await this.acknowledge(receipt);
     }
   }

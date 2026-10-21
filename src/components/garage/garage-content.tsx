@@ -233,7 +233,16 @@ export function GarageContent({ children }: { children: ReactNode }) {
             {children}
             {(snapshot.pendingSyncCount ?? 0) > 0 && (
               <div className="demo-banner" role="status">
-                <span>{t('currency.pendingSync', { count: snapshot.pendingSyncCount! })}</span>
+                <span>
+                  {(snapshot.syncConflictCount ?? 0) > 0
+                    ? t('currency.syncConflict', { count: snapshot.syncConflictCount! })
+                    : t('currency.pendingSync', { count: snapshot.pendingSyncCount! })}
+                </span>
+                {(snapshot.syncConflictCount ?? 0) > 0 && (
+                  <Link className="text-link" href="/history">
+                    {t('navigation.history')}
+                  </Link>
+                )}
                 <button
                   type="button"
                   className="text-link"

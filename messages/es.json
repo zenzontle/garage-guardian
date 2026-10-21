@@ -471,6 +471,7 @@
     "incomplete": "Total incompleto — se excluyeron {count} conversiones pendientes.",
     "background": "Convirtiendo recibos pendientes…",
     "retryHint": "Reintenta las conversiones o edita un recibo para ingresar el cargo real.",
-    "pendingSync": "Guardado en este dispositivo — {count} recibos pendientes de sincronizar con tu cuenta."
+    "pendingSync": "Guardado en este dispositivo — {count} recibos pendientes de sincronizar con tu cuenta.",
+    "syncConflict": "Guardado en este dispositivo — {count} recibos no se pueden sincronizar porque se eliminó su vehículo. Búscalos bajo Desconocido en el historial de servicio para descartarlos."
   }
 }

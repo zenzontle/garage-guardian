@@ -471,6 +471,7 @@
     "incomplete": "Incomplete total — {count} pending conversions excluded.",
     "background": "Converting pending receipts…",
     "retryHint": "Retry conversions, or edit a receipt to enter your actual charge.",
-    "pendingSync": "Saved on this device — {count} receipts waiting to sync with your account."
+    "pendingSync": "Saved on this device — {count} receipts waiting to sync with your account.",
+    "syncConflict": "Saved on this device — {count} receipts cannot sync because their vehicle was deleted. Find them under Unknown car in service history to discard them."
   }
 }
