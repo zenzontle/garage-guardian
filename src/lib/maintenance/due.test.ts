@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addMonths, dueDescription, getDueItem, latestOdometer } from './due';
+import { addMonths, dueDescription, getAllDue, getDueItem, latestOdometer } from './due';
 import type { Car, ScheduleItem, Visit } from '../garage/model';
 
 const car: Car = {
@@ -10,12 +10,27 @@ const car: Car = {
   model: 'RAV4',
   vin: '',
   plate: '',
+  isArchived: false,
   distanceUnit: 'miles',
   odometer: 19_500,
   reminderDays: 30,
   reminderMiles: 500,
   createdAt: '2026-01-01T00:00:00Z',
 };
+
+it('excludes archived vehicles from shared maintenance and restores their saved overdue schedule', () => {
+  const archived = { ...car, isArchived: true };
+  const active = { ...car, id: 'active-car' };
+  const saved = { ...schedule, firstDueMiles: 100, firstDueDate: '2020-01-01' };
+  const other = { ...saved, id: 'other', carId: active.id };
+  expect(
+    getAllDue([archived, active], [saved, other], [], '2026-10-21').map((item) => item.car.id),
+  ).toEqual([active.id]);
+  expect(getAllDue([archived], [saved], [], '2026-10-21')).toEqual([]);
+  expect(
+    getAllDue([{ ...archived, isArchived: false }], [saved], [], '2026-10-21')[0],
+  ).toMatchObject({ status: 'due', dueMiles: 100, dueDate: '2020-01-01' });
+});
 const schedule: ScheduleItem = {
   id: 'oil',
   carId: car.id,

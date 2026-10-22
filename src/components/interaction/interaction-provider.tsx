@@ -19,6 +19,8 @@ import { installHistoryGuard } from '@/lib/navigation/history-guard';
 
 type FormState = { dirty: boolean; busy: boolean; group?: string; discard: () => void };
 type SuccessKey =
+  | 'interactions.carArchived'
+  | 'interactions.carRestored'
   | 'interactions.carSaved'
   | 'interactions.taskSaved'
   | 'interactions.visitSaved'

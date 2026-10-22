@@ -36,6 +36,7 @@ export function HistoryRow({
         <td>{displayDate(visit.date)}</td>
         <td>
           <strong>{car?.name ?? t('history.unknown')}</strong>
+          {car?.isArchived && <span className="count-badge">{t('archive.archived')}</span>}
         </td>
         <td>
           <button

@@ -57,6 +57,7 @@ export function VisitModal({
 }) {
   const t = useTranslations();
   const photoInput = useRef<HTMLInputElement>(null);
+  cars = [...cars].sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
   const initialCar = cars.find((car) => car.id === (item?.carId ?? carId ?? cars[0]?.id));
   const [selectedCarId, setSelectedCarId] = useState(item?.carId ?? carId ?? cars[0]?.id ?? '');
   const [date, setDate] = useState(item?.date ?? todayISO());
@@ -277,6 +278,7 @@ export function VisitModal({
                   {cars.map((car) => (
                     <option key={car.id} value={car.id}>
                       {car.name}
+                      {car.isArchived && ` (${t('archive.archived')})`}
                     </option>
                   ))}
                 </select>

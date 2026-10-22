@@ -169,7 +169,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
           menuOpen={menuOpen}
           onNavigate={closeMenu}
           menuTrigger={menuTrigger}
-          carCount={snapshot.cars.length}
+          carCount={snapshot.cars.filter((car) => !car.isArchived).length}
         />
 
         <div className="main-wrap">

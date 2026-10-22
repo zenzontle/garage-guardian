@@ -19,6 +19,7 @@ export type Car = {
   model: string;
   vin: string;
   plate: string;
+  isArchived: boolean;
   distanceUnit: DistanceUnit;
   odometer: number;
   reminderDays: number;
@@ -143,6 +144,7 @@ export function normalizeCar(car: Car): Car {
   return {
     ...car,
     plate: car.plate ?? '',
+    isArchived: car.isArchived ?? false,
     distanceUnit,
     reminderMiles: car.reminderMiles ?? defaultReminderDistance(distanceUnit),
   };

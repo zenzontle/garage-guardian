@@ -16,6 +16,38 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
+it.each([false, true])(
+  'removes vehicles archived between preparation and submission (all: %s)',
+  async (all) => {
+    store.addAccount('alice');
+    store.tables.cars.push({ ...store.tables.cars[0], id: 'second-car', name: 'Second car' });
+    store.tables.schedule_items.push({
+      ...store.tables.schedule_items[0],
+      id: 'second-task',
+      car_id: 'second-car',
+    });
+    const identify = store.getUserById.getMockImplementation()!;
+    store.getUserById.mockImplementation(async (id) => {
+      store.tables.cars[0].is_archived = true;
+      if (all) store.tables.cars[1].is_archived = true;
+      return identify(id);
+    });
+    expect(await runReminders(store.db, config)).toMatchObject(
+      all ? { skipped: 1, accepted: 0 } : { skipped: 0, accepted: 1 },
+    );
+    expect(store.tables.reminder_deliveries[0]).toMatchObject({
+      item_count: all ? 0 : 1,
+      status: all ? 'skipped' : 'accepted',
+    });
+    if (all) expect(send).not.toHaveBeenCalled();
+    else {
+      const body = JSON.parse(String(send.mock.calls[0][1]?.body));
+      expect(body.textContent).not.toContain('alice car');
+      expect(body.textContent).toContain('Second car');
+    }
+  },
+);
+
 it('sends isolated bilingual digests and persists provider acceptance', async () => {
   store.addAccount('alice');
   store.addAccount('bob', 'es');

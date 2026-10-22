@@ -9,9 +9,16 @@ import { type Car, type ScheduleItem, type Visit } from '@/lib/garage/model';
 import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
 import { EmptyPanel } from '../ui/empty-panel';
+import type { AppFailure } from '@/lib/utils/app-error';
 
 export function CarsPage({
   cars,
+  archived,
+  hasArchived,
+  schedules,
+  archiveBusy,
+  archiveError,
+  onToggleArchived,
   visits,
   allDue,
   selectedCar,
@@ -24,6 +31,12 @@ export function CarsPage({
   onDeleteSchedule,
 }: {
   cars: Car[];
+  archived: boolean;
+  hasArchived: boolean;
+  schedules: ScheduleItem[];
+  archiveBusy: boolean;
+  archiveError: AppFailure | null;
+  onToggleArchived: () => void;
   visits: Visit[];
   allDue: DueItem[];
   selectedCar: Car | null;
@@ -39,6 +52,7 @@ export function CarsPage({
   const { number, money, displayDate, formatDistance, dueDescription } = useDisplay();
   const car = selectedCar;
   const carDue = car ? allDue.filter((item) => item.car.id === car.id) : [];
+  const carSchedules = car ? schedules.filter((item) => item.carId === car.id) : [];
   const carVisits = car ? visits.filter((visit) => visit.carId === car.id) : [];
   return (
     <>
@@ -47,21 +61,56 @@ export function CarsPage({
         title={t('navigation.cars')}
         description={t('car.description')}
         action={
-          <button className="button primary" onClick={onAdd}>
+          <button disabled={archiveBusy} className="button primary" onClick={onAdd}>
             <Plus size={18} />
             {t('shared.addCar')}
           </button>
         }
       />
+      <nav className="car-switcher" aria-label={t('archive.views')}>
+        <Link
+          className={`car-tab ${!archived ? 'active' : ''}`}
+          href="/cars"
+          aria-current={!archived ? 'page' : undefined}
+        >
+          {t('archive.active')}
+        </Link>
+        <Link
+          className={`car-tab ${archived ? 'active' : ''}`}
+          href="/cars?view=archived"
+          aria-current={archived ? 'page' : undefined}
+        >
+          {t('archive.archivedView')}
+        </Link>
+      </nav>
       {!car ? (
         <EmptyPanel
           icon={<CarFront size={25} />}
-          title={t('car.emptyTitle')}
-          description={t('car.emptyDescription')}
+          title={t(
+            archived
+              ? 'archive.emptyTitle'
+              : hasArchived
+                ? 'archive.activeEmptyTitle'
+                : 'car.emptyTitle',
+          )}
+          description={t(
+            archived
+              ? 'archive.emptyDescription'
+              : hasArchived
+                ? 'archive.activeEmptyDescription'
+                : 'car.emptyDescription',
+          )}
           action={
-            <button className="button primary" onClick={onAdd}>
-              {t('shared.addCar')}
-            </button>
+            <div className="account-actions">
+              <button disabled={archiveBusy} className="button primary" onClick={onAdd}>
+                {t('shared.addCar')}
+              </button>
+              {!archived && hasArchived && (
+                <Link className="button secondary" href="/cars?view=archived">
+                  {t('archive.viewArchived')}
+                </Link>
+              )}
+            </div>
           }
         />
       ) : (
@@ -121,6 +170,12 @@ export function CarsPage({
                 {car.year} {car.make.toUpperCase()} {car.model.toUpperCase()}
               </span>
               <h2>{car.name}</h2>
+              {car.isArchived && (
+                <>
+                  <span className="count-badge">{t('archive.archived')}</span>
+                  <p>{t('archive.paused')}</p>
+                </>
+              )}
               <p>
                 <Gauge size={16} /> {formatDistance(latestOdometer(car, visits), car.distanceUnit)}{' '}
                 {t('car.currentOdometer')}
@@ -131,17 +186,43 @@ export function CarsPage({
             <div className="car-header-actions">
               <button
                 className="button secondary"
+                onClick={onToggleArchived}
+                disabled={archiveBusy}
+                aria-busy={archiveBusy}
+              >
+                {t(
+                  archiveBusy
+                    ? car.isArchived
+                      ? 'archive.restoring'
+                      : 'archive.archiving'
+                    : car.isArchived
+                      ? 'archive.restore'
+                      : 'archive.archive',
+                )}
+              </button>
+              <button
+                disabled={archiveBusy}
+                className="button secondary"
                 onClick={() => onEdit({ ...car, odometer: latestOdometer(car, visits) })}
               >
                 <Settings2 size={16} />
                 {t('car.edit')}
               </button>
-              <button className="button primary" onClick={() => onAddVisit(car.id)}>
+              <button
+                disabled={archiveBusy}
+                className="button primary"
+                onClick={() => onAddVisit(car.id)}
+              >
                 <Plus size={17} />
                 {t('shared.logService')}
               </button>
             </div>
           </div>
+          {archiveError && (
+            <p className="error-text" role="alert">
+              {t(`errors.${archiveError.code}`, archiveError.values)}
+            </p>
+          )}
           <div className="car-content-grid">
             <section className="panel">
               <div className="section-heading">
@@ -149,13 +230,62 @@ export function CarsPage({
                   <span className="eyebrow">{t('car.servicePlan')}</span>
                   <h2>{t('car.maintenanceSchedule')}</h2>
                 </div>
-                <button className="text-link" onClick={() => onAddSchedule(car.id)}>
+                <button
+                  disabled={archiveBusy}
+                  className="text-link"
+                  onClick={() => onAddSchedule(car.id)}
+                >
                   <Plus size={16} />
                   {t('car.addTask')}
                 </button>
               </div>
               <p className="section-hint">{t('car.scheduleHint')}</p>
               <div className="schedule-list">
+                {carSchedules
+                  .filter((item) => !carDue.some((due) => due.schedule.id === item.id))
+                  .map((item) => (
+                    <div className="schedule-row saved-schedule-row" key={item.id}>
+                      <div className="schedule-main">
+                        <strong>{item.name}</strong>
+                        <small>
+                          {t(car.isArchived ? 'archive.scheduleSaved' : 'archive.inactiveSchedule')}
+                        </small>
+                        {item.intervalMiles !== null && (
+                          <small>
+                            {t('archive.repeatDistance', {
+                              distance: formatDistance(item.intervalMiles, car.distanceUnit),
+                            })}
+                          </small>
+                        )}
+                        {item.intervalMonths !== null && (
+                          <small>{t('archive.repeatMonths', { count: item.intervalMonths })}</small>
+                        )}
+                        {item.firstDueDate && <small>{displayDate(item.firstDueDate)}</small>}
+                        {item.firstDueMiles !== null && (
+                          <small>{formatDistance(item.firstDueMiles, car.distanceUnit)}</small>
+                        )}
+                        {item.sourceNote && (
+                          <small>{t('car.source', { source: item.sourceNote })}</small>
+                        )}
+                      </div>
+                      <button
+                        disabled={archiveBusy}
+                        className="icon-button"
+                        aria-label={t('shared.editNamed', { name: item.name })}
+                        onClick={() => onEditSchedule(item)}
+                      >
+                        <Settings2 size={16} />
+                      </button>
+                      <button
+                        disabled={archiveBusy}
+                        className="icon-button danger"
+                        aria-label={t('shared.deleteNamed', { name: item.name })}
+                        onClick={() => onDeleteSchedule(item)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
                 {carDue.map((due) => (
                   <div className="schedule-row" key={due.schedule.id}>
                     <span className={`status-dot ${due.status}`} />
@@ -180,6 +310,7 @@ export function CarsPage({
                       </span>
                     )}
                     <button
+                      disabled={archiveBusy}
                       className="icon-button"
                       aria-label={t('shared.editNamed', { name: due.schedule.name })}
                       onClick={() => onEditSchedule(due.schedule)}
@@ -187,6 +318,7 @@ export function CarsPage({
                       <Settings2 size={16} />
                     </button>
                     <button
+                      disabled={archiveBusy}
                       className="icon-button danger"
                       aria-label={t('shared.deleteNamed', { name: due.schedule.name })}
                       onClick={() => onDeleteSchedule(due.schedule)}
@@ -196,7 +328,7 @@ export function CarsPage({
                   </div>
                 ))}
               </div>
-              {carDue.length === 0 && (
+              {carSchedules.length === 0 && (
                 <div className="panel-empty">
                   <ClipboardList size={20} />
                   <div>
@@ -246,7 +378,11 @@ export function CarsPage({
                   </div>
                 </div>
               )}
-              <button className="text-link danger-text" onClick={() => onDeleteCar(car)}>
+              <button
+                disabled={archiveBusy}
+                className="text-link danger-text"
+                onClick={() => onDeleteCar(car)}
+              >
                 <Trash2 size={15} />
                 {t('car.delete')}
               </button>

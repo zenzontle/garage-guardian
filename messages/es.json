@@ -41,7 +41,8 @@
     "sessionRevocation": "Tu contraseña se actualizó, pero no se pudieron revocar las sesiones. Reintenta para terminar o inicia sesión con la nueva contraseña.",
     "accountSessionCleanup": "Es posible que la solicitud se haya completado, pero no se pudo cerrar la sesión temporal de verificación. Comprueba tu cuenta antes de reintentar.",
     "notificationInput": "Revisa tus preferencias de recordatorios e inténtalo de nuevo.",
-    "notificationSave": "No se pudieron cargar o guardar las preferencias de recordatorios. Inténtalo de nuevo."
+    "notificationSave": "No se pudieron cargar o guardar las preferencias de recordatorios. Inténtalo de nuevo.",
+    "archive": "No se pudo cambiar el estado del vehículo. Inténtalo de nuevo; los cambios en la nube requieren conexión."
   },
   "shared": {
     "language": "Idioma",
@@ -452,7 +453,9 @@
     "transferVerifying": "Verificando tu garaje…",
     "transferCleanup": "Terminando transferencia…",
     "reportSubmitting": "Enviando reporte con {count, plural, =0 {ninguna captura} one {# captura} other {# capturas}}…",
-    "reportChecking": "Consultando el estado del envío…"
+    "reportChecking": "Consultando el estado del envío…",
+    "carArchived": "Vehículo archivado. Los recordatorios están pausados.",
+    "carRestored": "Vehículo restaurado. Los recordatorios se han reanudado."
   },
   "currency": {
     "home": "Moneda principal",
@@ -473,5 +476,25 @@
     "retryHint": "Reintenta las conversiones o edita un recibo para ingresar el cargo real.",
     "pendingSync": "Guardado en este dispositivo — {count} recibos pendientes de sincronizar con tu cuenta.",
     "syncConflict": "Guardado en este dispositivo — {count} recibos no se pueden sincronizar porque se eliminó su vehículo. Búscalos bajo Desconocido en el historial de servicio para descartarlos."
+  },
+  "archive": {
+    "views": "Vistas de vehículos",
+    "active": "Activos",
+    "archived": "Archivado",
+    "archive": "Archivar vehículo",
+    "restore": "Restaurar vehículo",
+    "archiving": "Archivando…",
+    "restoring": "Restaurando…",
+    "paused": "Los recordatorios están pausados. Puedes editar servicios, recibos y programas de mantenimiento. Restaura este vehículo para reanudar los recordatorios.",
+    "scheduleSaved": "Programa guardado · recordatorios pausados",
+    "emptyTitle": "No hay vehículos archivados",
+    "emptyDescription": "Los vehículos que archives aparecerán aquí con todo su historial de servicio.",
+    "activeEmptyTitle": "No hay vehículos activos",
+    "activeEmptyDescription": "Tus vehículos están archivados. Añade un vehículo o consulta los archivados para gestionar su historial.",
+    "viewArchived": "Ver archivados",
+    "repeatDistance": "Repetir cada {distance}",
+    "repeatMonths": "Repetir cada {count, plural, one {# mes} other {# meses}}",
+    "inactiveSchedule": "Programa inactivo",
+    "archivedView": "Archivados"
   }
 }

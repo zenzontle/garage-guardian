@@ -40,6 +40,7 @@ export function Dashboard({
 }) {
   const t = useTranslations();
   const { number, money, displayDate, formatDistance } = useDisplay();
+  const activeCars = cars.filter((car) => !car.isArchived);
   const due = allDue.filter((item) => item.status === 'due');
   const upcoming = allDue.filter((item) => item.status === 'upcoming');
   const setup = allDue.filter((item) => item.status === 'setup');
@@ -55,9 +56,9 @@ export function Dashboard({
         title={t('dashboard.title')}
         description={t('dashboard.description')}
         action={
-          <button className="button primary" onClick={cars.length ? onAddVisit : onAddCar}>
+          <button className="button primary" onClick={activeCars.length ? onAddVisit : onAddCar}>
             <Plus size={18} />
-            {cars.length ? t('shared.logService') : t('dashboard.firstCar')}
+            {activeCars.length ? t('shared.logService') : t('dashboard.firstCar')}
           </button>
         }
       />
@@ -79,7 +80,7 @@ export function Dashboard({
             <Stat
               icon={<CarFront size={20} />}
               label={t('dashboard.vehicles')}
-              value={number(cars.length)}
+              value={number(activeCars.length)}
               detail={t('app.inGarage')}
             />
             <Stat
@@ -154,7 +155,24 @@ export function Dashboard({
                 </div>
               </div>
               <div className="vehicle-list">
-                {cars.map((car) => {
+                {activeCars.length === 0 && (
+                  <div className="panel-empty">
+                    <CarFront size={22} />
+                    <div>
+                      <strong>{t('archive.activeEmptyTitle')}</strong>
+                      <p>{t('archive.activeEmptyDescription')}</p>
+                      <div className="account-actions">
+                        <button className="button primary" onClick={onAddCar}>
+                          {t('shared.addCar')}
+                        </button>
+                        <Link className="button secondary" href="/cars?view=archived">
+                          {t('archive.viewArchived')}
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {activeCars.map((car) => {
                   const count = allDue.filter(
                     (item) => item.car.id === car.id && item.status === 'due',
                   ).length;
@@ -208,6 +226,8 @@ export function Dashboard({
                       </strong>
                       <small>
                         {cars.find((car) => car.id === visit.carId)?.name} ·{' '}
+                        {cars.find((car) => car.id === visit.carId)?.isArchived &&
+                          `${t('archive.archived')} · `}
                         {displayDate(visit.date)}
                       </small>
                     </span>

@@ -77,6 +77,7 @@ export function CarModal({
           model: model.trim(),
           vin: vin.trim().toUpperCase(),
           plate: normalizePlate(plate),
+          isArchived: item?.isArchived ?? false,
           distanceUnit,
           odometer: miles,
           reminderDays: Number(reminderDays),

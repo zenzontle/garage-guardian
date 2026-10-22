@@ -31,6 +31,26 @@ async function seedLocal(withPhoto = true) {
 }
 
 describe('signup transfer', () => {
+  it('transfers archived vehicles with editable history and identical receipt bytes', async () => {
+    const { local, photo } = await seedLocal();
+    await local.setCarArchived(car.id, true);
+    const before = await local.load();
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    await registerSignup(project, account(), true);
+    await transferSignupData(cloud.client, project, account().id);
+    const repository = new SupabaseRepository(cloud.client, account().id);
+    const saved = await repository.load();
+    expect(saved.cars).toEqual([{ ...car, isArchived: true }]);
+    expect(saved.schedules).toEqual(before.schedules);
+    expect(saved.visits[0]).toEqual({
+      ...before.visits[0],
+      photos: [{ ...photo, path: `${account().id}/${visit.id}/${photo.id}.webp` }],
+    });
+    expect(await cloud.photos.get(saved.visits[0].photos[0].path)!.text()).toBe('receipt');
+    await repository.setCarArchived(car.id, false);
+    expect((await repository.load()).cars[0].isArchived).toBe(false);
+  });
   it('reports upload and verification stages without changing transfer completion', async () => {
     const { local } = await seedLocal();
     const cloud = fakeSupabase();

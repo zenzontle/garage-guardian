@@ -43,6 +43,7 @@ export type Repository = {
   saveConversion(visit: Visit, target: Currency, conversion: Conversion): Promise<void>;
   load(): Promise<Snapshot>;
   saveCar(car: Car): Promise<void>;
+  setCarArchived(id: string, archived: boolean): Promise<void>;
   deleteCar(id: string): Promise<void>;
   saveSchedule(item: ScheduleItem): Promise<void>;
   deleteSchedule(id: string): Promise<void>;
@@ -132,7 +133,11 @@ export class LocalRepository implements Repository {
   async saveCar(car: Car) {
     const normalized = { ...normalizeCar(car), plate: normalizePlate(car.plate) };
     return this.write((snapshot) => {
-      snapshot.cars = upsert(snapshot.cars, normalized);
+      const current = snapshot.cars.find((entry) => entry.id === car.id);
+      snapshot.cars = upsert(snapshot.cars, {
+        ...normalized,
+        isArchived: current?.isArchived ?? normalized.isArchived,
+      });
     });
   }
   async deleteCar(id: string) {
@@ -144,6 +149,13 @@ export class LocalRepository implements Repository {
       current.cars = current.cars.filter((car) => car.id !== id);
       current.schedules = current.schedules.filter((item) => item.carId !== id);
       current.visits = current.visits.filter((visit) => visit.carId !== id);
+    });
+  }
+  async setCarArchived(id: string, archived: boolean) {
+    await this.write((snapshot) => {
+      const car = snapshot.cars.find((car) => car.id === id);
+      if (!car) throw new AppError('archive');
+      car.isArchived = archived;
     });
   }
   saveSchedule(item: ScheduleItem) {
@@ -288,6 +300,7 @@ const carToRow = (car: Car, userId: string) => ({
   model: car.model,
   vin: car.vin,
   plate: car.plate,
+  is_archived: car.isArchived,
   distance_unit: car.distanceUnit,
   odometer: car.odometer,
   reminder_days: car.reminderDays,
@@ -330,6 +343,7 @@ const visitToRow = (visit: Visit, userId: string) => ({
 
 export class SupabaseRepository implements Repository {
   private offline: OfflineReceipts | null;
+  private uncachedArchives = new Map<string, boolean>();
   constructor(
     private client: SupabaseClient,
     private userId: string,
@@ -381,11 +395,20 @@ export class SupabaseRepository implements Repository {
           this.saveVisitOnline(visit, manualTargets),
         );
       const snapshot = await this.loadOnline();
-      return this.offline ? this.offline.remember(snapshot) : snapshot;
+      const saved = this.offline ? await this.offline.remember(snapshot) : snapshot;
+      this.uncachedArchives.clear();
+      return saved;
     } catch (cause) {
       if (this.offline && connectionFailure(cause)) {
         const cached = await this.offline.cachedSnapshot();
-        if (cached) return cached;
+        if (cached)
+          return {
+            ...cached,
+            cars: cached.cars.map((car) => ({
+              ...car,
+              isArchived: this.uncachedArchives.get(car.id) ?? car.isArchived,
+            })),
+          };
       }
       throw cause;
     }
@@ -414,6 +437,7 @@ export class SupabaseRepository implements Repository {
           model: row.model,
           vin: row.vin,
           plate: row.plate,
+          isArchived: row.is_archived,
           distanceUnit: row.distance_unit,
           odometer: row.odometer,
           reminderDays: row.reminder_days,
@@ -453,11 +477,35 @@ export class SupabaseRepository implements Repository {
 
   async saveCar(car: Car) {
     const normalized = { ...normalizeCar(car), plate: normalizePlate(car.plate) };
-    const { error } = await this.client.from('cars').upsert(carToRow(normalized, this.userId));
+    const { error } = await this.client.rpc('save_car', {
+      p_car: carToRow(normalized, this.userId),
+    });
     if (error) throw error;
   }
   async deleteCar(id: string) {
     return this.withReceiptLock(() => this.deleteCarOnline(id));
+  }
+  async setCarArchived(id: string, archived: boolean) {
+    return this.withReceiptLock(() => this.setCarArchivedOnline(id, archived));
+  }
+  private async setCarArchivedOnline(id: string, archived: boolean) {
+    const { data, error } = await this.client
+      .from('cars')
+      .update({ is_archived: archived })
+      .eq('user_id', this.userId)
+      .eq('id', id)
+      .select('id')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new AppError('archive');
+    this.uncachedArchives.set(id, archived);
+    try {
+      await this.offline?.rememberCarArchived(id, archived);
+      this.uncachedArchives.delete(id);
+    } catch (cause) {
+      // A cache failure cannot undo an accepted cloud save or re-enable local reminders.
+      recordDiagnostic(cause);
+    }
   }
   private async deleteCarOnline(id: string) {
     const { data: visits, error: lookupError } = await this.client

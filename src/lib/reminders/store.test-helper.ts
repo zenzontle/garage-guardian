@@ -198,6 +198,7 @@ export function reminderStore() {
       model: 'Model',
       odometer: 9500,
       distance_unit: 'miles',
+      is_archived: false,
       reminder_days: 30,
       reminder_miles: 500,
     });
