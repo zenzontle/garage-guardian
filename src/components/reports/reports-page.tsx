@@ -47,6 +47,7 @@ export function ReportsPage({
           {cars.map((car) => (
             <option key={car.id} value={car.id}>
               {car.name}
+              {car.isArchived && ` (${t('archive.archived')})`}
             </option>
           ))}
         </select>
@@ -116,7 +117,10 @@ export function ReportsPage({
             <div className="breakdown-list">
               {totals.byCar.map(({ id, name, amount }) => (
                 <div className="breakdown-row" key={id}>
-                  <span>{name ?? t('reports.unknownCar')}</span>
+                  <span>
+                    {name ?? t('reports.unknownCar')}
+                    {cars.find((car) => car.id === id)?.isArchived && ` (${t('archive.archived')})`}
+                  </span>
                   <strong>{money(amount)}</strong>
                 </div>
               ))}

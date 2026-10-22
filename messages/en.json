@@ -41,7 +41,8 @@
     "sessionRevocation": "Your password was updated, but sessions could not be revoked. Retry to finish, or sign in with your new password.",
     "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying.",
     "notificationInput": "Check your reminder preferences and try again.",
-    "notificationSave": "Could not load or save reminder preferences. Try again."
+    "notificationSave": "Could not load or save reminder preferences. Try again.",
+    "archive": "Could not change vehicle archive status. Try again; cloud changes require an online save."
   },
   "shared": {
     "language": "Language",
@@ -452,7 +453,9 @@
     "transferVerifying": "Verifying your garage…",
     "transferCleanup": "Finishing transfer…",
     "reportSubmitting": "Submitting report with {count, plural, =0 {no screenshots} one {# screenshot} other {# screenshots}}…",
-    "reportChecking": "Checking submission status…"
+    "reportChecking": "Checking submission status…",
+    "carArchived": "Vehicle archived. Reminders are paused.",
+    "carRestored": "Vehicle restored. Reminders have resumed."
   },
   "currency": {
     "home": "Home currency",
@@ -473,5 +476,25 @@
     "retryHint": "Retry conversions, or edit a receipt to enter your actual charge.",
     "pendingSync": "Saved on this device — {count} receipts waiting to sync with your account.",
     "syncConflict": "Saved on this device — {count} receipts cannot sync because their vehicle was deleted. Find them under Unknown car in service history to discard them."
+  },
+  "archive": {
+    "views": "Vehicle views",
+    "active": "Active",
+    "archived": "Archived",
+    "archive": "Archive vehicle",
+    "restore": "Restore vehicle",
+    "archiving": "Archiving…",
+    "restoring": "Restoring…",
+    "paused": "Reminders are paused. Service records, receipts, and schedules remain editable. Restore this vehicle to resume reminders.",
+    "scheduleSaved": "Saved schedule · reminders paused",
+    "emptyTitle": "No archived vehicles",
+    "emptyDescription": "Vehicles you archive will appear here with their full service history.",
+    "activeEmptyTitle": "No active vehicles",
+    "activeEmptyDescription": "Your vehicles are archived. Add a vehicle or view archived vehicles to manage their history.",
+    "viewArchived": "View archived",
+    "repeatDistance": "Repeat every {distance}",
+    "repeatMonths": "Repeat every {count, plural, one {# month} other {# months}}",
+    "inactiveSchedule": "Inactive schedule",
+    "archivedView": "Archived"
   }
 }

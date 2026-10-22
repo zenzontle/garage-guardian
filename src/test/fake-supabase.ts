@@ -72,6 +72,7 @@ export function fakeSupabase() {
           return { data: null, error: new Error('Missing parent car') };
         const id = name === 'garage_settings' ? row.user_id : row.id;
         const previous = table.get(id);
+        if (name === 'cars' && previous) row.is_archived = previous.is_archived;
         if (name === 'visits' && previous) {
           const unchanged =
             previous.currency === row.currency &&
@@ -220,6 +221,7 @@ export function fakeSupabase() {
     async (
       name: string,
       args:
+        | { p_car: Row }
         | InitializeScheduleDefaultsArgs
         | SaveScheduleWithDefaultsArgs
         | {
@@ -231,6 +233,9 @@ export function fakeSupabase() {
             p_conversion: Conversion;
           },
     ) => {
+      if (name === 'save_car' && 'p_car' in args) {
+        return execute('cars', 'upsert', [], args.p_car);
+      }
       if (name === 'save_visit_conversion' && 'p_visit_id' in args) {
         const row = getTable('visits').get(args.p_visit_id);
         const inputs = {

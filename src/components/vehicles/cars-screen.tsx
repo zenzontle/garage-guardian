@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from '../interaction/guarded-link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { CarFront } from 'lucide-react';
 import { isCloudConfigured } from '@/lib/garage/repository';
@@ -12,16 +12,52 @@ import { EmptyPanel } from '../ui/empty-panel';
 import { PageHeading } from '../ui/page-heading';
 import { useGarage } from '../garage/garage-provider';
 import { useInteractions } from '../interaction/interaction-provider';
+import { useFormInteraction } from '../interaction/use-form-interaction';
+import { failureOf, type AppFailure } from '@/lib/utils/app-error';
 
 export function CarsScreen({ carId }: { carId?: string }) {
   const t = useTranslations();
   const interactions = useInteractions();
-  const { snapshot, visits, allDue, user, repository, setModal, perform, currentPath } =
-    useGarage();
+  const {
+    snapshot,
+    visits,
+    allDue,
+    user,
+    repository,
+    setModal,
+    perform,
+    currentPath,
+    setCarArchived,
+  } = useGarage();
   const router = useRouter();
   const pathname = usePathname();
-  const firstCar = snapshot.cars[0];
+  const search = useSearchParams();
   const selectedCar = snapshot.cars.find((car) => car.id === carId) ?? null;
+  const archived = selectedCar?.isArchived ?? search.get('view') === 'archived';
+  const cars = snapshot.cars.filter((car) => car.isArchived === archived);
+  const firstCar = cars[0];
+  const [busy, setBusy] = useState(false);
+  const [archiveError, setArchiveError] = useState<AppFailure | null>(null);
+  const interaction = useFormInteraction(null, { busy });
+
+  async function toggleArchived() {
+    if (!selectedCar || !interaction.begin()) return;
+    setBusy(true);
+    setArchiveError(null);
+    try {
+      await setCarArchived(selectedCar.id, !selectedCar.isArchived);
+      interactions?.notify(
+        selectedCar.isArchived ? 'interactions.carRestored' : 'interactions.carArchived',
+      );
+    } catch (cause) {
+      setArchiveError(failureOf(cause, 'archive'));
+    } finally {
+      interaction.end();
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => setArchiveError(null), [carId]);
 
   useEffect(() => {
     if (!carId && firstCar) router.replace(carPath(firstCar.id));
@@ -57,7 +93,13 @@ export function CarsScreen({ carId }: { carId?: string }) {
     );
   return (
     <CarsPage
-      cars={snapshot.cars}
+      cars={cars}
+      archived={archived}
+      hasArchived={snapshot.cars.some((car) => car.isArchived)}
+      schedules={snapshot.schedules}
+      archiveBusy={busy}
+      archiveError={archiveError}
+      onToggleArchived={() => interaction.request(() => void toggleArchived())}
       visits={visits}
       allDue={allDue}
       selectedCar={selectedCar}
@@ -73,7 +115,8 @@ export function CarsScreen({ carId }: { carId?: string }) {
           success: 'interactions.carDeleted',
           onDelete: async () => {
             const result = await perform(() => repository!.deleteCar(car.id));
-            if (result.refreshed && currentPath.current === pathname) router.replace('/cars');
+            if (result.refreshed && currentPath.current === pathname)
+              router.replace(car.isArchived ? '/cars?view=archived' : '/cars');
           },
         })
       }

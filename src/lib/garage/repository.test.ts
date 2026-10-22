@@ -14,6 +14,120 @@ beforeEach(async () => {
 });
 afterEach(() => vi.useRealTimers());
 
+describe.each(['local', 'cloud'] as const)('%s vehicle archive', (mode) => {
+  async function setup() {
+    const { LocalRepository, SupabaseRepository } = await import('./repository');
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    const repository =
+      mode === 'local'
+        ? new LocalRepository()
+        : new SupabaseRepository(cloud.client, account().id, true);
+    await repository.saveCar(car);
+    await repository.saveSchedule(schedule);
+    const photo = await repository.uploadPhoto(
+      visit.id,
+      new File(['receipt bytes'], 'receipt.webp', { type: 'image/webp' }),
+    );
+    await repository.saveVisit({ ...visit, photos: [photo] });
+    return { repository, cloud, photo };
+  }
+
+  it('defaults legacy vehicles to active and changes only the archive flag across reloads and edits', async () => {
+    const { repository, cloud, photo } = await setup();
+    if (mode === 'local') {
+      const saved = await repository.load();
+      delete (saved.cars[0] as Partial<Car>).isArchived;
+      await set('garage-guardian:local:v1', saved);
+    } else delete cloud.tables.get('cars')!.get(car.id)!.is_archived;
+    const before = await repository.load();
+    expect(before.cars[0].isArchived).toBe(false);
+    for (const archived of [true, false, true]) {
+      await repository.setCarArchived(car.id, archived);
+      const after = await repository.load();
+      expect(after.cars[0]).toEqual({ ...before.cars[0], isArchived: archived });
+      expect(after.visits).toEqual(before.visits);
+      expect(after.schedules).toEqual(before.schedules);
+      const blob =
+        mode === 'local' ? await get<Blob>(`photo:${photo.path}`) : cloud.photos.get(photo.path);
+      expect(await blob!.text()).toBe('receipt bytes');
+    }
+    const archived = (await repository.load()).cars[0];
+    await repository.saveCar({ ...car, name: 'Stale active editor' });
+    expect((await repository.load()).cars[0].isArchived).toBe(true);
+    await repository.setCarArchived(car.id, false);
+    await repository.saveCar(archived);
+    expect((await repository.load()).cars[0].isArchived).toBe(false);
+    await repository.setCarArchived(car.id, true);
+    await repository.saveCar({ ...archived, name: 'Edited archived vehicle' });
+    expect((await repository.load()).cars[0]).toMatchObject({
+      isArchived: true,
+      name: 'Edited archived vehicle',
+    });
+    await repository.saveVisit({ ...before.visits[0], notes: 'Late receipt' });
+    await repository.saveSchedule({ ...schedule, sourceNote: 'Updated while archived' });
+    expect((await repository.load()).visits[0].notes).toBe('Late receipt');
+    await repository.deleteCar(car.id);
+    expect((await repository.load()).cars).toEqual([]);
+    expect((await repository.load()).visits).toEqual([]);
+    expect((await repository.load()).schedules).toEqual([]);
+  });
+
+  it('rejects a missing or inaccessible vehicle instead of reporting success', async () => {
+    const { repository } = await setup();
+    await expect(repository.setCarArchived('missing', true)).rejects.toThrow();
+  });
+});
+
+it('requires online cloud archive saves and retains the successful flag in cached snapshots', async () => {
+  const { SupabaseRepository } = await import('./repository');
+  const cloud = fakeSupabase();
+  cloud.emit(account());
+  const repository = new SupabaseRepository(cloud.client, account().id, true);
+  await repository.saveCar(car);
+  await repository.load();
+  await repository.setCarArchived(car.id, true);
+  cloud.execute.mockRejectedValue(new TypeError('Failed to fetch'));
+  expect((await repository.load()).cars[0].isArchived).toBe(true);
+  await expect(repository.setCarArchived(car.id, false)).rejects.toThrow('Failed to fetch');
+  expect((await repository.load()).cars[0].isArchived).toBe(true);
+  expect(cloud.tables.get('cars')!.get(car.id)!.is_archived).toBe(true);
+});
+
+it('scopes cloud archive updates to the repository owner and authenticated owner', async () => {
+  const { SupabaseRepository } = await import('./repository');
+  const cloud = fakeSupabase();
+  cloud.emit(account());
+  const owner = new SupabaseRepository(cloud.client, account().id);
+  await owner.saveCar(car);
+  const other = new SupabaseRepository(cloud.client, 'other');
+  await expect(other.setCarArchived(car.id, true)).rejects.toThrow();
+  cloud.emit(account('other'));
+  await expect(owner.setCarArchived(car.id, true)).rejects.toThrow();
+  expect(cloud.tables.get('cars')!.get(car.id)!.is_archived).toBe(false);
+});
+
+it('keeps committed archive/restore authoritative when cache writes and the following network read fail', async () => {
+  const { SupabaseRepository } = await import('./repository');
+  const { OfflineReceipts } = await import('../currency/offline-receipts');
+  const cloud = fakeSupabase();
+  cloud.emit(account());
+  const repository = new SupabaseRepository(cloud.client, account().id, true);
+  await repository.saveCar(car);
+  await repository.load();
+  vi.spyOn(OfflineReceipts.prototype, 'rememberCarArchived').mockRejectedValue(
+    new Error('Disk full'),
+  );
+  const execute = cloud.execute.getMockImplementation()!;
+  for (const archived of [true, false]) {
+    cloud.execute.mockImplementation(execute);
+    await expect(repository.setCarArchived(car.id, archived)).resolves.toBeUndefined();
+    expect(cloud.tables.get('cars')!.get(car.id)!.is_archived).toBe(archived);
+    cloud.execute.mockRejectedValue(new TypeError('Failed to fetch'));
+    expect((await repository.load()).cars[0].isArchived).toBe(archived);
+  }
+});
+
 describe('atomic cloud schedule saves', () => {
   it.each(['car', 'visit'] as const)(
     'initializes a new task from a concurrent %s reading at save time',

@@ -516,6 +516,15 @@ export function useGarageSession() {
 
   return {
     repository,
+    setCarArchived: (id: string, archived: boolean) =>
+      run(async () => {
+        await repository!.setCarArchived(id, archived);
+        // The online save is authoritative even if the subsequent refresh fails.
+        setSnapshot((current) => ({
+          ...current,
+          cars: current.cars.map((car) => (car.id === id ? { ...car, isArchived: archived } : car)),
+        }));
+      }),
     snapshot,
     user,
     loading,

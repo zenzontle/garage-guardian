@@ -8,6 +8,7 @@ export const car: Car = {
   model: 'RAV4',
   vin: '',
   plate: '',
+  isArchived: false,
   distanceUnit: 'miles',
   odometer: 100,
   reminderDays: 30,

@@ -63,6 +63,20 @@ export class OfflineReceipts {
       };
     });
   }
+  async rememberCarArchived(id: string, archived: boolean) {
+    await update<CachedGarage | undefined>(this.key, (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        snapshot: {
+          ...current.snapshot,
+          cars: current.snapshot.cars.map((car) =>
+            car.id === id ? { ...car, isArchived: archived } : car,
+          ),
+        },
+      };
+    });
+  }
   async remember(snapshot: Snapshot): Promise<Snapshot> {
     let merged = snapshot;
     await update<CachedGarage>(this.key, (saved) => {

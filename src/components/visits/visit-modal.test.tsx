@@ -7,6 +7,39 @@ import { car, schedule, visit } from '@/test/fixtures';
 import { LocalRepository } from '@/lib/garage/repository';
 import { VisitModal } from './visit-modal';
 
+it('lists active vehicles first and accepts archived vehicles for late receipts', async () => {
+  const onSave = vi.fn(async () => {});
+  render(
+    <NextIntlClientProvider locale="en" messages={en}>
+      <VisitModal
+        cars={[
+          { ...car, isArchived: true },
+          { ...car, id: 'active', name: 'Active vehicle' },
+        ]}
+        visits={[]}
+        schedules={[]}
+        repository={new LocalRepository()}
+        onClose={vi.fn()}
+        onSave={onSave}
+      />
+    </NextIntlClientProvider>,
+  );
+  const selector = screen.getByRole('combobox', { name: 'Vehicle' }) as HTMLSelectElement;
+  expect(Array.from(selector.options).map((option) => option.text)).toEqual([
+    'Active vehicle',
+    `${car.name} (Archived)`,
+  ]);
+  expect(selector.value).toBe('active');
+  await userEvent.selectOptions(selector, car.id);
+  fireEvent.change(screen.getByLabelText('Service item name'), {
+    target: { value: 'Late receipt' },
+  });
+  await userEvent.click(screen.getByRole('button', { name: 'Save visit' }));
+  await waitFor(() =>
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ carId: car.id }), []),
+  );
+});
+
 it.each(['', '0'])('saves an unknown odometer and a zero total from %j', async (cost) => {
   const repository = new LocalRepository();
   const onSave = vi.fn(async (saved) => repository.saveVisit(saved));

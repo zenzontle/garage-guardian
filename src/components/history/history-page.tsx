@@ -115,6 +115,7 @@ export function HistoryPage({
               {cars.map((car) => (
                 <option key={car.id} value={car.id}>
                   {car.name}
+                  {car.isArchived && ` (${t('archive.archived')})`}
                 </option>
               ))}
             </select>

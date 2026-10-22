@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PreferenceRow } from '@/lib/notifications/notification-preferences';
-import { loadReminderItems } from './maintenance';
+import { eligibleReminderItems, loadReminderItems } from './maintenance';
 import { renderDigest } from './email';
 
 type Outcome = 'accepted' | 'failed' | 'unknown' | 'skipped';
@@ -45,37 +45,44 @@ async function processAccount(
         status = 'skipped';
         code = 'account_ineligible';
       } else {
-        const email = renderDigest(
-          items,
-          (preferences.data as PreferenceRow).email_language,
-          config.origin,
-        );
-        sending = true;
-        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          signal: AbortSignal.timeout(8_000),
-          headers: { 'api-key': config.apiKey, 'content-type': 'application/json' },
-          body: JSON.stringify({
-            sender: { email: config.sender, name: 'Garage Guardian' },
-            to: [{ email: user.email }],
-            ...email,
-          }),
-        });
-        if (response.ok) {
-          status = 'accepted';
-          // A malformed optional response body does not undo a definitive success status.
-          const body: unknown = await response.json().catch(() => null);
-          if (
-            body &&
-            typeof body === 'object' &&
-            'messageId' in body &&
-            typeof body.messageId === 'string' &&
-            body.messageId.length <= 512
-          )
-            messageId = body.messageId;
+        const eligible = await eligibleReminderItems(db, userId, items);
+        count = eligible.length;
+        if (!count) {
+          status = 'skipped';
+          code = 'nothing_due';
         } else {
-          status = response.status >= 500 || response.status === 408 ? 'unknown' : 'failed';
-          code = `provider_${response.status}`;
+          const email = renderDigest(
+            eligible,
+            (preferences.data as PreferenceRow).email_language,
+            config.origin,
+          );
+          sending = true;
+          const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
+            signal: AbortSignal.timeout(8_000),
+            headers: { 'api-key': config.apiKey, 'content-type': 'application/json' },
+            body: JSON.stringify({
+              sender: { email: config.sender, name: 'Garage Guardian' },
+              to: [{ email: user.email }],
+              ...email,
+            }),
+          });
+          if (response.ok) {
+            status = 'accepted';
+            // A malformed optional response body does not undo a definitive success status.
+            const body: unknown = await response.json().catch(() => null);
+            if (
+              body &&
+              typeof body === 'object' &&
+              'messageId' in body &&
+              typeof body.messageId === 'string' &&
+              body.messageId.length <= 512
+            )
+              messageId = body.messageId;
+          } else {
+            status = response.status >= 500 || response.status === 408 ? 'unknown' : 'failed';
+            code = `provider_${response.status}`;
+          }
         }
       }
     }

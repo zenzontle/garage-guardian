@@ -25,6 +25,7 @@ export function HistoryCard({
         <div>
           <time dateTime={visit.date}>{displayDate(visit.date)}</time>
           <strong>{car?.name ?? t('history.unknown')}</strong>
+          {car?.isArchived && <span className="count-badge">{t('archive.archived')}</span>}
         </div>
         <strong>{money(visit.totalCostCents, visit.currency ?? 'USD')}</strong>
       </div>

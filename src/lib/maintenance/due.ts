@@ -103,7 +103,7 @@ export function getAllDue(
   visits: Visit[],
   today: string,
 ): DueItem[] {
-  const carMap = new Map(cars.map((car) => [car.id, car]));
+  const carMap = new Map(cars.filter((car) => !car.isArchived).map((car) => [car.id, car]));
   const rank: Record<DueStatus, number> = { due: 0, upcoming: 1, later: 2, setup: 3, completed: 4 };
   return schedules
     .filter((item) => item.isActive)

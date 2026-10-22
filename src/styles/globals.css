@@ -1812,3 +1812,16 @@ input[type='number'] {
   appearance: textfield;
   -moz-appearance: textfield;
 }
+
+/* Archive actions and saved schedules retain room for translated labels. */
+.car-header-actions {
+  flex-wrap: wrap;
+}
+.saved-schedule-row .schedule-main {
+  flex: 1;
+}
+@media (max-width: 600px) {
+  .saved-schedule-row {
+    grid-template-columns: minmax(0, 1fr) 2.75rem 2.75rem;
+  }
+}

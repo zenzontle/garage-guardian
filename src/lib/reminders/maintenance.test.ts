@@ -2,6 +2,32 @@ import { expect, it } from 'vitest';
 import { loadReminderItems } from './maintenance';
 import { reminderStore } from './store.test-helper';
 
+it('excludes archived vehicles in mixed and empty active garages and restores saved overdue targets', async () => {
+  const store = reminderStore();
+  store.addAccount('owner');
+  const original = { ...store.tables.cars[0], odometer: 11000 };
+  store.tables.cars[0] = { ...original, is_archived: true };
+  store.tables.cars.push({ ...original, id: 'active-car' });
+  store.tables.schedule_items.push({
+    ...store.tables.schedule_items[0],
+    id: 'active-task',
+    car_id: 'active-car',
+  });
+  const schedules = structuredClone(store.tables.schedule_items);
+  const preferences = structuredClone(store.tables.notification_preferences);
+  expect(
+    (await loadReminderItems(store.db, 'owner', '2026-10-05')).map((item) => item.car.id),
+  ).toEqual(['active-car']);
+  store.tables.cars[1].is_archived = true;
+  expect(await loadReminderItems(store.db, 'owner', '2026-10-05')).toEqual([]);
+  store.tables.cars[0].is_archived = false;
+  expect(await loadReminderItems(store.db, 'owner', '2026-10-05')).toMatchObject([
+    { car: { id: 'owner-car' }, status: 'due', dueMiles: 10000 },
+  ]);
+  expect(store.tables.schedule_items).toEqual(schedules);
+  expect(store.tables.notification_preferences).toEqual(preferences);
+});
+
 it.each([
   ['miles', 500, 500, 1],
   ['miles', 500, 501, 0],

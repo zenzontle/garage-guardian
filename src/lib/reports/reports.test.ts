@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { reportTotals, visitsToCsv } from './reports';
 import type { Car, Visit } from '../garage/model';
 
+it('retains spending breakdowns and CSV history when a vehicle is archived', () => {
+  const archived = { ...car, isArchived: true };
+  expect(reportTotals([visit], [archived])).toEqual(reportTotals([visit], [car]));
+  expect(visitsToCsv([visit], [archived])).toBe(visitsToCsv([visit], [car]));
+});
+
 const car: Car = {
   id: 'car',
   name: 'Daily, driver',
@@ -10,6 +16,7 @@ const car: Car = {
   model: 'RAV4',
   vin: '',
   plate: '',
+  isArchived: false,
   distanceUnit: 'miles',
   odometer: 100,
   reminderDays: 30,

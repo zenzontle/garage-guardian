@@ -4,15 +4,17 @@ import { normalizeCar, type ScheduleItem, type Visit, type Snapshot } from '@/li
 import { initializeCloudSchedules } from '@/lib/maintenance/schedule-defaults';
 
 // Page every owner-scoped table: a user's history may exceed PostgREST's row limit.
-async function rows(db: SupabaseClient, table: string, userId: string) {
+async function rows(db: SupabaseClient, table: string, userId: string, activeOnly = false) {
   const collected = [];
   for (let offset = 0; ; offset += 500) {
-    const { data, error } = await db
+    let query = db
       .from(table)
       .select('*')
       .eq('user_id', userId)
       .order('id')
       .range(offset, offset + 499);
+    if (activeOnly) query = query.eq('is_archived', false);
+    const { data, error } = await query;
     if (error) throw new Error('maintenance_load');
     collected.push(...(data ?? []));
     if (!data || data.length < 500) return collected;
@@ -21,7 +23,7 @@ async function rows(db: SupabaseClient, table: string, userId: string) {
 
 export async function loadReminderItems(db: SupabaseClient, userId: string, today: string) {
   const [cars, schedules, visits] = await Promise.all([
-    rows(db, 'cars', userId),
+    rows(db, 'cars', userId, true),
     rows(db, 'schedule_items', userId),
     rows(db, 'visits', userId),
   ]);
@@ -35,6 +37,7 @@ export async function loadReminderItems(db: SupabaseClient, userId: string, toda
         model: row.model,
         vin: row.vin,
         plate: row.plate,
+        isArchived: row.is_archived,
         distanceUnit: row.distance_unit,
         odometer: row.odometer,
         reminderDays: row.reminder_days,
@@ -71,4 +74,15 @@ export async function loadReminderItems(db: SupabaseClient, userId: string, toda
   return getAllDue(initialized.cars, initialized.schedules, initialized.visits, today).filter(
     (item) => item.status === 'due' || item.status === 'upcoming',
   );
+}
+
+// Recheck after preparing the digest, as a vehicle may have been archived or deleted meanwhile.
+export async function eligibleReminderItems(
+  db: SupabaseClient,
+  userId: string,
+  items: Awaited<ReturnType<typeof loadReminderItems>>,
+) {
+  const cars = await rows(db, 'cars', userId, true);
+  const active = new Set(cars.map((car) => car.id));
+  return items.filter((item) => active.has(item.car.id));
 }
