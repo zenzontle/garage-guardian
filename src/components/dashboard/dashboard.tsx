@@ -64,7 +64,7 @@ export function Dashboard({
       />
       {cars.length === 0 ? (
         <div className="empty-hero">
-          <div className="empty-illustration">
+          <div className="empty-illustration" aria-hidden="true">
             <CarFront size={55} strokeWidth={1.5} />
           </div>
           <h2>{t('dashboard.emptyTitle')}</h2>
@@ -73,6 +73,20 @@ export function Dashboard({
             <Plus size={18} />
             {t('shared.addCar')}
           </button>
+          <ul className="garage-benefits">
+            <li>
+              <Wrench size={18} aria-hidden="true" />
+              {t('dashboard.benefitHistory')}
+            </li>
+            <li>
+              <CalendarDays size={18} aria-hidden="true" />
+              {t('dashboard.benefitSchedule')}
+            </li>
+            <li>
+              <ReceiptText size={18} aria-hidden="true" />
+              {t('dashboard.benefitSpending')}
+            </li>
+          </ul>
         </div>
       ) : (
         <>
