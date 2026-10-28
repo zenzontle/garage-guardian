@@ -31,3 +31,33 @@ jobs:
 
       - name: Check lint rules
         run: pnpm exec eslint . --max-warnings 0
+
+  verify:
+    name: Typecheck, test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+        with:
+          runtime: node@22
+          cache: true
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
