@@ -6,13 +6,16 @@ export async function GET(request: Request) {
   const base = params.get('base'),
     target = params.get('target'),
     date = params.get('date');
+  // Receipt dates are local; ahead of UTC, a user's "today" can be UTC tomorrow.
+  const utcToday = new Date().toISOString().slice(0, 10);
+  const latestDate = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   if (
     [...params.keys()].some((key) => !['base', 'target', 'date'].includes(key)) ||
     [...params.keys()].some((key) => params.getAll(key).length !== 1) ||
     !isCurrency(base) ||
     !isCurrency(target) ||
     !validDate(date) ||
-    date > new Date().toISOString().slice(0, 10)
+    date > latestDate
   ) {
     return NextResponse.json({ error: { code: 'invalidRateRequest' } }, { status: 400 });
   }
@@ -21,7 +24,7 @@ export async function GET(request: Request) {
     // Fixed host/path; only currency pairs and the date ever leave this server.
     // ECB dates roll back to the latest publication on or before the requested day.
     const response = await fetch(
-      `https://api.frankfurter.dev/v2/providers/ecb/rate/${base}/${target}?date=${date}`,
+      `https://api.frankfurter.dev/v2/providers/ecb/rate/${base}/${target}?date=${date > utcToday ? utcToday : date}`,
       {
         signal: AbortSignal.timeout(5000),
         redirect: 'error',

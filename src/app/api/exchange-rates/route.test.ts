@@ -73,3 +73,20 @@ it.each(['missing', 'offline', 'timeout'])(
     expect(fetcher).toHaveBeenCalledTimes(1);
   },
 );
+it('accepts a local today that is already tomorrow in UTC', async () => {
+  vi.useFakeTimers({ now: new Date('2024-06-08T20:00:00Z') });
+  const fetcher = vi
+    .fn()
+    .mockResolvedValue(
+      Response.json({ base: 'USD', quote: 'CAD', date: '2024-06-07', rate: 1.25 }),
+    );
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    const response = await GET(request('base=USD&target=CAD&date=2024-06-09'));
+    expect(response.status).toBe(200);
+    expect(fetcher.mock.calls[0][0]).toContain('?date=2024-06-08');
+    expect((await GET(request('base=USD&target=CAD&date=2024-06-10'))).status).toBe(400);
+  } finally {
+    vi.useRealTimers();
+  }
+});

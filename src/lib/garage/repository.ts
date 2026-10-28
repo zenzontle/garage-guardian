@@ -622,7 +622,7 @@ export class SupabaseRepository implements Repository {
   async photoUrl(photo: Photo): Promise<string> {
     const { data, error } = await this.client.storage
       .from('visit-photos')
-      .createSignedUrl(photo.path, 60);
+      .createSignedUrl(photo.path, 60, { download: photo.name });
     if (error) throw error;
     return data.signedUrl;
   }

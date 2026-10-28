@@ -50,7 +50,9 @@ export function reportTotals(visits: Visit[], cars: Car[], homeCurrency: Currenc
 }
 
 function escapeCsv(value: string | number): string {
-  const text = String(value);
+  // Prefix user text that spreadsheets would otherwise evaluate as a formula.
+  const text =
+    typeof value === 'string' && /^[=+\-@\t\r]/.test(value) ? `'${value}` : String(value);
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 

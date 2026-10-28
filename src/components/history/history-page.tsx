@@ -56,7 +56,8 @@ export function HistoryPage({
             .includes(query.toLowerCase())),
     )
     .sort((a, b) => {
-      if (sort === 'oldest') return a.date.localeCompare(b.date);
+      if (sort === 'oldest')
+        return a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt);
       if (sort === 'cost_high' || sort === 'cost_low')
         return compareCost(a, b, homeCurrency, sort === 'cost_high');
       if (sort === 'odometer_high')
@@ -75,7 +76,8 @@ export function HistoryPage({
     link.href = url;
     link.download = 'garage-guardian-service-history.csv';
     link.click();
-    URL.revokeObjectURL(url);
+    // Revoking synchronously can cancel the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
   return (
     <>
