@@ -85,6 +85,9 @@ it('accepts a local today that is already tomorrow in UTC', async () => {
     const response = await GET(request('base=USD&target=CAD&date=2024-06-09'));
     expect(response.status).toBe(200);
     expect(fetcher.mock.calls[0][0]).toContain('?date=2024-06-08');
+    // Today's rate may still be unpublished, so it is not cached for a full day.
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ next: { revalidate: 3600 } });
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=3600');
     expect((await GET(request('base=USD&target=CAD&date=2024-06-10'))).status).toBe(400);
   } finally {
     vi.useRealTimers();

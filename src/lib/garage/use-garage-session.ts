@@ -423,8 +423,10 @@ export function useGarageSession() {
     });
     if (generation.current !== version) throw new AppError('sessionChanged');
     if (!response.ok) {
-      const body = (await response.json().catch(() => ({}))) as { error?: { code?: string } };
-      const code = body.error?.code;
+      const body = (await response.json().catch(() => null)) as {
+        error?: { code?: string };
+      } | null;
+      const code = body?.error?.code;
       throw new AppError(
         code && Object.hasOwn(en.errors, code) ? (code as keyof typeof en.errors) : 'auth',
       );

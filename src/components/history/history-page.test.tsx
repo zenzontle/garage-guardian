@@ -160,3 +160,23 @@ it('handles an empty history and records whose vehicle is unavailable', () => {
   const cards = within(screen.getByRole('list', { name: 'Service history' }));
   expect(cards.getByText('Unknown')).toBeDefined();
 });
+
+it('orders same-day visits by creation time when sorting oldest first', async () => {
+  const early: Visit = {
+    ...visit,
+    id: 'early',
+    provider: 'First shop',
+    createdAt: '2026-09-25T08:00:00Z',
+  };
+  const late: Visit = {
+    ...early,
+    id: 'late',
+    provider: 'Second shop',
+    createdAt: '2026-09-25T17:00:00Z',
+  };
+  const { cards, user } = setup([late, early]);
+  await user.selectOptions(screen.getByLabelText('Sort service history'), 'oldest');
+  const entries = cards.getAllByRole('listitem');
+  expect(entries[0].textContent).toContain('First shop');
+  expect(entries[1].textContent).toContain('Second shop');
+});

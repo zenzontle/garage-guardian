@@ -6,8 +6,13 @@ import { useBackgroundConversions } from './use-background-conversions';
 import { lookupRate } from './rate-client';
 import { automaticConversion, receiptInputs, type Currency, type Rate } from './currency';
 import type { Repository } from '../garage/repository';
+import { todayISO } from '../utils/today-iso';
 
 vi.mock('./rate-client', () => ({ lookupRate: vi.fn() }));
+vi.mock('../utils/today-iso', async (original) => {
+  const actual = await original<typeof import('../utils/today-iso')>();
+  return { todayISO: vi.fn(actual.todayISO) };
+});
 beforeEach(() => {
   vi.mocked(lookupRate).mockReset();
 });
@@ -107,4 +112,20 @@ it('finishes a missing conversion after switching away and back during its looku
     'USD',
     expect.objectContaining({ convertedCents: 750 }),
   );
+});
+it('looks up a rate for a local today that is already tomorrow in UTC', async () => {
+  vi.useFakeTimers({ now: new Date('2026-06-08T20:00:00Z'), toFake: ['Date'] });
+  const real = vi.mocked(todayISO).getMockImplementation()!;
+  vi.mocked(todayISO).mockImplementation(() => '2026-06-09');
+  vi.mocked(lookupRate).mockResolvedValue({ rate: 0.05, rateDate: '2026-06-08' });
+  try {
+    const hook = renderHook(() =>
+      useReceiptConversion(undefined, 'MXN', '2026-06-09', '150.00', 'USD'),
+    );
+    await waitFor(() => expect(hook.result.current.conversion?.convertedCents).toBe(750));
+    expect(lookupRate).toHaveBeenCalledWith('MXN', 'USD', '2026-06-09');
+  } finally {
+    vi.mocked(todayISO).mockImplementation(real);
+    vi.useRealTimers();
+  }
 });

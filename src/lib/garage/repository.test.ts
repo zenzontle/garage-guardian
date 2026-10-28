@@ -369,6 +369,9 @@ describe.each([
       expect(cloud.tables.get('cars')?.get(car.id)?.user_id).toBe(account().id);
       expect(cloud.photos.get(photo.path)?.size).toBe(11);
       expect(await reloaded.photoUrl(photo)).toContain(photo.path);
+      expect(cloud.bucket.createSignedUrl).toHaveBeenLastCalledWith(photo.path, 60, {
+        download: photo.name,
+      });
     } else {
       expect(cloud.from).not.toHaveBeenCalled();
       expect(cloud.bucket.upload).not.toHaveBeenCalled();

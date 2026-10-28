@@ -11,6 +11,7 @@ import { EmptyPanel } from '../ui/empty-panel';
 import { HistoryRow } from './history-row';
 import { HistoryCard } from './history-card';
 import { compareCost, type Currency } from '@/lib/currency/currency';
+import { downloadUrl } from '@/lib/utils/download-url';
 
 export function HistoryPage({
   cars,
@@ -71,13 +72,7 @@ export function HistoryPage({
     const blob = new Blob([visitsToCsv(filtered, cars, homeCurrency)], {
       type: 'text/csv;charset=utf-8',
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'garage-guardian-service-history.csv';
-    link.click();
-    // Revoking synchronously can cancel the download in some browsers.
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    downloadUrl(URL.createObjectURL(blob), 'garage-guardian-service-history.csv');
   }
   return (
     <>

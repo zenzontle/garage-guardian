@@ -20,15 +20,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: { code: 'invalidRateRequest' } }, { status: 400 });
   }
   if (base === target) return NextResponse.json({ rate: 1, rateDate: date });
+  const queryDate = date > utcToday ? utcToday : date;
+  // Today's ECB rate may not be published yet, so do not pin a rolled-back rate for a day.
+  const maxAge = queryDate === utcToday ? 3600 : 86400;
   try {
     // Fixed host/path; only currency pairs and the date ever leave this server.
     // ECB dates roll back to the latest publication on or before the requested day.
     const response = await fetch(
-      `https://api.frankfurter.dev/v2/providers/ecb/rate/${base}/${target}?date=${date > utcToday ? utcToday : date}`,
+      `https://api.frankfurter.dev/v2/providers/ecb/rate/${base}/${target}?date=${queryDate}`,
       {
         signal: AbortSignal.timeout(5000),
         redirect: 'error',
-        next: { revalidate: 86400 },
+        next: { revalidate: maxAge },
       },
     );
     if (!response.ok) throw new Error('Rate unavailable');
@@ -50,7 +53,7 @@ export async function GET(request: Request) {
       throw new Error('Invalid rate response');
     return NextResponse.json(
       { rate: result.rate, rateDate: result.date },
-      { headers: { 'Cache-Control': 'public, max-age=86400' } },
+      { headers: { 'Cache-Control': `public, max-age=${maxAge}` } },
     );
   } catch {
     return NextResponse.json({ error: { code: 'rateUnavailable' } }, { status: 503 });
