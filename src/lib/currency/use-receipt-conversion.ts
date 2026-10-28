@@ -12,6 +12,7 @@ import {
   type Currency,
 } from './currency';
 import { lookupRate } from './rate-client';
+import { todayISO } from '../utils/today-iso';
 
 export function useReceiptConversion(
   item: Visit | undefined,
@@ -37,12 +38,7 @@ export function useReceiptConversion(
   manualRef.current = manual;
   const valid = validConversion(conversion, inputs) ? conversion : undefined;
   useEffect(() => {
-    if (
-      currency === target ||
-      totalCostCents === null ||
-      !validDate(date) ||
-      date > new Date().toISOString().slice(0, 10)
-    )
+    if (currency === target || totalCostCents === null || !validDate(date) || date > todayISO())
       return;
     if (valid || manual?.key === key) return;
     let active = true;

@@ -11,6 +11,7 @@ import { EmptyPanel } from '../ui/empty-panel';
 import { HistoryRow } from './history-row';
 import { HistoryCard } from './history-card';
 import { compareCost, type Currency } from '@/lib/currency/currency';
+import { downloadUrl } from '@/lib/utils/download-url';
 
 export function HistoryPage({
   cars,
@@ -56,7 +57,8 @@ export function HistoryPage({
             .includes(query.toLowerCase())),
     )
     .sort((a, b) => {
-      if (sort === 'oldest') return a.date.localeCompare(b.date);
+      if (sort === 'oldest')
+        return a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt);
       if (sort === 'cost_high' || sort === 'cost_low')
         return compareCost(a, b, homeCurrency, sort === 'cost_high');
       if (sort === 'odometer_high')
@@ -70,12 +72,7 @@ export function HistoryPage({
     const blob = new Blob([visitsToCsv(filtered, cars, homeCurrency)], {
       type: 'text/csv;charset=utf-8',
     });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'garage-guardian-service-history.csv';
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadUrl(URL.createObjectURL(blob), 'garage-guardian-service-history.csv');
   }
   return (
     <>

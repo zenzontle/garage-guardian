@@ -90,4 +90,10 @@ describe('reports and export', () => {
     expect(csv).toContain('"Oil, tires\nchecked"');
     expect(csv).toContain('150.00');
   });
+
+  it('neutralizes user text that spreadsheets would evaluate as a formula', () => {
+    const csv = visitsToCsv([{ ...visit, provider: '=HYPERLINK("x")', notes: '@SUM(A1)' }], [car]);
+    expect(csv).toContain(`"'=HYPERLINK(""x"")"`);
+    expect(csv).toContain(",'@SUM(A1),");
+  });
 });

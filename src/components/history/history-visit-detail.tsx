@@ -7,6 +7,7 @@ import type { Visit, Photo } from '@/lib/garage/model';
 import type { Repository } from '@/lib/garage/repository';
 import { useDisplay } from '@/i18n/use-display';
 import { failureOf, type AppFailure } from '@/lib/utils/app-error';
+import { downloadUrl } from '@/lib/utils/download-url';
 
 export function HistoryVisitDetail({
   visit,
@@ -21,13 +22,7 @@ export function HistoryVisitDetail({
   async function downloadPhoto(photo: Photo) {
     try {
       setPhotoError(null);
-      const url = await repository.photoUrl(photo);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = photo.name;
-      link.target = '_blank';
-      link.click();
-      if (url.startsWith('blob:')) setTimeout(() => URL.revokeObjectURL(url), 60000);
+      downloadUrl(await repository.photoUrl(photo), photo.name);
     } catch (cause) {
       setPhotoError(failureOf(cause, 'photo'));
     }

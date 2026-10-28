@@ -93,10 +93,16 @@ it('uses the same filters for cards, table, counts, and CSV export', async () =>
   expect(cards.getAllByRole('listitem')).toHaveLength(1);
   expect(table.getAllByRole('row')).toHaveLength(2);
   expect(screen.getByText('Showing 1 of 2 visits')).toBeDefined();
+  const timeout = vi.spyOn(globalThis, 'setTimeout');
   await user.click(screen.getByRole('button', { name: 'Export CSV' }));
   expect(await csv.text()).toContain('Daily driver');
   expect(await csv.text()).not.toContain('Metric driver');
   expect(click).toHaveBeenCalledOnce();
+  // The URL outlives the click so the browser can start the download.
+  expect(revokeObjectURL).not.toHaveBeenCalled();
+  const revoke = timeout.mock.calls.find(([, delay]) => delay === 60000)?.[0] as () => void;
+  timeout.mockRestore();
+  revoke();
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:csv');
   await user.type(screen.getByLabelText('Search service history'), 'no-match');
   expect(screen.getByText('No matching records')).toBeDefined();
@@ -153,4 +159,24 @@ it('handles an empty history and records whose vehicle is unavailable', () => {
   );
   const cards = within(screen.getByRole('list', { name: 'Service history' }));
   expect(cards.getByText('Unknown')).toBeDefined();
+});
+
+it('orders same-day visits by creation time when sorting oldest first', async () => {
+  const early: Visit = {
+    ...visit,
+    id: 'early',
+    provider: 'First shop',
+    createdAt: '2026-09-25T08:00:00Z',
+  };
+  const late: Visit = {
+    ...early,
+    id: 'late',
+    provider: 'Second shop',
+    createdAt: '2026-09-25T17:00:00Z',
+  };
+  const { cards, user } = setup([late, early]);
+  await user.selectOptions(screen.getByLabelText('Sort service history'), 'oldest');
+  const entries = cards.getAllByRole('listitem');
+  expect(entries[0].textContent).toContain('First shop');
+  expect(entries[1].textContent).toContain('Second shop');
 });
