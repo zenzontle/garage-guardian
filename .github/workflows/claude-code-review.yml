@@ -127,6 +127,24 @@ jobs:
               comment.body?.startsWith('## Code review')
             );
 
+            // claude-code-action refuses to run while this workflow differs from main's copy.
+            // Such PRs touch .github/, so CODEOWNERS already requires a human merge.
+            const files = await github.paginate(
+              github.rest.pulls.listFiles,
+              { owner, repo, pull_number, per_page: 100 }
+            );
+            const changesThisWorkflow = files.some(
+              file => file.filename === '.github/workflows/claude-code-review.yml'
+            );
+
+            if (!summaries.length && changesThisWorkflow) {
+              core.warning(
+                `Claude review cannot run on a PR that changes this workflow. ` +
+                `${headSha} needs a human review before merge.`
+              );
+              return;
+            }
+
             // A skipped or failed review posts nothing; that must not pass as clean.
             if (!summaries.length) {
               core.setFailed(
