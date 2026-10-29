@@ -1,0 +1,12 @@
+# Paths that always need a human review (see REVIEW.md). Enforced by the
+# "Require Code Owners approval" ruleset on main.
+/.github/               @zenzontle
+/REVIEW.md              @zenzontle
+/supabase/              @zenzontle
+/src/app/api/           @zenzontle
+/vercel.json            @zenzontle
+/src/lib/account/       @zenzontle
+/src/app/(garage)/auth/ @zenzontle
+/package.json           @zenzontle
+/pnpm-lock.yaml         @zenzontle
+/pnpm-workspace.yaml    @zenzontle
