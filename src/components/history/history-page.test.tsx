@@ -109,6 +109,23 @@ it('uses the same filters for cards, table, counts, and CSV export', async () =>
   expect(screen.getByRole('button', { name: 'Export CSV' })).toHaveProperty('disabled', true);
 });
 
+it('matches the car name in search and exports only the matching visits', async () => {
+  const { cards, user } = setup();
+  let csv!: Blob;
+  const createObjectURL = vi.fn((blob: Blob) => {
+    csv = blob;
+    return 'blob:csv';
+  });
+  vi.stubGlobal('URL', { createObjectURL, revokeObjectURL: vi.fn() });
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  await user.type(screen.getByLabelText('Search service history'), 'metric DRIVER');
+  expect(cards.getAllByRole('listitem')).toHaveLength(1);
+  expect(cards.getByRole('listitem').textContent).toContain('Metric driver');
+  await user.click(screen.getByRole('button', { name: 'Export CSV' }));
+  expect(await csv.text()).toContain('Metric driver');
+  expect(await csv.text()).not.toContain('Daily driver');
+});
+
 it('connects edit and delete actions to the corresponding visit in both presentations', async () => {
   const { cards, table, user, onEdit, onDelete } = setup([visit]);
   await user.click(cards.getByRole('button', { name: 'Edit visit' }));
