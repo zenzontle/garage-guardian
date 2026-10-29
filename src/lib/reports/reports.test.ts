@@ -61,6 +61,17 @@ describe('reports and export', () => {
       { id: 'missing', name: null, amount: 15000 },
     ]);
   });
+  it('sorts the vehicle breakdown by amount, highest first', () => {
+    const truck: Car = { ...car, id: 'truck', name: 'Truck' };
+    const result = reportTotals(
+      [visit, { ...visit, id: 'truck-visit', carId: truck.id, totalCostCents: 40000 }],
+      [car, truck],
+    );
+    expect(result.byCar).toEqual([
+      { id: truck.id, name: 'Truck', amount: 40000 },
+      { id: car.id, name: 'Daily, driver', amount: 15000 },
+    ]);
+  });
   it('exports native numeric readings with per-row units for a mixed-unit garage', () => {
     const metric: Car = { ...car, id: 'metric', name: 'Metric car', distanceUnit: 'kilometers' };
     const csv = visitsToCsv(

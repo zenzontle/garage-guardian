@@ -35,11 +35,13 @@ export function reportTotals(visits: Visit[], cars: Car[], homeCurrency: Currenc
     pendingCount,
     convertedCount: visits.length - pendingCount,
     byMonth: [...byMonth].sort(([a], [b]) => a.localeCompare(b)),
-    byCar: [...byCar].map(([id, amount]) => ({
-      id,
-      name: cars.find((car) => car.id === id)?.name ?? null,
-      amount,
-    })),
+    byCar: [...byCar]
+      .map(([id, amount]) => ({
+        id,
+        name: cars.find((car) => car.id === id)?.name ?? null,
+        amount,
+      }))
+      .sort((a, b) => b.amount - a.amount),
     byCategory: [
       ...[...byCategory].map(([name, amount]) => ({ kind: 'category' as const, name, amount })),
       ...(unallocatedCents
