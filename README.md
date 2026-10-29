@@ -1,216 +1,33 @@
 # Garage Guardian
 
-A private, responsive car maintenance tracker. Record multiple cars and service visits, set maintenance schedules from an owner's manual, see what is due, review spending, and export history to CSV.
+A private, responsive car maintenance tracker. Record multiple cars and service visits, set maintenance schedules from an owner's manual, see what is due, review spending, and export history to CSV. VIN lookup, automatic manufacturer schedules, spreadsheet import, and native apps are future work.
 
-Choose **Miles** (default) or **Kilometers** when adding a car. The distance unit is read-only in **Edit car**. Odometer readings, maintenance intervals, and service history use that vehicle’s chosen unit. Each car starts with a 30-day upcoming window and a distance window of **500 miles** or **1,000 kilometers**, adjustable in **Edit car**. Distance reminders use the latest entered odometer rather than an estimate. Existing vehicles remain Miles with their saved readings and reminder settings unchanged. CSV exports include a numeric Odometer column and a per-row Distance unit (`mi` or `km`).
+## Features
 
-Each car can have an optional **License plate**, shown in its detail header when present. Add, edit, or clear it alongside VIN. Plates are free text up to **20 characters** after trimming leading and trailing whitespace; case, internal spaces, and punctuation are preserved. Blank input means no plate. No country-specific format, uniqueness rule, registration jurisdiction, or plate lookup is used. Older records load with no plate, and signup transfers preserve saved plates, including interrupted transfers resumed after a reload.
-
-Repeat intervals alone are enough. With no first due point, a distance interval uses the next multiple of that interval at or above the latest recorded odometer (for example, 69,000 miles with a 5,000-mile interval is first due at 70,000 miles; a zero odometer starts at 5,000). A time interval starts when the task is saved. These automatic first due points are persisted, so reloads, edits to the car's odometer, and the passage of time cannot push them forward. Existing active interval-only tasks are initialized once when loaded by the app or email reminder worker. Apply migrations `0008_schedule_defaults.sql` and `0009_atomic_schedule_saves.sql` before deploying this update: cloud initialization and interval-only saves lock the car and visit readings in the same transaction as the write. Initialization returns the current schedule if another tab edits or deletes it. An explicit first due point is preserved, and linked service visits advance repeats from their recorded date/odometer. A service visit without an odometer does not advance a distance target. Tasks with neither intervals nor a due point still appear in dashboard setup guidance, with links to their vehicle schedules.
-
-## Navigation
-
-Forms protect unsaved work, uploads report their current stage, and saves/deletes provide accessible confirmations. See [interaction states and verification](docs/interaction-states.md) for dismissal, retry, and browser-navigation behavior.
-
-Dashboard lives at `/`, Vehicles at `/cars`, individual vehicles at `/cars/[carId]`,
-Service history at `/history`, and Reports at `/reports`. Vehicles opens the first car
-and replaces `/cars` with its detail URL, or shows the empty garage when no cars exist.
-Reloads, bookmarks, browser Back/Forward, and opening navigation links in a new tab
-work across these screens. Vehicle IDs remain stable when names change.
-
-Sign-in and create-account use `/signin` and `/signup`. Their validated `returnTo`
-parameter returns to the originating workspace screen; direct visits default to Dashboard.
-A missing vehicle keeps its URL and displays an unavailable message. Guest/prototype
-bookmarks depend on data stored in that browser and origin; cloud bookmarks require
-access to the vehicle in the current account. Dialogs and history/report filters remain
-local UI state and are not restored from URLs. No database migration is required.
-
-Vehicle links support Left/Right (with wrapping) and Home/End to move focus; Enter
-opens the focused vehicle. Every link also remains reachable with Tab. On phones,
-opening the navigation drawer focuses the current page link; Escape closes it and
-returns focus to the menu button. The drawer also closes when focus leaves or the
-viewport becomes desktop.
-
-Service history uses stacked visit cards at widths of 720px and below and a table
-above that breakpoint. Both views share filters, sorting, CSV export, and expanded
-visit details. Shared styles use larger text and a minimum 44px target for actions.
-
-## Languages
-
-Use the **English / Español** selector in the header, account screens, or open dialogs. The first render is English on both server and client. After mounting, the app uses a valid saved choice, otherwise the first supported browser language (including regional variants such as `es-MX`), with English fallback. Explicit choices are stored under `garage-guardian:locale` in local storage, independently of accounts and garage data, and survive reload, sign-in, and sign-out. If storage is unavailable, switching still works for the current session. The document's `lang` follows the resolved language. Switching updates provider values without remounting forms or restarting transfers.
-
-Neutral Spanish uses `es` number/date formatting. Currency stays **USD**, each vehicle keeps its **mi/km** unit, and form values remain canonical numbers, integer cents, and ISO dates. Date-only displays use UTC explicitly so the calendar day never shifts. Stored names, notes, categories, and other user-entered text are never translated or renamed. New starter tasks use the language selected when the car is saved. CSV headers, values, fallback labels, units, and escaping remain canonical English regardless of the export button's language. No database migration is needed. Provider-owned confirmation emails remain in their provider language. Weekly reminder emails have a separate English/Spanish preference saved to each account.
-
-Translations live in `messages/en.json` and `messages/es.json`, grouped by feature and shared controls. Use `next-intl`'s `useTranslations` with typed keys and complete ICU sentences for interpolation/plurals; use `useDisplay` (backed by `useFormatter`) for display values, and keep calculations and storage independent of locale. Spanish messages recursively override English defaults; `next-intl`'s development diagnostics remain enabled for missing or malformed messages. Errors use stable `AppFailure` codes and values and are translated at render time, including errors already visible when language changes. Unknown provider details are replaced with actionable localized fallback copy.
-
-When adding another language, add a complete dictionary with the same nested keys and ICU placeholders, extend `Locale` and `isLocale` in `src/i18n/config.ts`, merge it over English defaults, add its selector option, and extend dictionary parity, pluralization, locale resolution, and workflow tests. Review terminology and text expansion in desktop/mobile dialogs and tables. The configuration follows the [next-intl client provider documentation](https://next-intl.dev/docs/usage/configuration#nextintlclientprovider); this browser-local release needs no locale routes or server request configuration.
+- **Vehicles** in miles or kilometers, with optional license plates, archiving, and make/model suggestions. See [vehicles](docs/vehicles.md).
+- **Maintenance schedules** driven by repeat intervals, with persisted first due points. See [maintenance schedules](docs/maintenance-schedules.md).
+- **Receipts** in USD, MXN, or CAD, with home-currency reports and offline receipt retry. See [multi-currency](docs/multi-currency.md).
+- **Guest mode and accounts**: use everything without signing in, then transfer to a private cloud account on signup. See [deployment](docs/deployment.md#guest-data-and-signup) and [account management](docs/account-management.md).
+- **Weekly email reminders** (opt-in) alongside in-app due reminders. See [account reminders](docs/account-reminders.md).
+- **English and Spanish** throughout. See [languages](docs/languages.md).
+- **Protected forms**: forms protect unsaved work, uploads report their current stage, and saves/deletes provide accessible confirmations. See [interaction states](docs/interaction-states.md).
+- **Bookmarkable screens** with keyboard and mobile-friendly navigation. See [navigation](docs/navigation.md).
+- **Public bug reporting** (optional) to GitHub Issues. See [bug reporting](docs/bug-reporting.md).
 
 ## Run locally
 
-Use Node.js 22 and pnpm 12.6.0, pinned in `package.json`. CI reads the same pnpm pin.
+Use Node.js 22 and pnpm 12.6.0, pinned in `package.json`.
 
 ```powershell
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open `http://localhost:3000`. Without environment variables the app runs in **local prototype mode** and saves records and compressed photos in this browser's IndexedDB. This mode has no account or cross-device sync and is intended for trying the workflow.
+Open `http://localhost:3000`. Without environment variables the app runs in browser-only **local prototype mode**. To enable accounts and private cloud sync with Supabase and Vercel, follow [deployment](docs/deployment.md).
 
-### Dependency security
+## Documentation
 
-`pnpm-workspace.yaml` applies the [pnpm supply-chain mitigations](https://pnpm.io/supply-chain-security)
-to local and CI installs. Releases must be at least one week old; missing publication dates
-or a range with no eligible release fail installation. Transitive Git/tarball dependencies
-are blocked, and `trustPolicy: no-downgrade` rejects a release whose publishing trust is
-lower than an earlier release. Frozen installs keep these checks enabled.
-Three existing releases without provenance have exact-version trust exceptions recorded
-in the configuration; their registry integrity hashes match the committed lockfile.
-Review these exceptions when updating the affected dependencies.
-
-During ordinary local installs, dependency install scripts run only for the reviewed `esbuild@0.28.2` and
-`unrs-resolver@1.12.2` versions that prepare native tooling. `@parcel/watcher` and
-`@swc/core` scripts remain denied. An unreviewed script fails an ordinary local install.
-The formatting and lint CI job uses `--ignore-scripts` to skip all install scripts;
-it does not enforce the unreviewed-script failure check.
-When updating an approved package, inspect its install script and any helpers it invokes
-before changing its version in `allowBuilds`. Keep optional dependencies enabled so the
-tooling can use the native binaries recorded in the lockfile.
-
-Commit `pnpm-lock.yaml` with dependency changes and review its integrity and source changes
-alongside `package.json` and the build policy. Use `pnpm install --frozen-lockfile` for
-ordinary installs; use `pnpm add` or `pnpm update` for intentional dependency changes.
-If a security update is blocked, review the upstream release and use a narrowly scoped,
-version-specific exception only when needed, documenting the reason in the configuration.
-Run `pnpm audit` before releases; these policies complement known-vulnerability checks.
-pnpm 12 records its own dependencies in the first document of a two-document lockfile.
-Any vulnerability scanner or SBOM tool must read both documents to include application dependencies.
-
-## Enable private cloud sync
-
-Search metadata uses Vercel's automatically supplied `VERCEL_PROJECT_PRODUCTION_URL` as its
-base URL. The homepage has a canonical link to that production domain and permits indexing
-only when `VERCEL_ENV=production` and the production URL is available. All other app pages
-use `noindex`, including vehicle records, history, reports, sign-in, signup, and account
-settings. Preview and local pages also use `noindex`. Local metadata falls back to
-`http://localhost:3000`; no additional environment variable is required on Vercel. Keep
-Vercel's **Automatically expose System Environment Variables** setting enabled. Canonical
-links are defined on the homepage rather than inherited by every route.
-
-1. Create a free Supabase project. Run `supabase/migrations/0001_initial.sql` in its SQL editor, or apply it with the Supabase CLI.
-2. Apply `supabase/migrations/0002_signup_photo_transfer.sql` as well. It permits owner-scoped photo updates so interrupted signup transfers can retry safely. In Supabase Auth, enable email/password authentication and **Allow new users to sign up**.
-3. Apply `supabase/migrations/0003_vehicle_distance_units.sql` before deploying the distance-unit update. It adds the unit with a Miles default; existing numeric values are preserved. All distance fields (including legacy `*_miles` columns) use the parent vehicle’s unit. The app writes the 500-mile or 1,000-kilometer reminder default explicitly.
-4. Apply `supabase/migrations/0004_car_plate.sql` **before deploying this plate update**. It adds an empty-default, non-null `cars.plate` column and a 20-character database constraint without changing owner-scoped RLS. Existing cars receive an empty plate. Deploy application writes only after this migration succeeds.
-5. Apply `supabase/migrations/0005_vehicle_catalog.sql`, then run `supabase/seeds/vehicle-catalog.sql` as an administrator before deploying autocomplete. Run `supabase/tests/vehicle_catalog.sql` in the SQL editor to verify public reads, blocked browser writes, and owner-scoped car access. The check rolls back its fixtures.
-6. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` from the project API settings in `.env.local` for local development, and in the hosting environment for deployment. Restart the app. Do not expose the service role key in a `NEXT_PUBLIC_` variable.
-7. Deploy the Next.js app to a personal Vercel Hobby project. Add the two public Supabase variables there. The migration enables owner-scoped row security and a private photo bucket.
-
-Set Supabase Auth's **Site URL** to your app URL and allow your deployed URL and `http://localhost:3000` as confirmation redirect URLs. The app supports email confirmation being enabled or disabled. If confirmation is required, users can continue locally until they confirm their email and authenticate in the browser containing their guest data.
-
-| Configuration         | Account             | Application data                           |
-| --------------------- | ------------------- | ------------------------------------------ |
-| No Supabase variables | No account required | Local prototype mode, browser IndexedDB    |
-| Supabase configured   | Signed out          | Guest mode, browser IndexedDB              |
-| Supabase configured   | Signed in           | Supabase database and private photo bucket |
-
-Guests can use all garage features without signing in. **Create account** automatically transfers their records and photos after the new account authenticates. Transfers preserve record relationships and can resume after a reload or failed upload. Editing pauses during transfer or while awaiting retry; errors offer **Retry** or **Sign out**. Browser records and photos are only cleared after the cloud copy is verified. After a successful transfer, signing out opens a fresh guest garage. Edits made in another tab or after signing out during an interrupted transfer are retained locally.
-
-Ordinary **Sign in** does not import or delete guest data; it opens the account's cloud garage. Signing out restores any guest records that have never been transferred. A pending signup transfer resumes only for the account that created it and the same Supabase project. Use the same browser and site origin for signup and transfer; guest data cannot be recovered from another browser or device. Authenticated cloud failures do not fall back to local writes. CSV export remains available from **Service history**.
-
-Account recovery, confirmation resend, and email/password changes are documented in [account management setup and verification](docs/account-management.md). Configure exact recovery/confirmation redirects and secure email-change confirmation before releasing these features. These account features use the public Supabase configuration and require no additional database migrations or server secret.
-
-## Optional make/model suggestions
-
-**Add a car** and **Edit car** offer editable Make and Model suggestions whenever Supabase is configured, including signed-out guests. Prototype mode keeps plain inputs and performs zero catalog requests. Makes load when the modal opens; models load only for the exact make after trimming, collapsing whitespace, and ignoring case. Year does not filter suggestions. Changing make preserves the typed model. Lists are paginated and cached in memory per project and make; typing filters locally. Failed reads offer a retry and never block car entry or saving.
-
-Up to ten suggestions appear, ordered by exact match, prefix, then substring, alphabetically within each group. Use Arrow Up/Down and Enter to choose, Escape to dismiss, or tap/click an option. Tab and blur preserve free text. Suggestions are optional: unknown names and arbitrary make/model pairs are accepted, with the existing required/50-character fields and trim-on-save behavior. There is no VIN lookup or vehicle verification, and cars have no catalog foreign keys.
-
-The initial catalog contains **145 makes and 1,560 models**, generated from the supplied [FuelEconomy.gov consolidated CSV](https://www.fueleconomy.gov/feg/download.shtml) (50,407 source records). The source covers US passenger cars and light trucks from 1984 onward; historical gaps, heavier vehicles, imports, and newly introduced models may be missing. See [field documentation](https://www.fueleconomy.gov/feg/ws/index.shtml). The import uses `baseModel` when nonempty and `model` otherwise, retaining meaningful punctuation and discarding years. It collapses whitespace, deduplicates normalized make/model pairs, and reports capitalization conflicts rather than inventing aliases.
-
-The file was supplied/imported on **2026-10-03**; its original retrieval date is unknown. SHA-256: `b1ff0e3071c46cdc1c99e0015878b98a01851462d7e447237ce2fc1294ccf303`. Full provenance, counts, and the 11 reviewed capitalization conflicts are in `supabase/seeds/vehicle-catalog.provenance.json`. Output chooses the first display name in code-point order for conflicts. The original CSV is not bundled into the browser or committed.
-
-Refresh explicitly after downloading a new CSV (no runtime source dependency or scheduled refresh):
-
-```powershell
-node scripts/generate-vehicle-catalog.mjs C:/path/to/vehicles.csv supabase/seeds/vehicle-catalog.sql 2026-10-03 2026-10-03
-```
-
-Use the actual received/import and retrieval dates as the final two arguments; omit the last date if unknown. Review the SQL and provenance diff before applying. Malformed, empty, invalid-control-character, or overlength names reject the generation and leave the previous seed intact; details are written to the report. Repeated generation with the same input and dates is deterministic. Apply the SQL through Supabase's administrative SQL editor or `psql` with `ON_ERROR_STOP=1`. Upserts preserve identifiers and prevent duplicates; refreshes add/update entries and do not delete historical entries. Browser roles (`anon`, `authenticated`) can only SELECT the catalog.
-
-Deployment order: migration, seed, database permission check, then UI. Smoke-test add/edit in configured guest and authenticated environments and in an unconfigured prototype; check desktop/narrow-screen dropdown scrolling, touch selection, focus return, and screen-reader active-option announcements. Keyboard/ARIA behavior is covered by component tests; an actual screen-reader pass remains part of release verification.
-
-## Optional public bug reporting
-
-Enable an authenticated **Report a bug** button per deployment with `BUG_REPORTS_ENABLED=true`. Users review their description, diagnostic context, recent errors, and optional screenshots before acknowledging that the report will be public and publishing it to GitHub Issues. Guests cannot submit. Upstash Redis provides shared user/IP limits and retry receipts; no Supabase migration is needed.
-
-See [bug reporting setup and verification](docs/bug-reporting.md) and `.env.example` for server-only credentials, validation limits, public-data handling, and the synthetic preview smoke test. Reporting defaults to disabled; keep production disabled until the preview smoke test passes.
-
-## Web analytics
-
-Vercel Web Analytics is included in the root layout to track page views. Enable **Web Analytics** for the project in the Vercel dashboard, then deploy the app to start collecting data. No additional environment variables are required. See the [Vercel setup guide](https://vercel.com/docs/analytics/quickstart).
-
-Vercel Speed Insights is also included in the root layout to measure performance across all routes. Enable **Speed Insights** for the project in the Vercel dashboard, then deploy the app and visit it to start collecting data. No additional environment variables are required. See the [Speed Insights setup guide](https://vercel.com/docs/speed-insights/quickstart).
-
-## Account email reminders
-
-In-app due reminders always work. Cloud accounts can opt in to a weekly email digest in Account settings, choosing a weekday and English or Spanish. Emails link directly to each vehicle and notification settings. Apply migration `0007_account_reminders.sql` and follow [reminder setup, delivery semantics, and verification](docs/account-reminders.md) before enabling `REMINDERS_ENABLED`. Sending defaults to disabled; there is no configured single recipient.
-
-No paid plan or automatic upgrade is required. Free service quotas and Supabase inactivity pausing can delay an email or make the prototype temporarily unavailable. Check provider usage and export records regularly. The free photo bucket is limited to 1 GB; each visit accepts up to three resized photos of at most 2 MB each.
-
-## Project organization
-
-Files are grouped by responsibility. Components and library modules use feature folders,
-with tests beside the files they cover and shared test support in `src/test`.
-
-| Folder              | Contents                                                                                                                                                          |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/app`           | Next.js route pages, layouts, API handlers, and app icon                                                                                                          |
-| `src/components`    | Feature folders for account, bug reports, dashboard, garage shell, history, localization, interactions, maintenance, notifications, reports, vehicles, and visits |
-| `src/components/ui` | Shared controls, dialogs, input helpers, and feedback components                                                                                                  |
-| `src/lib`           | Feature folders for account, bug reports, garage data, maintenance, navigation, notifications, reminders, reports, and vehicle catalog logic                      |
-| `src/lib/utils`     | Shared error, date, and photo preparation helpers                                                                                                                 |
-| `src/i18n`          | Locale configuration, context, and display formatting                                                                                                             |
-| `src/styles`        | Global, localization, and usability styles                                                                                                                        |
-| `src/test`          | Shared fixtures, fake services, routing helpers, and test setup                                                                                                   |
-| `messages`          | English and Spanish translation dictionaries                                                                                                                      |
-| `public`            | Public static assets                                                                                                                                              |
-| `scripts`           | Maintenance and smoke-test scripts with their tests                                                                                                               |
-| `supabase`          | Database migrations, seeds, and SQL verification scripts                                                                                                          |
-| `docs`              | Feature setup guides and verification notes                                                                                                                       |
-
-Each UI component has its own kebab-case file within its feature folder.
-`GarageApp` supplies persistent locale and garage providers through the shared route layout.
-`GarageProvider` owns the session and transient UI state, `GarageContent` renders the shell
-and dialogs, and route screen components connect page components to shared data and actions.
-Pages, account forms, car/task/visit dialogs, navigation
-controls, and bug-report sections import shared UI components directly from their files.
-The locale provider and selector in `src/components/i18n` share
-`src/i18n/locale-context.ts`; date and photo preparation helpers live in `src/lib/utils`.
-
-## Checks
-
-ESLint checks JavaScript, TypeScript, and TSX files with the recommended Next.js Core Web
-Vitals and TypeScript rules. Run `pnpm lint` to check the project or `pnpm lint:fix` to
-apply automatic fixes. Configuration lives in `eslint.config.mjs`; generated Next.js
-types, build output, and coverage are excluded. Prettier handles formatting separately,
-with `eslint-config-prettier` preventing conflicting lint rules.
-
-Prettier is installed locally with a pinned version. Run `pnpm format` to format supported
-project files, or `pnpm format:check` to check formatting without changing files. The
-configuration uses single quotes, semicolons, trailing commas, two-space indentation,
-a 100-character print width, and LF line endings enforced by `.gitattributes`. Generated files and build output are
-excluded through `.prettierignore`; Prettier also respects `.gitignore`.
-
-To format only files changed during a task, run `pnpm exec prettier --write path/to/file.ts`
-with the relevant file paths.
-
-```powershell
-pnpm lint
-pnpm test
-pnpm run typecheck
-pnpm run build
-```
-
-The schedule is owner-entered. Starter tasks are names only; no interval is presented as an OEM recommendation. VIN lookup, automatic manufacturer schedules, spreadsheet import, and native apps are future work. Receipts support USD, MXN, and CAD with saved home-currency conversions and account-scoped offline receipt retry; see [multi-currency behavior and migration order](docs/multi-currency.md).
+The [documentation index](docs/README.md) lists every setup, feature, and contributor guide. Start with [contributing](docs/contributing.md) for project layout and checks.
 
 ## License
 
