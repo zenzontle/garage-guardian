@@ -263,7 +263,7 @@
     "eyebrow": "REGISTRO DE SERVICIO",
     "description": "Un registro claro de cada visita, recibo y tarea completada.",
     "search": "Buscar en el historial de servicio",
-    "searchPlaceholder": "Buscar servicio o proveedor",
+    "searchPlaceholder": "Buscar auto, servicio o proveedor",
     "filterCar": "Filtrar por auto",
     "from": "Desde",
     "to": "Hasta",

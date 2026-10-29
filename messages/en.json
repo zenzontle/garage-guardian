@@ -263,7 +263,7 @@
     "eyebrow": "SERVICE LOG",
     "description": "A clear record of every visit, receipt, and completed task.",
     "search": "Search service history",
-    "searchPlaceholder": "Search service or provider",
+    "searchPlaceholder": "Search car, service or provider",
     "filterCar": "Filter by car",
     "from": "From",
     "to": "To",

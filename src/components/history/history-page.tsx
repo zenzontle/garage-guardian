@@ -45,16 +45,24 @@ export function HistoryPage({
       return next;
     });
   }
+  function searchText(visit: Visit) {
+    const car = cars.find((candidate) => candidate.id === visit.carId);
+    return [
+      car?.name,
+      car?.make,
+      car?.model,
+      visit.provider,
+      visit.notes,
+      ...visit.items.map((item) => item.name),
+    ].join(' ');
+  }
   const filtered = visits
     .filter(
       (visit) =>
         (!carId || visit.carId === carId) &&
         (!from || visit.date >= from) &&
         (!to || visit.date <= to) &&
-        (!query ||
-          `${visit.provider} ${visit.notes} ${visit.items.map((item) => item.name).join(' ')}`
-            .toLowerCase()
-            .includes(query.toLowerCase())),
+        (!query || searchText(visit).toLowerCase().includes(query.toLowerCase())),
     )
     .sort((a, b) => {
       if (sort === 'oldest')
