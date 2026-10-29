@@ -2,7 +2,8 @@ name: Auto-merge PRs by Default
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review]
+    # synchronize covers PRs opened with merge conflicts, which trigger no workflows until a push.
+    types: [opened, reopened, ready_for_review, synchronize]
 
 permissions:
   contents: write
