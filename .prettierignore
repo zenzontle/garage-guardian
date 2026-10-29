@@ -10,3 +10,6 @@ next-env.d.ts
 pnpm-lock.yaml
 supabase/seeds/vehicle-catalog.sql
 supabase/seeds/vehicle-catalog.provenance.json
+
+# Local, untracked settings
+.claude/settings.local.json
