@@ -4,9 +4,9 @@ import sharp from 'sharp';
 import { POST } from './route';
 import { GET as configuration } from './config/route';
 import { GET as status } from './[submissionId]/route';
-import { memoryStore, oversizedReport, report } from '@/lib/bug-reports/fixtures.test-helper';
-import type { ReportStore } from '@/lib/bug-reports/store';
-import { ReportError } from '@/lib/bug-reports/server-config';
+import { memoryStore, oversizedReport, report } from '@/lib/feedback/fixtures.test-helper';
+import type { ReportStore } from '@/lib/feedback/store';
+import { ReportError } from '@/lib/feedback/server-config';
 
 const runtime = vi.hoisted(() => ({
   store: null as unknown as ReportStore,
@@ -18,9 +18,9 @@ const runtime = vi.hoisted(() => ({
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({ auth: { getUser: runtime.getUser } }),
 }));
-vi.mock('@/lib/bug-reports/store', () => ({ reportStore: () => runtime.store }));
-vi.mock('@/lib/bug-reports/github', async (original) => ({
-  ...(await original<typeof import('@/lib/bug-reports/github')>()),
+vi.mock('@/lib/feedback/store', () => ({ reportStore: () => runtime.store }));
+vi.mock('@/lib/feedback/github', async (original) => ({
+  ...(await original<typeof import('@/lib/feedback/github')>()),
   githubAdapter: () => ({
     create: runtime.create,
     upload: runtime.upload,
@@ -39,11 +39,11 @@ const headers = {
 
 beforeEach(() => {
   for (const [key, value] of Object.entries({
-    BUG_REPORTS_ENABLED: 'true',
-    BUG_REPORT_HMAC_SECRET: 'x'.repeat(32),
-    BUG_REPORT_GITHUB_TOKEN: 'github-test',
-    BUG_REPORT_ENVIRONMENT: 'preview',
-    BUG_REPORT_RELEASE: '0.1.0+test',
+    FEEDBACK_ENABLED: 'true',
+    FEEDBACK_HMAC_SECRET: 'x'.repeat(32),
+    FEEDBACK_GITHUB_TOKEN: 'github-test',
+    FEEDBACK_ENVIRONMENT: 'preview',
+    FEEDBACK_RELEASE: '0.1.0+test',
     UPSTASH_REDIS_REST_URL: 'https://test.upstash.io',
     UPSTASH_REDIS_REST_TOKEN: 'redis-test',
     NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
@@ -64,13 +64,13 @@ beforeEach(() => {
 });
 async function postRequest(extra: Record<string, unknown> = {}, files: File[] = []) {
   const configResponse = await configuration(
-    new Request('https://app.test/api/bug-reports/config', { headers }),
+    new Request('https://app.test/api/feedback/config', { headers }),
   );
   const config = await configResponse.json();
   const form = new FormData();
   form.append('report', JSON.stringify({ ...report(), metadata: config.metadata, ...extra }));
   files.forEach((file) => form.append('screenshots', file));
-  return new Request('https://app.test/api/bug-reports', { method: 'POST', headers, body: form });
+  return new Request('https://app.test/api/feedback', { method: 'POST', headers, body: form });
 }
 async function screenshot() {
   const bytes = await sharp({
@@ -215,13 +215,13 @@ describe('HTTP reporting boundary', () => {
     },
   );
   it('does not expose reporting when disabled or create issues with missing configuration', async () => {
-    vi.stubEnv('BUG_REPORTS_ENABLED', 'false');
+    vi.stubEnv('FEEDBACK_ENABLED', 'false');
     expect(await (await configuration(new Request('https://app.test'))).json()).toEqual({
       enabled: false,
     });
     expect((await POST(new Request('https://app.test', { method: 'POST' }))).status).toBe(404);
-    vi.stubEnv('BUG_REPORTS_ENABLED', 'true');
-    vi.stubEnv('BUG_REPORT_GITHUB_TOKEN', '');
+    vi.stubEnv('FEEDBACK_ENABLED', 'true');
+    vi.stubEnv('FEEDBACK_GITHUB_TOKEN', '');
     expect((await POST(new Request('https://app.test', { method: 'POST', headers }))).status).toBe(
       503,
     );
@@ -260,7 +260,7 @@ describe('HTTP reporting boundary', () => {
   });
   it('returns retry hints and prevents uploads when shared limits deny submission', async () => {
     const request = await postRequest();
-    const { ReportError } = await import('@/lib/bug-reports/server-config');
+    const { ReportError } = await import('@/lib/feedback/server-config');
     runtime.store.limit = vi
       .fn()
       .mockRejectedValue(new ReportError(429, 'RATE_LIMITED', 'Wait', 120));

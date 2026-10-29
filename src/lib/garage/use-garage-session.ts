@@ -12,7 +12,7 @@ import {
   withSignupTransferLock,
   type TransferProgress,
 } from './signup-transfer';
-import { recordDiagnostic } from '../bug-reports/diagnostics';
+import { recordDiagnostic } from '../feedback/diagnostics';
 import {
   clearAuthCallback,
   clearRecovery,

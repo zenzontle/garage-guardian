@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import Image from 'next/image';
 export type Screenshot = { file: File; url: string };
 
-export function BugReportScreenshots({
+export function FeedbackScreenshots({
   screenshots,
   sent,
   busy,
@@ -15,9 +15,9 @@ export function BugReportScreenshots({
   busy: boolean;
   onRemove: (index: number) => void;
 }) {
-  const t = useTranslations('bugReports');
+  const t = useTranslations('feedback');
   return (
-    <div className="bug-report-screenshots">
+    <div className="feedback-screenshots">
       {screenshots.map((item, index) => (
         <figure key={item.url}>
           <Image

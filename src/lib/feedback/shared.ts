@@ -83,14 +83,13 @@ export const contextSchema = z.strictObject({
 export type ReportContext = z.infer<typeof contextSchema>;
 export const reportSchema = z.strictObject({
   submissionId: z.uuid(),
-  title: text(120).trim().min(5),
   description: text(5000).trim().min(10),
   acknowledged: z.literal(true),
   metadata: publicMetadataSchema,
   context: contextSchema,
   diagnostics: z.array(diagnosticSchema).max(20),
 });
-export type BugReport = z.infer<typeof reportSchema>;
+export type FeedbackReport = z.infer<typeof reportSchema>;
 
 export function redact(value: string): string {
   return (
@@ -171,10 +170,18 @@ function literal(value: string) {
   );
   return `${fence}text\n${value}\n${fence}`;
 }
-export function issueTitle(title: string) {
-  return `[Bug] ${title.replace(/@/g, '@\u200b').replace(/[<>]/g, '')}`;
+// The form only asks for a description, so the issue title summarizes its first line.
+export function feedbackTitle(description: string) {
+  const collapse = (value: string) => value.replace(/\s+/g, ' ').trim();
+  const first = collapse(description.trim().split('\n')[0]);
+  // Code points keep emoji and other astral characters whole when truncating.
+  const line = Array.from(first.length >= 5 ? first : collapse(description));
+  return line.length > 80 ? `${line.slice(0, 79).join('').trimEnd()}\u2026` : line.join('');
 }
-export function formatIssue(report: BugReport, screenshots: string[] = []): string {
+export function issueTitle(description: string) {
+  return `[Feedback] ${feedbackTitle(description).replace(/@/g, '@\u200b').replace(/[<>]/g, '')}`;
+}
+export function formatIssue(report: FeedbackReport, screenshots: string[] = []): string {
   const { metadata: m, context: c } = report;
   const details = `Release: ${m.release}\nEnvironment: ${m.environment}\nReporter: ${m.reporterId}\nBrowser / OS: ${m.browserOS}\nRoute: ${c.pathname}\nScreen: ${c.screen}\nDialog: ${c.dialog}\nViewport: ${c.viewport.width} × ${c.viewport.height} (${c.viewport.pixelRatio}x)\nLocale: ${c.locale}\nOnline: ${c.online}`;
   const errors = report.diagnostics
@@ -183,9 +190,9 @@ export function formatIssue(report: BugReport, screenshots: string[] = []): stri
         `${new Date(entry.timestamp).toISOString()} [${entry.source}] ${entry.message}${entry.stack ? `\n${entry.stack}` : ''}`,
     )
     .join('\n\n');
-  return `## Description\n${literal(report.description)}\n\n## App context\n${literal(details)}\n\n## Recent errors\n${literal(errors || 'No errors included.')}\n\n## Screenshots\n${screenshots.length ? screenshots.map((url, index) => (url ? `![Screenshot ${index + 1}](${url})` : `Screenshot ${index + 1} (reviewed attachment)`)).join('\n\n') : 'No screenshots included.'}\n\n<!-- garage-bug-report:${m.reporterId}:${report.submissionId} -->`;
+  return `## Description\n${literal(report.description)}\n\n## App context\n${literal(details)}\n\n## Recent errors\n${literal(errors || 'No errors included.')}\n\n## Screenshots\n${screenshots.length ? screenshots.map((url, index) => (url ? `![Screenshot ${index + 1}](${url})` : `Screenshot ${index + 1} (reviewed attachment)`)).join('\n\n') : 'No screenshots included.'}\n\n<!-- garage-feedback:${m.reporterId}:${report.submissionId} -->`;
 }
-export function fitsIssueBody(report: BugReport): boolean {
+export function fitsIssueBody(report: FeedbackReport): boolean {
   // Reserve two maximum-length asset URLs so the public preview and final body fit.
   return (
     formatIssue(report, Array(2).fill('x'.repeat(REPORT_LIMITS.assetUrl))).length <=

@@ -26,23 +26,23 @@ export type ReportConfig = {
   release: string;
   prefix: string;
 };
-export const reportingEnabled = () => process.env.BUG_REPORTS_ENABLED === 'true';
+export const reportingEnabled = () => process.env.FEEDBACK_ENABLED === 'true';
 export function reportConfig(): ReportConfig {
-  const repository = process.env.BUG_REPORT_GITHUB_REPOSITORY || 'zenzontle/garage-guardian';
-  const environment = process.env.BUG_REPORT_ENVIRONMENT || process.env.VERCEL_ENV || 'development';
+  const repository = process.env.FEEDBACK_GITHUB_REPOSITORY || 'zenzontle/garage-guardian';
+  const environment = process.env.FEEDBACK_ENVIRONMENT || process.env.VERCEL_ENV || 'development';
   const commit = process.env.VERCEL_GIT_COMMIT_SHA;
-  const release = process.env.BUG_REPORT_RELEASE || `${packageInfo.version}+${commit || 'local'}`;
+  const release = process.env.FEEDBACK_RELEASE || `${packageInfo.version}+${commit || 'local'}`;
   const config = {
     repository,
     environment,
     release,
-    githubToken: process.env.BUG_REPORT_GITHUB_TOKEN || '',
-    secret: process.env.BUG_REPORT_HMAC_SECRET || '',
+    githubToken: process.env.FEEDBACK_GITHUB_TOKEN || '',
+    secret: process.env.FEEDBACK_HMAC_SECRET || '',
     redisUrl: process.env.UPSTASH_REDIS_REST_URL || '',
     redisToken: process.env.UPSTASH_REDIS_REST_TOKEN || '',
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '',
-    prefix: `garage-guardian:bug-reports:${repository}:${environment}`,
+    prefix: `garage-guardian:feedback:${repository}:${environment}`,
   };
   if (
     !/^[\w.-]+\/[\w.-]+$/.test(repository) ||
@@ -55,9 +55,9 @@ export function reportConfig(): ReportConfig {
     !config.supabaseKey ||
     !validHttps(config.redisUrl) ||
     !validHttps(config.supabaseUrl) ||
-    (process.env.VERCEL && !commit && !process.env.BUG_REPORT_RELEASE)
+    (process.env.VERCEL && !commit && !process.env.FEEDBACK_RELEASE)
   ) {
-    throw new ReportError(503, 'NOT_CONFIGURED', 'Bug reporting is unavailable.');
+    throw new ReportError(503, 'NOT_CONFIGURED', 'Feedback is unavailable.');
   }
   return config;
 }
@@ -74,7 +74,7 @@ export function identifier(config: ReportConfig, purpose: string, value: string)
 export async function authenticate(request: Request, config: ReportConfig) {
   const match = /^Bearer ([^\s]+)$/.exec(request.headers.get('authorization') || '');
   if (!match || match[1].length > 8192)
-    throw new ReportError(401, 'UNAUTHENTICATED', 'Sign in again to report this bug.');
+    throw new ReportError(401, 'UNAUTHENTICATED', 'Sign in again to send feedback.');
   const client = createClient(config.supabaseUrl, config.supabaseKey, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
@@ -98,7 +98,7 @@ export async function authenticate(request: Request, config: ReportConfig) {
       'Account verification is unavailable. Try again later.',
     );
   if (result.error || !result.data.user || result.data.user.is_anonymous)
-    throw new ReportError(401, 'UNAUTHENTICATED', 'Sign in again to report this bug.');
+    throw new ReportError(401, 'UNAUTHENTICATED', 'Sign in again to send feedback.');
   return result.data.user.id;
 }
 export function publicMetadata(
@@ -118,11 +118,7 @@ export function clientIp(request: Request): string {
   // Never accept client-selected forwarding headers on a non-Vercel production host.
   if (!process.env.VERCEL && process.env.NODE_ENV !== 'production') return '127.0.0.1';
   if (!process.env.VERCEL)
-    throw new ReportError(
-      503,
-      'IP_UNAVAILABLE',
-      'Bug reporting requires a trusted deployment proxy.',
-    );
+    throw new ReportError(503, 'IP_UNAVAILABLE', 'Feedback requires a trusted deployment proxy.');
   let ip = (request.headers.get('x-vercel-forwarded-for') || '').trim().toLowerCase();
   if (ip.startsWith('::ffff:') && isIP(ip.slice(7)) === 4) ip = ip.slice(7);
   const kind = isIP(ip);
@@ -133,11 +129,7 @@ export function errorResponse(cause: unknown): Response {
   const error =
     cause instanceof ReportError
       ? cause
-      : new ReportError(
-          503,
-          'UNAVAILABLE',
-          'Bug reporting is unavailable. Your draft has been kept.',
-        );
+      : new ReportError(503, 'UNAVAILABLE', 'Feedback is unavailable. Your draft has been kept.');
   return Response.json(
     { error: error.message, code: error.code },
     {

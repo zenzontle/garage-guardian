@@ -51,7 +51,7 @@ export function reportStore(config: ReportConfig) {
           throw new ReportError(
             503,
             'LIMITER_UNAVAILABLE',
-            'Bug reporting is temporarily unavailable. Try again later.',
+            'Feedback is temporarily unavailable. Try again later.',
           );
         await result.pending;
         return result;
@@ -60,7 +60,7 @@ export function reportStore(config: ReportConfig) {
       throw new ReportError(
         503,
         'LIMITER_UNAVAILABLE',
-        'Bug reporting is temporarily unavailable. Try again later.',
+        'Feedback is temporarily unavailable. Try again later.',
       );
     });
     const denied = results.filter((result) => !result.success);

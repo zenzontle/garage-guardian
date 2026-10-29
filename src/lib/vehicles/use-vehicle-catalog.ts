@@ -7,7 +7,7 @@ import {
   type CatalogEntry,
   type VehicleCatalogReader,
 } from './vehicle-catalog';
-import { recordDiagnostic } from '../bug-reports/diagnostics';
+import { recordDiagnostic } from '../feedback/diagnostics';
 
 type ListState = { entries: CatalogEntry[]; loading: boolean; failed: boolean };
 const empty: ListState = { entries: [], loading: false, failed: false };

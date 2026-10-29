@@ -38,13 +38,13 @@ Shipped migrations are never edited; schema changes go in a new numbered file.
 
 ## Environment variables
 
-`.env.example` lists every deployment variable; Vercel supplies its system variables (`VERCEL_ENV`, `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_GIT_COMMIT_SHA`) automatically, and the bug-report smoke test reads its own private tokens (see [bug reporting](bug-reporting.md#preview-smoke-test-and-rollout)). All deployment variables except the two `NEXT_PUBLIC_SUPABASE_*` values are server-only.
+`.env.example` lists every deployment variable; Vercel supplies its system variables (`VERCEL_ENV`, `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_GIT_COMMIT_SHA`) automatically, and the feedback smoke test reads its own private tokens (see [feedback](feedback.md#preview-smoke-test-and-rollout)). All deployment variables except the two `NEXT_PUBLIC_SUPABASE_*` values are server-only.
 
 | Variables                                                                                   | Used by                                              |
 | ------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                          | Accounts and cloud sync                              |
 | `SUPABASE_SECRET_KEY`, `REMINDERS_ENABLED`, `BREVO_*`, `CRON_SECRET`, `REMINDER_APP_ORIGIN` | [Account reminders](account-reminders.md#deployment) |
-| `BUG_REPORTS_ENABLED`, `BUG_REPORT_*`, `UPSTASH_REDIS_REST_*`                               | [Bug reporting](bug-reporting.md#deployment-setup)   |
+| `FEEDBACK_ENABLED`, `FEEDBACK_*`, `UPSTASH_REDIS_REST_*`                                    | [Feedback](feedback.md#deployment-setup)             |
 
 ## Guest data and signup
 

@@ -2,22 +2,17 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Bug, X } from 'lucide-react';
+import { MessageSquareText, X } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { reportPath } from '@/lib/navigation/garage-routes';
 import en from '../../../messages/en.json';
-import { LocaleSelector } from '../i18n/locale-selector';
 import { useFormInteraction } from '../interaction/use-form-interaction';
 import { isTopDialog, useDialogFocus } from '../interaction/dialog-focus';
-import { BugReportFields } from './bug-report-fields';
-import { BugReportPreview } from './bug-report-preview';
-import { BugReportScreenshots, type Screenshot } from './bug-report-screenshots';
+import { FeedbackFields } from './feedback-fields';
+import { FeedbackPreview } from './feedback-preview';
+import { FeedbackScreenshots, type Screenshot } from './feedback-screenshots';
 import { supabase } from '@/lib/garage/repository';
-import {
-  clearDiagnostics,
-  recentDiagnostics,
-  startDiagnostics,
-} from '@/lib/bug-reports/diagnostics';
+import { clearDiagnostics, recentDiagnostics, startDiagnostics } from '@/lib/feedback/diagnostics';
 import {
   IMAGE_TYPES,
   REPORT_LIMITS,
@@ -25,12 +20,12 @@ import {
   isRepositoryIssueUrl,
   publicMetadataSchema,
   reportSchema,
-  type BugReport,
+  type FeedbackReport,
   type PublicMetadata,
   type ReportContext,
-} from '@/lib/bug-reports/shared';
+} from '@/lib/feedback/shared';
 
-type ReporterErrorCode = keyof typeof en.bugReports.errors;
+type ReporterErrorCode = keyof typeof en.feedback.errors;
 type ReporterProblem = { code: ReporterErrorCode; retryAfter?: number };
 class ReporterFailure extends Error {
   constructor(
@@ -41,7 +36,7 @@ class ReporterFailure extends Error {
   }
 }
 function isReporterErrorCode(value: unknown): value is ReporterErrorCode {
-  return typeof value === 'string' && Object.hasOwn(en.bugReports.errors, value);
+  return typeof value === 'string' && Object.hasOwn(en.feedback.errors, value);
 }
 
 async function authenticatedFetch(url: string, init: RequestInit = {}) {
@@ -71,7 +66,7 @@ function trapFocus(event: KeyboardEvent, root: Element | null) {
     first.focus();
   }
 }
-export function BugReporter({
+export function FeedbackReporter({
   userId,
   screen,
   dialog: appDialog,
@@ -80,21 +75,20 @@ export function BugReporter({
   screen: ReportContext['screen'];
   dialog: ReportContext['dialog'];
 }) {
-  const t = useTranslations('bugReports');
+  const t = useTranslations('feedback');
   const shared = useTranslations('interactions');
   const locale = useLocale();
   const [metadata, setMetadata] = useState<PublicMetadata | null>(null);
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const filesRef = useRef<Screenshot[]>([]);
-  const [draft, setDraft] = useState<BugReport | null>(null);
+  const [draft, setDraft] = useState<FeedbackReport | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
-  const [status, setStatus] = useState<keyof typeof en.bugReports.statuses | null>(null);
+  const [status, setStatus] = useState<keyof typeof en.feedback.statuses | null>(null);
   const [error, setError] = useState<ReporterProblem | null>(null);
   const [issueUrl, setIssueUrl] = useState('');
   const [launcherTarget, setLauncherTarget] = useState<Element | null>(null);
@@ -104,7 +98,7 @@ export function BugReporter({
   useEffect(() => {
     if (!userId || !supabase) return;
     let active = true;
-    void authenticatedFetch('/api/bug-reports/config')
+    void authenticatedFetch('/api/feedback/config')
       .then(async (response) => {
         if (!response.ok) return;
         const result = await response.json();
@@ -124,7 +118,7 @@ export function BugReporter({
   }, [metadata, userId]);
   useEffect(() => {
     setLauncherTarget(
-      appDialog === 'none' ? null : document.querySelector('.modal:not(.bug-report-modal)'),
+      appDialog === 'none' ? null : document.querySelector('.modal:not(.feedback-modal)'),
     );
   }, [appDialog, metadata]);
   useEffect(() => {
@@ -136,10 +130,14 @@ export function BugReporter({
     },
     [],
   );
-  useDialogFocus(dialogRef, open, 'input:not(:disabled)', '.bug-report-launcher');
+  useDialogFocus(
+    dialogRef,
+    open,
+    'textarea:not(:disabled), input:not(:disabled)',
+    '.feedback-launcher',
+  );
   const interaction = useFormInteraction(
     {
-      title,
       description,
       screenshots: screenshots.map(({ file }) => ({
         name: file.name,
@@ -155,10 +153,9 @@ export function BugReporter({
     interaction.request(() => setOpen(false));
   };
   function reset() {
-    interaction.accept({ title: '', description: '', screenshots: [] });
+    interaction.accept({ description: '', screenshots: [] });
     screenshots.forEach((item) => URL.revokeObjectURL(item.url));
     setScreenshots([]);
-    setTitle('');
     setDescription('');
     setDraft(null);
     setAcknowledged(false);
@@ -200,7 +197,6 @@ export function BugReporter({
   function review() {
     const candidate = reportSchema.safeParse({
       submissionId: crypto.randomUUID(),
-      title,
       description,
       acknowledged: true,
       metadata,
@@ -247,7 +243,7 @@ export function BugReporter({
       // Once a transport failure is possible, check the receipt before reposting.
       setSent(true);
       const response = await authenticatedFetch(
-        checking ? `/api/bug-reports/${draft.submissionId}` : '/api/bug-reports',
+        checking ? `/api/feedback/${draft.submissionId}` : '/api/feedback',
         checking ? {} : { method: 'POST', body: data },
       );
       const result = await response.json();
@@ -271,7 +267,7 @@ export function BugReporter({
           setSent(false);
         if (!checking && result.code === 'PREVIEW_CHANGED') {
           setSent(false);
-          const fresh = await authenticatedFetch('/api/bug-reports/config');
+          const fresh = await authenticatedFetch('/api/feedback/config');
           const configuration = await fresh.json();
           const parsed = publicMetadataSchema.safeParse(configuration.metadata);
           if (fresh.ok && configuration.enabled === true && parsed.success) {
@@ -321,15 +317,16 @@ export function BugReporter({
   // Portal events follow React ownership, so bridge the underlying modal's Tab trap.
   const launcher = (
     <button
-      className="button secondary bug-report-launcher"
+      className="icon-button feedback-launcher"
+      aria-label={t('launch')}
+      data-tooltip={t('launch')}
       onKeyDown={(event) => trapFocus(event, launcherTarget)}
       onClick={() => {
         if (issueUrl) reset();
         setOpen(true);
       }}
     >
-      <Bug size={16} />
-      {t('launch')}
+      <MessageSquareText size={20} />
     </button>
   );
   return (
@@ -339,7 +336,7 @@ export function BugReporter({
         createPortal(
           <div
             ref={portalRef}
-            className="modal-backdrop bug-report-backdrop"
+            className="modal-backdrop feedback-backdrop"
             onKeyDown={keyboard}
             onMouseDown={(event) => {
               if (event.target === event.currentTarget && isTopDialog(dialogRef.current)) close();
@@ -348,18 +345,17 @@ export function BugReporter({
             <div
               ref={dialogRef}
               tabIndex={-1}
-              className="modal bug-report-modal"
+              className="modal feedback-modal"
               role="dialog"
               aria-modal="true"
               aria-busy={busy}
-              aria-labelledby="bug-report-title"
+              aria-labelledby="feedback-title"
             >
               <div className="modal-header">
                 <div>
-                  <h2 id="bug-report-title">{draft ? t('reviewTitle') : t('launch')}</h2>
+                  <h2 id="feedback-title">{draft ? t('reviewTitle') : t('launch')}</h2>
                   <p>{t('repository', { repository: metadata.repository })}</p>
                 </div>
-                {screen !== 'loading' && <LocaleSelector />}
                 <button
                   className="icon-button"
                   aria-label={t('close')}
@@ -373,15 +369,13 @@ export function BugReporter({
                 <fieldset className="interaction-fields" disabled={busy}>
                   <p className="info-callout">{t('publicWarning')}</p>
                   {!draft ? (
-                    <BugReportFields
-                      title={title}
+                    <FeedbackFields
                       description={description}
-                      onTitleChange={setTitle}
                       onDescriptionChange={setDescription}
                       onChooseFiles={chooseFiles}
                     />
                   ) : (
-                    <BugReportPreview
+                    <FeedbackPreview
                       draft={draft}
                       screenshotCount={screenshots.length}
                       disabled={sent || busy}
@@ -391,7 +385,7 @@ export function BugReporter({
                       }}
                     />
                   )}
-                  <BugReportScreenshots
+                  <FeedbackScreenshots
                     screenshots={screenshots}
                     sent={sent}
                     busy={busy}

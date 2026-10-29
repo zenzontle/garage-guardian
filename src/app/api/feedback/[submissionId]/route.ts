@@ -6,10 +6,10 @@ import {
   ReportError,
   reportConfig,
   reportingEnabled,
-} from '@/lib/bug-reports/server-config';
-import { reportStore } from '@/lib/bug-reports/store';
-import { githubAdapter } from '@/lib/bug-reports/github';
-import { receiptResponse, reconcileReceipt } from '@/lib/bug-reports/submission';
+} from '@/lib/feedback/server-config';
+import { reportStore } from '@/lib/feedback/store';
+import { githubAdapter } from '@/lib/feedback/github';
+import { receiptResponse, reconcileReceipt } from '@/lib/feedback/submission';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,10 +19,7 @@ export async function GET(
   context: { params: Promise<{ submissionId: string }> },
 ) {
   if (!reportingEnabled())
-    return Response.json(
-      { error: 'Bug reporting is disabled.', code: 'DISABLED' },
-      { status: 404 },
-    );
+    return Response.json({ error: 'Feedback is disabled.', code: 'DISABLED' }, { status: 404 });
   try {
     const id = z.uuid().safeParse((await context.params).submissionId);
     if (!id.success) throw new ReportError(422, 'INVALID_REPORT', 'Invalid submission reference.');

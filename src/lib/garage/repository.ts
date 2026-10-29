@@ -4,7 +4,7 @@ import { del, get, set, update } from 'idb-keyval';
 import { AppError } from '../utils/app-error';
 import { accountAuthStorageKey, serializeAccountSignIns } from '../account/account-session';
 import { bootstrapRecovery } from '../account/account-recovery';
-import { recordDiagnostic } from '../bug-reports/diagnostics';
+import { recordDiagnostic } from '../feedback/diagnostics';
 import {
   initializeCloudSchedules,
   initializeSchedule,

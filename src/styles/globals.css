@@ -1729,22 +1729,44 @@ textarea::placeholder {
   color: var(--accent);
   font-size: 0.875rem;
 }
-.bug-report-launcher {
+.feedback-launcher {
   position: fixed;
   right: 20px;
   bottom: 20px;
   z-index: 90;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
   box-shadow: var(--shadow);
-  min-height: 44px;
 }
-.bug-report-backdrop {
+.feedback-launcher::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.feedback-launcher:hover::after,
+.feedback-launcher:focus-visible::after {
+  opacity: 1;
+}
+.feedback-backdrop {
   z-index: 100;
 }
-.bug-report-modal {
+.feedback-modal {
   max-width: 760px;
 }
-.bug-report-preview,
-.bug-report-diagnostic pre {
+.feedback-preview,
+.feedback-diagnostic pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-size: 0.875rem;
@@ -1754,66 +1776,66 @@ textarea::placeholder {
   border-radius: 8px;
   padding: 12px;
 }
-.bug-report-preview {
+.feedback-preview {
   max-height: 320px;
   overflow: auto;
 }
-.bug-report-diagnostics {
+.feedback-diagnostics {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
   min-width: 0;
 }
-.bug-report-diagnostics legend {
+.feedback-diagnostics legend {
   font-size: 0.875rem;
   font-weight: 700;
 }
-.bug-report-diagnostic {
+.feedback-diagnostic {
   margin: 12px 0;
 }
-.bug-report-screenshots {
+.feedback-screenshots {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
-.bug-report-screenshots figure {
+.feedback-screenshots figure {
   margin: 0;
   min-width: 0;
 }
-.bug-report-screenshots img {
+.feedback-screenshots img {
   width: 100%;
   max-height: 220px;
   object-fit: contain;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
-.bug-report-screenshots figcaption {
+.feedback-screenshots figcaption {
   display: grid;
   gap: 8px;
   font-size: 0.875rem;
 }
-.bug-report-modal summary {
+.feedback-modal summary {
   cursor: pointer;
   min-height: 44px;
   display: flex;
   align-items: center;
 }
-.bug-report-modal .checkbox-line {
+.feedback-modal .checkbox-line {
   align-items: flex-start;
 }
-.bug-report-modal .info-callout {
+.feedback-modal .info-callout {
   margin: 0;
 }
-.bug-report-modal h3 {
+.feedback-modal h3 {
   overflow-wrap: anywhere;
   margin: 0;
 }
 @media (max-width: 720px) {
-  .bug-report-launcher {
+  .feedback-launcher {
     bottom: calc(78px + env(safe-area-inset-bottom));
     right: 16px;
   }
-  .bug-report-screenshots {
+  .feedback-screenshots {
     grid-template-columns: 1fr;
   }
 }

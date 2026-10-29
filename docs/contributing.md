@@ -4,23 +4,23 @@
 
 Files are grouped by responsibility. Components and library modules use feature folders, with tests beside the files they cover and shared test support in `src/test`.
 
-| Folder              | Contents                                                                                                                                                          |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/app`           | Next.js route pages, layouts, API handlers, and app icon                                                                                                          |
-| `src/components`    | Feature folders for account, bug reports, dashboard, garage shell, history, localization, interactions, maintenance, notifications, reports, vehicles, and visits |
-| `src/components/ui` | Shared controls, dialogs, input helpers, and feedback components                                                                                                  |
-| `src/lib`           | Feature folders for account, bug reports, garage data, maintenance, navigation, notifications, reminders, reports, and vehicle catalog logic                      |
-| `src/lib/utils`     | Shared error, date, and photo preparation helpers                                                                                                                 |
-| `src/i18n`          | Locale configuration, context, and display formatting                                                                                                             |
-| `src/styles`        | Global, localization, and usability styles                                                                                                                        |
-| `src/test`          | Shared fixtures, fake services, routing helpers, and test setup                                                                                                   |
-| `messages`          | English and Spanish translation dictionaries                                                                                                                      |
-| `public`            | Public static assets                                                                                                                                              |
-| `scripts`           | Maintenance and smoke-test scripts with their tests                                                                                                               |
-| `supabase`          | Database migrations, seeds, and SQL verification scripts                                                                                                          |
-| `docs`              | Setup, feature, and contributor guides                                                                                                                            |
+| Folder              | Contents                                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app`           | Next.js route pages, layouts, API handlers, and app icon                                                                                                       |
+| `src/components`    | Feature folders for account, feedback, dashboard, garage shell, history, localization, interactions, maintenance, notifications, reports, vehicles, and visits |
+| `src/components/ui` | Shared controls, dialogs, input helpers, and feedback components                                                                                               |
+| `src/lib`           | Feature folders for account, feedback, garage data, maintenance, navigation, notifications, reminders, reports, and vehicle catalog logic                      |
+| `src/lib/utils`     | Shared error, date, and photo preparation helpers                                                                                                              |
+| `src/i18n`          | Locale configuration, context, and display formatting                                                                                                          |
+| `src/styles`        | Global, localization, and usability styles                                                                                                                     |
+| `src/test`          | Shared fixtures, fake services, routing helpers, and test setup                                                                                                |
+| `messages`          | English and Spanish translation dictionaries                                                                                                                   |
+| `public`            | Public static assets                                                                                                                                           |
+| `scripts`           | Maintenance and smoke-test scripts with their tests                                                                                                            |
+| `supabase`          | Database migrations, seeds, and SQL verification scripts                                                                                                       |
+| `docs`              | Setup, feature, and contributor guides                                                                                                                         |
 
-Each UI component has its own kebab-case file within its feature folder. `GarageApp` supplies persistent locale and garage providers through the shared route layout. `GarageProvider` owns the session and transient UI state, `GarageContent` renders the shell and dialogs, and route screen components connect page components to shared data and actions. Pages, account forms, car/task/visit dialogs, navigation controls, and bug-report sections import shared UI components directly from their files. The locale provider and selector in `src/components/i18n` share `src/i18n/locale-context.ts`; date and photo preparation helpers live in `src/lib/utils`.
+Each UI component has its own kebab-case file within its feature folder. `GarageApp` supplies persistent locale and garage providers through the shared route layout. `GarageProvider` owns the session and transient UI state, `GarageContent` renders the shell and dialogs, and route screen components connect page components to shared data and actions. Pages, account forms, car/task/visit dialogs, navigation controls, and feedback sections import shared UI components directly from their files. The locale provider and selector in `src/components/i18n` share `src/i18n/locale-context.ts`; date and photo preparation helpers live in `src/lib/utils`.
 
 User-facing text belongs in the translation dictionaries; see [languages](languages.md#translations).
 

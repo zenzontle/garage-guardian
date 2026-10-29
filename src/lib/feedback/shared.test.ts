@@ -5,6 +5,7 @@ import {
   fitsIssueBody,
   formatIssue,
   isRepositoryIssueUrl,
+  feedbackTitle,
   issueTitle,
   redact,
   reportSchema,
@@ -274,7 +275,12 @@ describe('public report diagnostics', () => {
     draft.description = '```\n<img src="https://evil.test">\n![x](https://evil.test) @someone\n```';
     const issue = formatIssue(draft);
     expect(issue).toContain('````text\n```');
-    expect(issueTitle('@someone bug')).not.toContain('@someone');
+    expect(issueTitle('@someone found a <b>bug</b>')).toBe('[Feedback] @​someone found a bbug/b');
+    expect(feedbackTitle('  Date resets\n\nWhen I save a visit')).toBe('Date resets');
+    expect(feedbackTitle('Hi\nthe date resets')).toBe('Hi the date resets');
+    expect(feedbackTitle('a\n\n\n\n\n\n\n\nb')).toBe('a b');
+    expect(feedbackTitle('x'.repeat(200))).toBe(`${'x'.repeat(79)}…`);
+    expect(feedbackTitle(`${'x'.repeat(78)}🚗🚗🚗`)).toBe(`${'x'.repeat(78)}🚗…`);
     expect(reportSchema.safeParse({ ...report(), userId: 'spoofed' }).success).toBe(false);
     expect(
       reportSchema.safeParse({ ...report(), description: 'invalid\u0000description' }).success,
