@@ -2,7 +2,7 @@
 
 ## Choosing a language
 
-Use the **English / Español** selector in the header, account screens, or open dialogs. The first render is English on both server and client. After mounting, the app uses a valid saved choice, otherwise the first supported browser language (including regional variants such as `es-MX`), with English fallback. Explicit choices are stored under `garage-guardian:locale` in local storage, independently of accounts and garage data, and survive reload, sign-in, and sign-out. If storage is unavailable, switching still works for the current session. The document's `lang` follows the resolved language. Switching updates provider values without remounting forms or restarting transfers.
+Use the **English / Español** selector in the header, account screens, or open dialogs. The **Send feedback** dialog has no selector; choose the language before opening it. The first render is English on both server and client. After mounting, the app uses a valid saved choice, otherwise the first supported browser language (including regional variants such as `es-MX`), with English fallback. Explicit choices are stored under `garage-guardian:locale` in local storage, independently of accounts and garage data, and survive reload, sign-in, and sign-out. If storage is unavailable, switching still works for the current session. The document's `lang` follows the resolved language. Switching updates provider values without remounting forms or restarting transfers.
 
 ## What is and isn't translated
 

@@ -14,7 +14,7 @@ describe('isolated GitHub adapter', () => {
         .mockResolvedValueOnce(Response.json({ html_url: url, body: 'report' }))
         .mockResolvedValueOnce(
           Response.json([
-            { html_url: url, body: '\n\n<!-- garage-bug-report:reporter-test:abc -->' },
+            { html_url: url, body: '\n\n<!-- garage-feedback:reporter-test:abc -->' },
           ]),
         ),
     );
@@ -83,7 +83,7 @@ describe('isolated GitHub adapter', () => {
       Response.json([
         {
           html_url: 'https://github.com/zenzontle/garage-guardian/issues/2',
-          body: '\n\n<!-- garage-bug-report:reporter-test:abc -->',
+          body: '\n\n<!-- garage-feedback:reporter-test:abc -->',
         },
       ]),
     );
@@ -100,11 +100,11 @@ describe('isolated GitHub adapter', () => {
         Response.json([
           {
             html_url: 'https://github.com/zenzontle/garage-guardian/issues/2',
-            body: '<!-- garage-bug-report:reporter-one:abc -->\n\nother text',
+            body: '<!-- garage-feedback:reporter-one:abc -->\n\nother text',
           },
           {
             html_url: 'https://github.com/zenzontle/garage-guardian/issues/3',
-            body: '\n\n<!-- garage-bug-report:reporter-two:abc -->',
+            body: '\n\n<!-- garage-feedback:reporter-two:abc -->',
           },
         ]),
       ),

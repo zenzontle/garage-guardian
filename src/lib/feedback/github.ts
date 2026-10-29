@@ -100,7 +100,7 @@ export function githubAdapter(config: ReportConfig) {
         );
         const issues = z.array(issueSchema).parse(await response.json());
         const found = issues.find((issue) =>
-          issue.body?.endsWith(`\n\n<!-- garage-bug-report:${reporterId}:${submissionId} -->`),
+          issue.body?.endsWith(`\n\n<!-- garage-feedback:${reporterId}:${submissionId} -->`),
         );
         if (found) return issueUrl(found.html_url);
         if (issues.length < 100) break;

@@ -1,37 +1,37 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { formatIssue, issueTitle, type BugReport } from '@/lib/bug-reports/shared';
+import { formatIssue, issueTitle, type FeedbackReport } from '@/lib/feedback/shared';
 
-export function BugReportPreview({
+export function FeedbackPreview({
   draft,
   screenshotCount,
   disabled,
   onDraftChange,
 }: {
-  draft: BugReport;
+  draft: FeedbackReport;
   screenshotCount: number;
   disabled: boolean;
-  onDraftChange: (draft: BugReport) => void;
+  onDraftChange: (draft: FeedbackReport) => void;
 }) {
-  const t = useTranslations('bugReports');
+  const t = useTranslations('feedback');
   return (
     <>
-      <h3>{issueTitle(draft.title)}</h3>
+      <h3>{issueTitle(draft.description)}</h3>
       <details open>
         <summary>{t('completePreview')}</summary>
-        <pre className="bug-report-preview">
+        <pre className="feedback-preview">
           {formatIssue(
             draft,
             Array.from({ length: screenshotCount }, () => ''),
           )}
         </pre>
       </details>
-      <fieldset className="bug-report-diagnostics" disabled={disabled}>
+      <fieldset className="feedback-diagnostics" disabled={disabled}>
         <legend>{t('diagnostics')}</legend>
         <p className="field-help">{t('redactionHelp')}</p>
         {draft.diagnostics.map((entry, index) => (
-          <div className="bug-report-diagnostic" key={`${entry.timestamp}-${index}`}>
+          <div className="feedback-diagnostic" key={`${entry.timestamp}-${index}`}>
             <pre>
               {entry.message}
               {entry.stack ? `\n${entry.stack}` : ''}

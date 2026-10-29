@@ -1,4 +1,4 @@
-import type { BugReport, PublicMetadata } from './shared';
+import type { FeedbackReport, PublicMetadata } from './shared';
 import type { ReportConfig } from './server-config';
 import type { Receipt, ReportStore } from './store';
 
@@ -9,10 +9,9 @@ export const metadata: PublicMetadata = {
   reporterId: `reporter-${'a'.repeat(24)}`,
   browserOS: 'Test browser / OS',
 };
-export function report(): BugReport {
+export function report(): FeedbackReport {
   return {
     submissionId: 'b3a37ad0-6f5a-4ca8-96e1-499b169767df',
-    title: 'Broken car dialog',
     description: 'Steps: open dialog. Expected: readable. Actual: clipped.',
     acknowledged: true,
     metadata,
@@ -27,7 +26,7 @@ export function report(): BugReport {
     diagnostics: [],
   };
 }
-export function oversizedReport(): BugReport {
+export function oversizedReport(): FeedbackReport {
   return {
     ...report(),
     description: 'd'.repeat(5000),

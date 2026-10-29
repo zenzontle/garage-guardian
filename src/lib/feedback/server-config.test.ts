@@ -17,11 +17,11 @@ beforeEach(() => {
 });
 describe('configuration and verified identity', () => {
   it('defaults to disabled and rejects enabled but incomplete configuration', () => {
-    vi.stubEnv('BUG_REPORTS_ENABLED', '');
+    vi.stubEnv('FEEDBACK_ENABLED', '');
     expect(reportingEnabled()).toBe(false);
-    vi.stubEnv('BUG_REPORTS_ENABLED', 'true');
+    vi.stubEnv('FEEDBACK_ENABLED', 'true');
     expect(reportingEnabled()).toBe(true);
-    vi.stubEnv('BUG_REPORT_HMAC_SECRET', '');
+    vi.stubEnv('FEEDBACK_HMAC_SECRET', '');
     expect(reportConfig).toThrow('unavailable');
   });
   it('requires a server-verified nonanonymous Supabase account', async () => {

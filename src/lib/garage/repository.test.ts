@@ -465,7 +465,7 @@ it.each(['local', 'cloud'] as const)(
   async (mode) => {
     const { LocalRepository, SupabaseRepository } = await import('./repository');
     const { startDiagnostics, recentDiagnostics, clearDiagnostics } =
-      await import('../bug-reports/diagnostics');
+      await import('../feedback/diagnostics');
     const cloud = fakeSupabase();
     cloud.emit(account());
     const repository =

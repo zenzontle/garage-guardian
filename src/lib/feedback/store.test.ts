@@ -217,7 +217,7 @@ describe('shared rate limits', () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({
       code: 'LIMITER_UNAVAILABLE',
-      error: 'Bug reporting is temporarily unavailable. Try again later.',
+      error: 'Feedback is temporarily unavailable. Try again later.',
     });
   });
   it('claims atomically and isolates receipts by verified user', async () => {

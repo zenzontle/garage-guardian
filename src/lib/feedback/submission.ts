@@ -8,7 +8,7 @@ import {
   formatIssue,
   issueTitle,
   reportSchema,
-  type BugReport,
+  type FeedbackReport,
   type PublicMetadata,
 } from './shared';
 import { ReportError } from './server-config';
@@ -54,7 +54,7 @@ export async function readReport(request: Request, metadata: PublicMetadata) {
     typeof form.get('report') !== 'string'
   )
     throw new ReportError(422, 'INVALID_REPORT', 'Unexpected report fields.');
-  let report: BugReport;
+  let report: FeedbackReport;
   try {
     report = reportSchema.parse(JSON.parse(form.get('report') as string));
   } catch {
@@ -196,7 +196,7 @@ export async function replayReport(
   store: ReportStore,
   github: GitHubAdapter,
   userId: string,
-  report: BugReport,
+  report: FeedbackReport,
   hash: string,
 ): Promise<Response | null> {
   const receipt = await beforeReceiptWrite(store.get(userId, report.submissionId));
@@ -271,7 +271,7 @@ export async function submitReport(
     await store.save(userId, id, receipt);
     try {
       const issueUrl = await github.create(
-        issueTitle(report.title),
+        issueTitle(report.description),
         formatIssue(report, receipt.assets),
       );
       receipt = { ...receipt, state: 'succeeded', issueUrl };

@@ -7,12 +7,12 @@ import {
   validatedReturnTo,
   workspaceScreen,
 } from './garage-routes';
-import { contextSchema } from '../bug-reports/shared';
-import { report } from '../bug-reports/fixtures.test-helper';
+import { contextSchema } from '../feedback/shared';
+import { report } from '../feedback/fixtures.test-helper';
 
 describe('garage URLs', () => {
   it.each(['notifications', 'account', 'security'] as const)(
-    'classifies %s settings consistently for navigation and bug reports',
+    'classifies %s settings consistently for navigation and feedback',
     (section) => {
       const pathname = `/settings/${section}`;
       expect(workspaceScreen(pathname)).toBe(section);

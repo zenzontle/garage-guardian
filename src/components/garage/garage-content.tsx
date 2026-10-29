@@ -10,7 +10,7 @@ import { makeStarterSchedules } from '@/lib/garage/model';
 import { reportingCents } from '@/lib/currency/currency';
 import { accountMode, accountPath, carPath, workspaceScreen } from '@/lib/navigation/garage-routes';
 import { useGarage } from './garage-provider';
-import { BugReporter } from '../bug-reports/bug-reporter';
+import { FeedbackReporter } from '../feedback/feedback-reporter';
 import { LocaleSelector } from '../i18n/locale-selector';
 import { CarModal } from '../vehicles/car-modal';
 import { ScheduleModal } from '../maintenance/schedule-modal';
@@ -59,7 +59,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
     (visit) => reportingCents(visit, garage.homeCurrency) === null,
   ).length;
   const reporter = (
-    <BugReporter
+    <FeedbackReporter
       key={user?.id ?? 'guest'}
       userId={user?.id}
       screen={loading ? 'loading' : !repository ? 'recovery' : page}

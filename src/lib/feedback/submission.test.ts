@@ -20,7 +20,7 @@ function request(value: unknown = report(), files: File[] = []) {
   const form = new FormData();
   form.append('report', JSON.stringify(value));
   files.forEach((file) => form.append('screenshots', file));
-  return new Request('http://localhost/api/bug-reports', { method: 'POST', body: form });
+  return new Request('http://localhost/api/feedback', { method: 'POST', body: form });
 }
 function adapter() {
   return {
@@ -69,7 +69,8 @@ describe('submission validation', () => {
   });
   it('validates strict metadata, lengths, acknowledgment and diagnostics', async () => {
     for (const value of [
-      { ...report(), title: 'tiny' },
+      { ...report(), description: 'too short' },
+      { ...report(), title: 'Unexpected title' },
       { ...report(), description: 'x'.repeat(5001) },
       { ...report(), acknowledged: false },
       { ...report(), extra: true },
@@ -88,14 +89,11 @@ describe('submission validation', () => {
       await expect(readReport(request(value), metadata)).rejects.toHaveProperty('status');
     }
     await expect(readReport(request(), metadata)).resolves.toHaveProperty(
-      'report.title',
-      'Broken car dialog',
+      'report.description',
+      report().description,
     );
     await expect(
-      readReport(
-        request({ ...report(), title: 'x'.repeat(120), description: 'x'.repeat(5000) }),
-        metadata,
-      ),
+      readReport(request({ ...report(), description: 'x'.repeat(5000) }), metadata),
     ).resolves.toBeDefined();
   });
   it('caps streamed bodies without relying on Content-Length', async () => {

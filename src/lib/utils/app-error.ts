@@ -1,5 +1,5 @@
 import en from '../../../messages/en.json';
-import { recordDiagnostic } from '../bug-reports/diagnostics';
+import { recordDiagnostic } from '../feedback/diagnostics';
 
 export type ErrorCode = keyof typeof en.errors;
 export type AppFailure = { code: ErrorCode; values?: Record<string, string | number> };

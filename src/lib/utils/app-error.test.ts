@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { AppError, failureOf } from './app-error';
-import { recentDiagnostics, startDiagnostics } from '../bug-reports/diagnostics';
+import { recentDiagnostics, startDiagnostics } from '../feedback/diagnostics';
 
 it('keeps app error codes and interpolation values independent of presentation', () => {
   expect(failureOf(new AppError('photoMissing', { name: 'receipt.webp' }))).toEqual({

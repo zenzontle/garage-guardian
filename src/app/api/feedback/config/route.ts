@@ -4,8 +4,8 @@ import {
   publicMetadata,
   reportConfig,
   reportingEnabled,
-} from '@/lib/bug-reports/server-config';
-import { reportStore } from '@/lib/bug-reports/store';
+} from '@/lib/feedback/server-config';
+import { reportStore } from '@/lib/feedback/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
