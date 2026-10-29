@@ -1,6 +1,6 @@
 # Password recovery and account settings
 
-For [ZEN-10](https://linear.app/zenzontle/issue/ZEN-10/account-recovery-and-management), email/password accounts support recovery and confirmation resend. The avatar menu opens `/settings/account` to show the current email and `/settings/security` to change the email or password. Signed-out users can sign in and return to either page. An Account dialog beside Sign out remains available after cloud-load failures. All app copy is available in English and Spanish. Prototype mode still works without Supabase.
+Email/password accounts support recovery and confirmation resend. The avatar menu opens `/settings/account` to show the current email and `/settings/security` to change the email or password. Signed-out users can sign in and return to either page. An Account dialog beside Sign out remains available after cloud-load failures. All app copy is available in English and Spanish. Prototype mode still works without Supabase.
 
 ## Release setup
 
