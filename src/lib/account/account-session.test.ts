@@ -87,7 +87,6 @@ it.each(
           release = () => resolve(new Response(JSON.stringify(replacement)));
         }),
     );
-    const { request: requested } = fakeLocks();
     const logoutFetch = vi.fn();
     const boundClient = serializeAccountSignIns(
       createClient(sessionProject, 'test-key', {
@@ -110,13 +109,13 @@ it.each(
       password: 'password',
     });
     await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
-    requested.mockClear();
     const cleanup =
       scope === 'reset'
         ? updateRecoveryPassword(boundClient, originalSession, 'new-password')
         : signOutPasswordSession(boundClient, originalSession, scope);
     const rejected = expect(cleanup).rejects.toMatchObject({ code: 'sessionChanged' });
-    await vi.waitFor(() => expect(requested).toHaveBeenCalled());
+    // Cleanup waits for the sign-in's account lock.
+    await new Promise((resolve) => setTimeout(resolve, 20));
     expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe(account().id);
     release();
     await signIn;

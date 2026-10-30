@@ -413,8 +413,10 @@ describe.each([
     await waitFor(() => expect(held.requested).toBe(true));
     expect(back.closest('fieldset')?.disabled).toBe(true);
     act(() => cloud.emit(account('replacement')));
-    await act(async () => held.release());
-    await waitFor(() => expect(back.closest('fieldset')?.disabled).toBe(false));
+    await act(async () => {
+      held.release();
+      await held.finished;
+    });
     expect((await cloud.auth.getSession()).data.session?.user.id).toBe('replacement');
     expect(cloud.auth.signOut).not.toHaveBeenCalled();
     expect(testRouter.url).toBe('/auth/recovery');

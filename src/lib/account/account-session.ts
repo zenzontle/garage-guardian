@@ -16,16 +16,19 @@ export const accountAuthOptions = (project: string) => ({
 // The SDK coordinates its own token refreshes without a lock. Every other write
 // to the shared session (initialization, sign-in, sign-out, password completion)
 // takes this app-owned lock so tabs cannot overwrite each other's accounts.
-const lockNames = new WeakMap<SupabaseClient['auth'], string>();
+// A global symbol, so a reloaded module never wraps the same client twice:
+// the lock is not reentrant, and nested wrappers would wait on themselves.
+const lockName = Symbol.for('garage-guardian.accountLock');
 
-type InitializingAuth = { _initialize?: () => Promise<unknown> };
+type AccountAuth = { [lockName]?: string; _initialize?: () => Promise<unknown> };
 
 export function serializeAccountSignIns(client: SupabaseClient, project: string) {
   const auth = client.auth;
-  const name = `garage-guardian:account:${accountAuthStorageKey(project)}`;
-  lockNames.set(auth, name);
+  const internal = auth as unknown as AccountAuth;
+  if (internal[lockName]) return client;
+  internal[lockName] = `garage-guardian:account:${accountAuthStorageKey(project)}`;
+  const name = internal[lockName];
   // Initialization can detect a callback session or clear an invalid one.
-  const internal = auth as unknown as InitializingAuth;
   const initialize = internal._initialize?.bind(auth);
   if (initialize) internal._initialize = () => withNamedLock(name, initialize);
   void auth.initialize().catch(() => {});
@@ -37,7 +40,7 @@ export function serializeAccountSignIns(client: SupabaseClient, project: string)
 }
 
 function accountLock(client: SupabaseClient, code: 'auth' | 'sessionRevocation') {
-  const name = lockNames.get(client.auth);
+  const name = (client.auth as unknown as AccountAuth)[lockName];
   if (!name) throw new AppError(code);
   return name;
 }
