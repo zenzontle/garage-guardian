@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getAllDue } from '@/lib/maintenance/due';
 import { normalizeCar, type ScheduleItem, type Visit, type Snapshot } from '@/lib/garage/model';
+import { fuelFromRow } from '@/lib/fuel/fuel-rows';
 import { initializeCloudSchedules } from '@/lib/maintenance/schedule-defaults';
 
 // Page every owner-scoped table: a user's history may exceed PostgREST's row limit.
@@ -22,10 +23,11 @@ async function rows(db: SupabaseClient, table: string, userId: string, activeOnl
 }
 
 export async function loadReminderItems(db: SupabaseClient, userId: string, today: string) {
-  const [cars, schedules, visits] = await Promise.all([
+  const [cars, schedules, visits, fuelEntries] = await Promise.all([
     rows(db, 'cars', userId, true),
     rows(db, 'schedule_items', userId),
     rows(db, 'visits', userId),
+    rows(db, 'fuel_entries', userId),
   ]);
   const snapshot: Snapshot = {
     cars: cars.map((row) =>
@@ -69,11 +71,16 @@ export async function loadReminderItems(db: SupabaseClient, userId: string, toda
       photos: [],
       createdAt: row.created_at,
     })),
+    fuelEntries: fuelEntries.map(fuelFromRow),
   };
   const initialized = await initializeCloudSchedules(db, userId, snapshot, today);
-  return getAllDue(initialized.cars, initialized.schedules, initialized.visits, today).filter(
-    (item) => item.status === 'due' || item.status === 'upcoming',
-  );
+  return getAllDue(
+    initialized.cars,
+    initialized.schedules,
+    initialized.visits,
+    today,
+    initialized.fuelEntries,
+  ).filter((item) => item.status === 'due' || item.status === 'upcoming');
 }
 
 // Recheck after preparing the digest, as a vehicle may have been archived or deleted meanwhile.

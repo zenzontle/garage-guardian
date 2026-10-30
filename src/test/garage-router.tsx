@@ -124,6 +124,7 @@ export async function loadGarageTestApp() {
     import('@/components/dashboard/dashboard-screen'),
     import('@/components/vehicles/cars-screen'),
     import('@/components/history/history-screen'),
+    import('@/components/fuel/fuel-screen'),
     import('@/components/reports/reports-screen'),
     import('@/components/account/account-screen'),
     import('@/components/account/account-recovery-screen'),

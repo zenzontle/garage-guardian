@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { Plus, X } from 'lucide-react';
 import { latestOdometer } from '@/lib/maintenance/due';
@@ -9,6 +9,7 @@ import {
   distanceUnitOrDefault,
   newId,
   type Car,
+  type FuelEntry,
   type ScheduleItem,
   type Visit,
   type VisitItem,
@@ -17,9 +18,9 @@ import {
 import { MoneyInput } from '../ui/money-input';
 import { failureOf, type AppFailure } from '@/lib/utils/app-error';
 import { Modal } from '../ui/modal';
+import { PhotoPicker, usePhotoAttachments } from '../ui/photo-attachments';
 import { useFormInteraction } from '../interaction/use-form-interaction';
 import { todayISO } from '@/lib/utils/today-iso';
-import { resizePhoto } from '@/lib/utils/resize-photo';
 import {
   CURRENCIES,
   currencyOrDefault,
@@ -37,6 +38,7 @@ export function VisitModal({
   carId,
   cars,
   visits,
+  fuelEntries = [],
   schedules,
   repository,
   onClose,
@@ -50,13 +52,13 @@ export function VisitModal({
   carId?: string;
   cars: Car[];
   visits: Visit[];
+  fuelEntries?: FuelEntry[];
   schedules: ScheduleItem[];
   repository: Repository;
   onClose: () => void;
   onSave: (visit: Visit, manualTargets?: Currency[]) => Promise<void>;
 }) {
   const t = useTranslations();
-  const photoInput = useRef<HTMLInputElement>(null);
   cars = [...cars].sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
   const initialCar = cars.find((car) => car.id === (item?.carId ?? carId ?? cars[0]?.id));
   const [selectedCarId, setSelectedCarId] = useState(item?.carId ?? carId ?? cars[0]?.id ?? '');
@@ -64,7 +66,7 @@ export function VisitModal({
   const [odometer, setOdometer] = useState(
     item
       ? String(item.odometer ?? '')
-      : String(initialCar ? latestOdometer(initialCar, visits) : ''),
+      : String(initialCar ? latestOdometer(initialCar, visits, fuelEntries) : ''),
   );
   const [totalCost, setTotalCost] = useState(item ? (item.totalCostCents / 100).toFixed(2) : '');
   const [currency, setCurrency] = useState<Currency>(
@@ -82,16 +84,10 @@ export function VisitModal({
       { id: newId(), key: newId(), name: '', scheduleItemId: null, costCents: null, costInput: '' },
     ],
   );
-  const [files, setFiles] = useState<File[]>([]);
-  const [retainedPhotos, setRetainedPhotos] = useState<Photo[]>(item?.photos ?? []);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<AppFailure | null>(null);
-  const [preparing, setPreparing] = useState(false);
-  const [progress, setProgress] = useState<{
-    phase: 'photos' | 'saving' | 'cleanup';
-    completed: number;
-  } | null>(null);
-  const preparation = useRef(false);
+  const attachments = usePhotoAttachments(item?.photos ?? [], setFormError);
+  const { preparing, preparation } = attachments;
   const interaction = useFormInteraction(
     {
       selectedCarId,
@@ -107,12 +103,7 @@ export function VisitModal({
         scheduleItemId,
         costInput,
       })),
-      files: files.map((file) => ({
-        name: file.name,
-        size: file.size,
-        modified: file.lastModified,
-      })),
-      photos: retainedPhotos.map((photo) => photo.id),
+      ...attachments.state,
     },
     { busy: busy || preparing },
   );
@@ -180,15 +171,10 @@ export function VisitModal({
     }
     if (preparation.current || !interaction.begin()) return;
     setBusy(true);
-    setProgress({ phase: files.length ? 'photos' : 'saving', completed: 0 });
     const uploaded: Photo[] = [];
     try {
       const visitId = item?.id ?? newId();
-      for (const file of files) {
-        uploaded.push(await repository.uploadPhoto(visitId, file));
-        setProgress({ phase: 'photos', completed: uploaded.length });
-      }
-      setProgress({ phase: 'saving', completed: files.length });
+      const photos = await attachments.upload(repository, visitId, uploaded);
       await onSave(
         normalizeVisit({
           id: visitId,
@@ -204,42 +190,19 @@ export function VisitModal({
           provider: provider.trim(),
           notes: notes.trim(),
           items: cleanItems,
-          photos: [...retainedPhotos, ...uploaded],
+          photos,
           createdAt: item?.createdAt ?? new Date().toISOString(),
         }),
         conversion.manualInput !== null ? [homeCurrency] : [],
       );
       interaction.accept();
     } catch (cause) {
-      setProgress({ phase: 'cleanup', completed: uploaded.length });
-      for (const photo of uploaded) await repository.removePhoto(photo).catch(() => undefined);
+      await attachments.cleanup(repository, uploaded);
       setFormError(failureOf(cause, 'save'));
     } finally {
       interaction.end();
       setBusy(false);
-      setProgress(null);
-    }
-  }
-  async function addFiles(list: FileList | null) {
-    if (!list || preparation.current || busy) return;
-    setFormError(null);
-    const incoming = Array.from(list);
-    if (files.length + retainedPhotos.length + incoming.length > 3) {
-      setFormError({ code: 'photoLimit' });
-      return;
-    }
-    if (!incoming.length) return;
-    preparation.current = true;
-    setPreparing(true);
-    try {
-      const processed = await Promise.all(incoming.map(resizePhoto));
-      setFiles((current) => [...current, ...processed]);
-    } catch (cause) {
-      setFormError(failureOf(cause, 'photoPrepare'));
-    } finally {
-      preparation.current = false;
-      setPreparing(false);
-      if (photoInput.current) photoInput.current.value = '';
+      attachments.finish();
     }
   }
   return (
@@ -260,7 +223,7 @@ export function VisitModal({
                   onChange={(e) => {
                     setSelectedCarId(e.target.value);
                     const car = cars.find((car) => car.id === e.target.value);
-                    setOdometer(car ? String(latestOdometer(car, visits)) : '');
+                    setOdometer(car ? String(latestOdometer(car, visits, fuelEntries)) : '');
                     setItems([
                       {
                         id: newId(),
@@ -459,82 +422,12 @@ export function VisitModal({
                 maxLength={2000}
               />
             </label>
-            <div className="photo-picker">
-              <label>
-                <span className="field-label">
-                  {t('shared.photos')} <span className="optional">{t('visit.photoLimit')}</span>
-                </span>
-                <input
-                  ref={photoInput}
-                  className="sr-only"
-                  tabIndex={-1}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={(e) => void addFiles(e.target.files)}
-                />
-              </label>
-              <button
-                type="button"
-                className="button secondary"
-                onClick={() => photoInput.current?.click()}
-              >
-                {t('visit.choosePhotos')}
-              </button>
-              {retainedPhotos.map((photo) => (
-                <span className="file-chip" key={photo.id}>
-                  {photo.name}
-                  <button
-                    type="button"
-                    aria-label={t('shared.removeNamed', { name: photo.name })}
-                    onClick={() =>
-                      setRetainedPhotos((current) =>
-                        current.filter((entry) => entry.id !== photo.id),
-                      )
-                    }
-                  >
-                    <X size={13} />
-                  </button>
-                </span>
-              ))}
-              {files.map((file, index) => (
-                <span className="file-chip" key={`${file.name}-${index}`}>
-                  {file.name}
-                  <button
-                    type="button"
-                    aria-label={t('shared.removeNamed', { name: file.name })}
-                    onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}
-                  >
-                    <X size={13} />
-                  </button>
-                </span>
-              ))}
-            </div>
-            {(preparing || progress) && (
-              <div className="upload-status" role="status" aria-live="polite">
-                <p>
-                  {preparing
-                    ? t('interactions.preparingPhotos')
-                    : progress?.phase === 'photos'
-                      ? t(cloud ? 'interactions.uploadingPhoto' : 'interactions.savingPhoto', {
-                          current: Math.min((progress?.completed ?? 0) + 1, files.length),
-                          total: files.length,
-                        })
-                      : t(
-                          progress?.phase === 'cleanup'
-                            ? 'interactions.cleaningPhotos'
-                            : 'interactions.savingVisit',
-                        )}
-                </p>
-                {progress?.phase === 'photos' && (
-                  <progress
-                    aria-label={t('interactions.photoProgress')}
-                    max={files.length}
-                    value={progress.completed}
-                  />
-                )}
-              </div>
-            )}
+            <PhotoPicker
+              attachments={attachments}
+              busy={busy}
+              cloud={cloud}
+              savingLabel={t('interactions.savingVisit')}
+            />
             {formError && (
               <p className="error-text" role="alert">
                 {t(`errors.${formError.code}`, formError.values)}

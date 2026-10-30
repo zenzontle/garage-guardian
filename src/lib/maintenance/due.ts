@@ -2,6 +2,7 @@ import {
   defaultReminderDistance,
   formatDistance,
   type Car,
+  type FuelEntry,
   type ScheduleItem,
   type Visit,
 } from '../garage/model';
@@ -32,10 +33,14 @@ function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
 }
 
-export function latestOdometer(car: Car, visits: Visit[]): number {
-  return visits
+// Fill-ups are usually the most frequent readings, so they count alongside service visits.
+export function latestOdometer(car: Car, visits: Visit[], fuelEntries: FuelEntry[] = []): number {
+  const fromVisits = visits
     .filter((visit) => visit.carId === car.id)
     .reduce((highest, visit) => Math.max(highest, visit.odometer ?? highest), car.odometer);
+  return fuelEntries
+    .filter((entry) => entry.carId === car.id)
+    .reduce((highest, entry) => Math.max(highest, entry.odometer), fromVisits);
 }
 
 export function getDueItem(
@@ -43,6 +48,7 @@ export function getDueItem(
   car: Car,
   visits: Visit[],
   today: string,
+  fuelEntries: FuelEntry[] = [],
 ): DueItem {
   const completed = visits
     .filter(
@@ -80,7 +86,8 @@ export function getDueItem(
         : null
     : schedule.firstDueMiles;
   const daysRemaining = dueDate ? daysBetween(today, dueDate) : null;
-  const milesRemaining = dueMiles !== null ? dueMiles - latestOdometer(car, visits) : null;
+  const milesRemaining =
+    dueMiles !== null ? dueMiles - latestOdometer(car, visits, fuelEntries) : null;
   let status: DueStatus = 'later';
   if (dueDate === null && dueMiles === null) status = 'setup';
   else if (
@@ -102,6 +109,7 @@ export function getAllDue(
   schedules: ScheduleItem[],
   visits: Visit[],
   today: string,
+  fuelEntries: FuelEntry[] = [],
 ): DueItem[] {
   const carMap = new Map(cars.filter((car) => !car.isArchived).map((car) => [car.id, car]));
   const rank: Record<DueStatus, number> = { due: 0, upcoming: 1, later: 2, setup: 3, completed: 4 };
@@ -109,7 +117,7 @@ export function getAllDue(
     .filter((item) => item.isActive)
     .flatMap((item) => {
       const car = carMap.get(item.carId);
-      return car ? [getDueItem(item, car, visits, today)] : [];
+      return car ? [getDueItem(item, car, visits, today, fuelEntries)] : [];
     })
     .sort(
       (a, b) => rank[a.status] - rank[b.status] || a.schedule.name.localeCompare(b.schedule.name),

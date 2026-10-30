@@ -17,7 +17,13 @@ export function GarageMobileNavigation({ page }: { page: Page }) {
           aria-current={page === id ? 'page' : undefined}
         >
           <Icon size={20} />
-          <span>{id === 'history' ? t('navigation.historyShort') : t(`navigation.${id}`)}</span>
+          <span>
+            {id === 'history'
+              ? t('navigation.historyShort')
+              : id === 'fuel'
+                ? t('navigation.fuelShort')
+                : t(`navigation.${id}`)}
+          </span>
         </Link>
       ))}
     </nav>

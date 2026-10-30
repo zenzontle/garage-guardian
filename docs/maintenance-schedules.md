@@ -4,7 +4,7 @@ The schedule is owner-entered. Starter tasks are names only; no interval is pres
 
 ## Repeat intervals and first due points
 
-Repeat intervals alone are enough. With no first due point, a distance interval uses the next multiple of that interval at or above the latest recorded odometer (for example, 69,000 miles with a 5,000-mile interval is first due at 70,000 miles; a zero odometer starts at 5,000). A time interval starts when the task is saved. These automatic first due points are persisted, so reloads, edits to the car's odometer, and the passage of time cannot push them forward. Existing active interval-only tasks are initialized once when loaded by the app or email reminder worker.
+Repeat intervals alone are enough. With no first due point, a distance interval uses the next multiple of that interval at or above the latest recorded odometer, including service visit and [fill-up](fuel.md) readings (for example, 69,000 miles with a 5,000-mile interval is first due at 70,000 miles; a zero odometer starts at 5,000). A time interval starts when the task is saved. These automatic first due points are persisted, so reloads, edits to the car's odometer, and the passage of time cannot push them forward. Existing active interval-only tasks are initialized once when loaded by the app or email reminder worker.
 
 An explicit first due point is preserved, and linked service visits advance repeats from their recorded date/odometer. Tasks with neither intervals nor a due point still appear in dashboard setup guidance, with links to their vehicle schedules.
 

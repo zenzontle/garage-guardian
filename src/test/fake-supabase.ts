@@ -98,7 +98,7 @@ export function fakeSupabase() {
         for (const entry of matches) {
           table.delete(entry.id);
           if (name === 'cars')
-            for (const childName of ['schedule_items', 'visits']) {
+            for (const childName of ['schedule_items', 'visits', 'fuel_entries']) {
               for (const child of getTable(childName).values())
                 if (child.car_id === entry.id) getTable(childName).delete(child.id);
             }

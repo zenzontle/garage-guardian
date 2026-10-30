@@ -15,6 +15,7 @@ import { LocaleSelector } from '../i18n/locale-selector';
 import { CarModal } from '../vehicles/car-modal';
 import { ScheduleModal } from '../maintenance/schedule-modal';
 import { VisitModal } from '../visits/visit-modal';
+import { FuelModal } from '../fuel/fuel-modal';
 import { GarageSidebar } from './garage-sidebar';
 import { GarageTopbar } from './garage-topbar';
 import { GarageMobileNavigation } from './garage-mobile-navigation';
@@ -44,6 +45,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
     menuOpen,
     setMenuOpen,
     visits,
+    fuelEntries,
     perform,
     currentPath,
   } = garage;
@@ -328,6 +330,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
             carId={modal.carId}
             cars={snapshot.cars}
             visits={visits}
+            fuelEntries={fuelEntries}
             schedules={snapshot.schedules}
             repository={repository!}
             cloud={Boolean(user)}
@@ -336,6 +339,23 @@ export function GarageContent({ children }: { children: ReactNode }) {
             onSave={async (item, manualTargets) => {
               await perform(() => repository!.saveVisit(item, manualTargets));
               interactions?.notify('interactions.visitSaved');
+            }}
+          />
+        )}
+        {modal?.kind === 'fuel' && (
+          <FuelModal
+            item={modal.item}
+            carId={modal.carId}
+            cars={snapshot.cars}
+            visits={visits}
+            fuelEntries={fuelEntries}
+            repository={repository!}
+            cloud={Boolean(user)}
+            homeCurrency={garage.homeCurrency}
+            onClose={() => setModal(null)}
+            onSave={async (entry) => {
+              await perform(() => repository!.saveFuelEntry(entry));
+              interactions?.notify('interactions.fuelSaved');
             }}
           />
         )}

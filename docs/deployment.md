@@ -33,6 +33,7 @@ Apply migrations in numeric order, each **before** deploying the application cod
 | `0009_atomic_schedule_saves.sql`   | Interval-only task saves and their baseline initialization in one transaction                                          | `supabase/tests/atomic_schedule_saves.sql` | [Maintenance schedules](maintenance-schedules.md)         |
 | `0010_multi_currency.sql`          | Garage settings, receipt currencies and conversions, and the conditional background-save function                      | `supabase/tests/multi_currency.sql`        | [Multi-currency](multi-currency.md#reporting-and-rollout) |
 | `0011_archive_vehicles.sql`        | Vehicle archive state and a `save_car` function that cannot undo a concurrent archive/restore                          | `supabase/tests/archive_vehicles.sql`      | [Vehicles](vehicles.md#archiving)                         |
+| `0012_fuel_entries.sql`            | Owner-scoped fill-ups, and first due baselines that also count fill-up odometers                                       | `supabase/tests/fuel_entries.sql`          | [Fuel log](fuel.md#deployment)                            |
 
 Shipped migrations are never edited; schema changes go in a new numbered file.
 

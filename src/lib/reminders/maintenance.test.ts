@@ -78,3 +78,41 @@ it('initializes interval-only reminder targets once and keeps them fixed as mile
     store.rpc.mock.calls.filter(([name]) => name === 'initialize_schedule_defaults'),
   ).toHaveLength(1);
 });
+
+it('uses fill-up odometers for due status and first due baselines', async () => {
+  const store = reminderStore();
+  store.addAccount('owner');
+  const fill = {
+    id: 'fill',
+    user_id: 'owner',
+    car_id: 'owner-car',
+    fuel_date: '2026-10-04',
+    odometer: 10100,
+    volume_milli: 10000,
+    volume_unit: 'gallons',
+    fuel_type: 'regular',
+    unit_price_milli: 3459,
+    total_cost_cents: 3459,
+    currency: 'USD',
+    is_full_tank: true,
+    missed_previous: false,
+    station: '',
+    notes: '',
+    photos: [],
+    created_at: '2026-10-04T00:00:00.000Z',
+  };
+  expect(await loadReminderItems(store.db, 'owner', '2026-10-05')).toMatchObject([
+    { status: 'upcoming', milesRemaining: 500 },
+  ]);
+  store.tables.fuel_entries.push(fill, { ...fill, id: 'other', user_id: 'other', odometer: 99999 });
+  expect(await loadReminderItems(store.db, 'owner', '2026-10-05')).toMatchObject([
+    { status: 'due', milesRemaining: -100 },
+  ]);
+  Object.assign(store.tables.schedule_items[0], {
+    interval_miles: 5000,
+    interval_months: null,
+    first_due_miles: null,
+  });
+  await loadReminderItems(store.db, 'owner', '2026-10-05');
+  expect(store.tables.schedule_items[0].first_due_miles).toBe(15000);
+});

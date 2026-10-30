@@ -13,7 +13,10 @@ const intervalOnly = { ...schedule, firstDueMiles: null, firstDueDate: null };
 const unconfigured = { ...intervalOnly, intervalMiles: null, intervalMonths: null };
 
 function dashboard(schedules: ScheduleItem[], visits: Visit[] = [], locale: Locale = 'en') {
-  const snapshot = initializeSnapshotSchedules({ cars: [car], schedules, visits }, '2026-10-13');
+  const snapshot = initializeSnapshotSchedules(
+    { cars: [car], schedules, visits, fuelEntries: [] },
+    '2026-10-13',
+  );
   return (
     <NextIntlClientProvider locale={locale} messages={messages[locale]} timeZone="UTC">
       <Dashboard

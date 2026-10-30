@@ -1,4 +1,5 @@
 import { AppError } from '../utils/app-error';
+import { normalizeFuelEntry, type FuelType, type VolumeUnit } from '../fuel/fuel';
 import {
   normalizeVisit,
   currencyOrDefault,
@@ -7,6 +8,7 @@ import {
 } from '../currency/currency';
 
 export type { Currency } from '../currency/currency';
+export type { FuelType, VolumeUnit } from '../fuel/fuel';
 
 export type DistanceUnit = 'miles' | 'kilometers';
 
@@ -69,6 +71,27 @@ export type Visit = {
   createdAt: string;
 };
 
+// Volumes and unit prices are integer thousandths (12.345 gal → 12345, $3.459 → 3459),
+// like cents, so totals never drift. The odometer uses the owning car's distance unit.
+export type FuelEntry = {
+  id: string;
+  carId: string;
+  date: string;
+  odometer: number;
+  volumeMilli: number;
+  volumeUnit: VolumeUnit;
+  fuelType: FuelType;
+  unitPriceMilli: number;
+  totalCostCents: number;
+  currency: Currency;
+  isFullTank: boolean;
+  missedPrevious: boolean;
+  station: string;
+  notes: string;
+  photos: Photo[];
+  createdAt: string;
+};
+
 export type Snapshot = {
   pendingSyncCount?: number;
   syncConflictCount?: number;
@@ -76,9 +99,10 @@ export type Snapshot = {
   cars: Car[];
   schedules: ScheduleItem[];
   visits: Visit[];
+  fuelEntries: FuelEntry[];
 };
 
-export const EMPTY_SNAPSHOT: Snapshot = { cars: [], schedules: [], visits: [] };
+export const EMPTY_SNAPSHOT: Snapshot = { cars: [], schedules: [], visits: [], fuelEntries: [] };
 
 const STARTER_DEFAULTS = [
   { name: 'Oil change', months: 12, miles: 7500, kilometers: 12000 },
@@ -161,12 +185,16 @@ export function normalizePlate(plate?: string | null): string {
   return value;
 }
 
-export function normalizeSnapshot(snapshot: Snapshot): Snapshot {
+// Browser, offline, and pending-transfer snapshots saved before fill-ups have no fuel entries.
+export function normalizeSnapshot(
+  snapshot: Omit<Snapshot, 'fuelEntries'> & Partial<Pick<Snapshot, 'fuelEntries'>>,
+): Snapshot {
   return {
     ...snapshot,
     homeCurrency: currencyOrDefault(snapshot.homeCurrency),
     cars: snapshot.cars.map(normalizeCar),
     visits: snapshot.visits.map(normalizeVisit),
+    fuelEntries: (snapshot.fuelEntries ?? []).map(normalizeFuelEntry),
   };
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addMonths, dueDescription, getAllDue, getDueItem, latestOdometer } from './due';
 import type { Car, ScheduleItem, Visit } from '../garage/model';
+import { fuelEntry } from '@/test/fixtures';
 
 const car: Car = {
   id: 'car-1',
@@ -191,4 +192,24 @@ it('preserves the distance target without inventing a service reading for unknow
   expect(
     getDueItem({ ...schedule, intervalMonths: null }, car, [unknown], '2026-10-09').status,
   ).toBe('upcoming');
+});
+
+it("counts fill-up readings toward a car's current odometer", () => {
+  const distanceOnly = { ...schedule, firstDueDate: null, intervalMonths: null };
+  const fill = {
+    ...fuelEntry,
+    carId: car.id,
+    odometer: 20_100,
+  };
+  const otherCar = { ...fill, id: 'other-fill', carId: 'other-car', odometer: 90_000 };
+  expect(getDueItem(distanceOnly, car, [], '2026-09-25').milesRemaining).toBe(500);
+  const result = getDueItem(distanceOnly, car, [], '2026-09-25', [fill, otherCar]);
+  expect(latestOdometer(car, [visit], [fill, otherCar])).toBe(20_100);
+  expect(result).toMatchObject({ status: 'due', milesRemaining: -100 });
+  expect(getAllDue([car], [distanceOnly], [], '2026-09-25', [fill])[0]).toMatchObject({
+    status: 'due',
+    milesRemaining: -100,
+  });
+  // A lower fill-up reading never moves the odometer backwards.
+  expect(latestOdometer(car, [visit], [{ ...fill, odometer: 1 }])).toBe(20_050);
 });

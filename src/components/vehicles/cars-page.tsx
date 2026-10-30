@@ -1,11 +1,23 @@
 'use client';
 
 import Link from '../interaction/guarded-link';
-import { carPath } from '@/lib/navigation/garage-routes';
+import { carPath, fuelPath } from '@/lib/navigation/garage-routes';
 import { useTranslations } from 'next-intl';
-import { CarFront, ClipboardList, Gauge, Plus, Settings2, Trash2, Wrench } from 'lucide-react';
+import {
+  ArrowRight,
+  CarFront,
+  ClipboardList,
+  Fuel,
+  Gauge,
+  Plus,
+  Settings2,
+  Trash2,
+  Wrench,
+} from 'lucide-react';
 import { latestOdometer, type DueItem } from '@/lib/maintenance/due';
-import { type Car, type ScheduleItem, type Visit } from '@/lib/garage/model';
+import { fuelEconomy } from '@/lib/fuel/economy';
+import { type Car, type FuelEntry, type ScheduleItem, type Visit } from '@/lib/garage/model';
+import { useFuelDisplay } from '../fuel/use-fuel-display';
 import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
 import { EmptyPanel } from '../ui/empty-panel';
@@ -20,6 +32,7 @@ export function CarsPage({
   archiveError,
   onToggleArchived,
   visits,
+  fuelEntries,
   allDue,
   selectedCar,
   onAdd,
@@ -27,6 +40,7 @@ export function CarsPage({
   onAddSchedule,
   onEditSchedule,
   onAddVisit,
+  onAddFuel,
   onDeleteCar,
   onDeleteSchedule,
 }: {
@@ -38,6 +52,7 @@ export function CarsPage({
   archiveError: AppFailure | null;
   onToggleArchived: () => void;
   visits: Visit[];
+  fuelEntries: FuelEntry[];
   allDue: DueItem[];
   selectedCar: Car | null;
   onAdd: () => void;
@@ -45,15 +60,19 @@ export function CarsPage({
   onAddSchedule: (carId: string) => void;
   onEditSchedule: (item: ScheduleItem) => void;
   onAddVisit: (carId: string) => void;
+  onAddFuel: (carId: string) => void;
   onDeleteCar: (car: Car) => void;
   onDeleteSchedule: (item: ScheduleItem) => void;
 }) {
   const t = useTranslations();
   const { number, money, displayDate, formatDistance, dueDescription } = useDisplay();
+  const fuel = useFuelDisplay();
   const car = selectedCar;
   const carDue = car ? allDue.filter((item) => item.car.id === car.id) : [];
   const carSchedules = car ? schedules.filter((item) => item.carId === car.id) : [];
   const carVisits = car ? visits.filter((visit) => visit.carId === car.id) : [];
+  const carFuel = car ? fuelEntries.filter((entry) => entry.carId === car.id) : [];
+  const economy = car ? fuelEconomy(car, carFuel) : null;
   return (
     <>
       <PageHeading
@@ -177,7 +196,8 @@ export function CarsPage({
                 </>
               )}
               <p>
-                <Gauge size={16} /> {formatDistance(latestOdometer(car, visits), car.distanceUnit)}{' '}
+                <Gauge size={16} />{' '}
+                {formatDistance(latestOdometer(car, visits, fuelEntries), car.distanceUnit)}{' '}
                 {t('car.currentOdometer')}
                 {car.vin && ` · VIN ${car.vin}`}
               </p>
@@ -203,10 +223,20 @@ export function CarsPage({
               <button
                 disabled={archiveBusy}
                 className="button secondary"
-                onClick={() => onEdit({ ...car, odometer: latestOdometer(car, visits) })}
+                onClick={() =>
+                  onEdit({ ...car, odometer: latestOdometer(car, visits, fuelEntries) })
+                }
               >
                 <Settings2 size={16} />
                 {t('car.edit')}
+              </button>
+              <button
+                disabled={archiveBusy}
+                className="button secondary"
+                onClick={() => onAddFuel(car.id)}
+              >
+                <Fuel size={16} />
+                {t('fuel.log')}
               </button>
               <button
                 disabled={archiveBusy}
@@ -386,6 +416,66 @@ export function CarsPage({
                 <Trash2 size={15} />
                 {t('car.delete')}
               </button>
+            </section>
+            <section className="panel">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">{t('navigation.fuelShort')}</span>
+                  <h2>{t('fuel.recent')}</h2>
+                </div>
+                <span className="count-badge">{number(carFuel.length)}</span>
+              </div>
+              <p className="section-hint">
+                {economy?.average != null
+                  ? `${t('fuel.average')}: ${fuel.economy(economy.average, economy.unit)}`
+                  : t('fuel.noEconomy')}
+              </p>
+              {carFuel.length ? (
+                <div className="recent-list">
+                  {carFuel.slice(0, 5).map((entry) => (
+                    <div className="recent-row" key={entry.id}>
+                      <span className="service-icon">
+                        <Fuel size={18} />
+                      </span>
+                      <span className="recent-main">
+                        <strong>
+                          {fuel.volume(entry)} · {t(`fuel.types.${entry.fuelType}`)}
+                          {!entry.isFullTank && ` · ${t('fuel.partial')}`}
+                        </strong>
+                        <small>
+                          {displayDate(entry.date)} ·{' '}
+                          {formatDistance(entry.odometer, car.distanceUnit)}
+                          {economy?.byEntry.has(entry.id) &&
+                            ` · ${fuel.economy(economy.byEntry.get(entry.id), economy.unit)}`}
+                        </small>
+                      </span>
+                      <strong>{fuel.total(entry)}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="panel-empty">
+                  <Fuel size={20} />
+                  <div>
+                    <strong>{t('fuel.empty')}</strong>
+                    <p>{t('fuel.firstEntry')}</p>
+                  </div>
+                </div>
+              )}
+              <div className="account-actions">
+                <button
+                  disabled={archiveBusy}
+                  className="text-link"
+                  onClick={() => onAddFuel(car.id)}
+                >
+                  <Plus size={16} />
+                  {t('fuel.log')}
+                </button>
+                <Link className="text-link" href={fuelPath(car.id)}>
+                  {t('fuel.viewAll')}
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
             </section>
           </div>
         </>

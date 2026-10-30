@@ -2,7 +2,7 @@
 
 ## Routes
 
-Dashboard lives at `/`, Vehicles at `/cars`, individual vehicles at `/cars/[carId]`, Service history at `/history`, and Reports at `/reports`. Vehicles opens the first car and replaces `/cars` with its detail URL, or shows the empty garage when no cars exist. Reloads, bookmarks, browser Back/Forward, and opening navigation links in a new tab work across these screens. Vehicle IDs remain stable when names change.
+Dashboard lives at `/`, Vehicles at `/cars`, individual vehicles at `/cars/[carId]`, Service history at `/history`, the Fuel log at `/fuel` (`/fuel?car=[carId]` filters to one vehicle), and Reports at `/reports`. Vehicles opens the first car and replaces `/cars` with its detail URL, or shows the empty garage when no cars exist. Reloads, bookmarks, browser Back/Forward, and opening navigation links in a new tab work across these screens. Vehicle IDs remain stable when names change.
 
 Sign-in and create-account use `/signin` and `/signup`. Their validated `returnTo` parameter returns to the originating workspace screen; direct visits default to Dashboard. Account settings live at `/settings/account`, `/settings/security`, and `/settings/notifications`.
 

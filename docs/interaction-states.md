@@ -8,11 +8,11 @@ Saving, deleting, preparing photos, and transferring the guest garage prevent di
 
 Vehicle, maintenance-task, and visit saves/deletes show one success toast, retained across navigation. It dismisses after six seconds, pausing while hovered, focused, or the document is hidden. Account changes, reminder preferences, and feedback retain their inline confirmation messages. Email changes remain pending until confirmation.
 
-Visit photos show preparation, the current file and total count, and visit saving. Local mode says “Saving photo”; cloud mode says “Uploading photo.” The progress bar counts completed files rather than claiming byte-level percentages. Preparation batches cannot overlap. Failed uploads clean up only the new uploads, preserving the draft and existing attachments. Signup transfers show record saving, photo upload and verification, garage verification, and final cleanup; resumability and verification remain unchanged.
+Visit and fill-up photos show preparation, the current file and total count, and record saving. Local mode says “Saving photo”; cloud mode says “Uploading photo.” The progress bar counts completed files rather than claiming byte-level percentages. Preparation batches cannot overlap. Failed uploads clean up only the new uploads, preserving the draft and existing attachments. Signup transfers show record saving, photo upload and verification, garage verification, and final cleanup; resumability and verification remain unchanged.
 
 Feedback shows submission activity with screenshot counts or status-check activity. Transport failures retain the reviewed submission identifier and check its receipt before reposting. Explicitly discarding an unfinished report clears that draft; it does not withdraw a report already submitted.
 
-Persisted vehicle, maintenance-task, and visit deletion uses a shared confirmation dialog with Cancel focused initially. Vehicle deletion explains that tasks, visits, and photos are included. Failed deletion retains the dialog for retry. Removing unsaved visit items or photo selections remains immediate.
+Persisted vehicle, maintenance-task, visit, and fill-up deletion uses a shared confirmation dialog with Cancel focused initially. Vehicle deletion explains that tasks, visits, fill-ups, and photos are included. Failed deletion retains the dialog for retry. Removing unsaved visit items or photo selections remains immediate.
 
 Only the topmost dialog handles Escape and traps focus. Underlying content is inert until the dialog stack closes; focus returns to the previous control when available. Escape or an outside click on a confirmation cancels it. Escape first closes an open make/model suggestion list.
 

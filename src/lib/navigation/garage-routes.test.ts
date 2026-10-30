@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   accountPath,
   carPath,
+  fuelPath,
   reportPath,
   reportPaths,
   validatedReturnTo,
@@ -30,6 +31,7 @@ describe('garage URLs', () => {
     '/',
     '/cars',
     '/history',
+    '/fuel',
     '/reports',
     '/cars/stable-id',
     '/cars/%C3%B1',
@@ -67,6 +69,21 @@ describe('garage URLs', () => {
   });
   it('encodes vehicle identifiers', () => {
     expect(carPath('café')).toBe('/cars/caf%C3%A9');
+    expect(fuelPath('a b&c')).toBe('/fuel?car=a+b%26c');
+    expect(fuelPath()).toBe('/fuel');
+  });
+  it('classifies the fuel log for navigation and feedback without its vehicle filter', () => {
+    expect(workspaceScreen('/fuel')).toBe('fuel');
+    expect(reportPath('/fuel')).toBe('/fuel');
+    expect(
+      contextSchema.safeParse({
+        ...report().context,
+        pathname: reportPath('/fuel'),
+        screen: workspaceScreen('/fuel'),
+        dialog: 'fuel',
+      }).success,
+    ).toBe(true);
+    expect(validatedReturnTo(fuelPath('car-id'))).toBe('/');
   });
   it.each(reportPaths)('allows report route template %s', (pathname) => {
     expect(contextSchema.safeParse({ ...report().context, pathname }).success).toBe(true);

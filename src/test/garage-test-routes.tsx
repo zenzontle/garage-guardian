@@ -2,6 +2,7 @@ import { validatedReturnTo } from '@/lib/navigation/garage-routes';
 export type Screens = typeof import('@/components/dashboard/dashboard-screen') &
   typeof import('@/components/vehicles/cars-screen') &
   typeof import('@/components/history/history-screen') &
+  typeof import('@/components/fuel/fuel-screen') &
   typeof import('@/components/reports/reports-screen') &
   typeof import('@/components/account/account-screen') &
   typeof import('@/components/account/account-recovery-screen') &
@@ -15,6 +16,7 @@ export function TestRoutes({ screens, url }: { screens: Screens; url: string }) 
   if (pathname.startsWith('/cars/'))
     return <screens.CarsScreen carId={decodeURIComponent(pathname.slice(6))} />;
   if (pathname === '/history') return <screens.HistoryScreen />;
+  if (pathname === '/fuel') return <screens.FuelScreen />;
   if (pathname === '/reports') return <screens.ReportsScreen />;
   if (pathname === '/settings/notifications') return <screens.NotificationSettingsScreen />;
   if (pathname === '/settings/account') return <screens.AccountSettingsScreen section="account" />;

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { clear, get, set } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../../test/fake-supabase';
-import { car, schedule, visit } from '../../test/fixtures';
+import { car, fuelEntry, schedule, visit } from '../../test/fixtures';
 import type { Car } from './model';
 import { getAllDue } from '../maintenance/due';
 
@@ -288,6 +288,7 @@ describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
         cars: [{ ...car, plate: plate ?? '' }],
         schedules: [schedule],
         visits: [visit],
+        fuelEntries: [],
       });
     },
   );
@@ -351,6 +352,7 @@ describe.each([
       cars: [car],
       schedules: [schedule],
       visits: [{ ...visit, photos: [photo] }],
+      fuelEntries: [],
     });
     await reloaded.saveCar({ ...car, distanceUnit: 'kilometers', reminderMiles: 1000 });
     expect((await reloaded.load()).cars[0]).toEqual({
@@ -389,6 +391,7 @@ describe.each([
       cars: [],
       schedules: [],
       visits: [],
+      fuelEntries: [],
     });
   });
 });
@@ -408,6 +411,7 @@ it('loads legacy guest records as Miles without rewriting readings or custom win
     cars: [{ ...car, reminderMiles: 123 }],
     schedules: [schedule],
     visits: [visit],
+    fuelEntries: [],
   });
   await local.saveCar({ ...(await local.load()).cars[0], name: 'Edited legacy' });
   expect((await get<{ cars: (typeof car)[] }>('garage-guardian:local:v1'))?.cars[0]).toMatchObject({
@@ -500,5 +504,114 @@ it.each(['local', 'cloud'] as const)(
       stop();
       clearDiagnostics();
     }
+  },
+);
+
+describe.each(['local', 'cloud'] as const)('%s fill-ups', (mode) => {
+  async function setup() {
+    const { LocalRepository, SupabaseRepository } = await import('./repository');
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    const repository =
+      mode === 'local'
+        ? new LocalRepository()
+        : new SupabaseRepository(cloud.client, account().id, true);
+    await repository.saveCar(car);
+    const upload = (name: string) =>
+      repository.uploadPhoto(fuelEntry.id, new File([name], name, { type: 'image/webp' }));
+    const stored = async (path: string) =>
+      mode === 'local' ? await get<Blob>(`photo:${path}`) : cloud.photos.get(path);
+    return { repository, cloud, upload, stored };
+  }
+
+  it('saves, edits, and deletes fill-ups with their photos', async () => {
+    const { repository, upload, stored } = await setup();
+    const kept = await upload('kept.webp');
+    const dropped = await upload('dropped.webp');
+    await repository.saveFuelEntry({ ...fuelEntry, station: ' Corner ', photos: [kept, dropped] });
+    expect((await repository.load()).fuelEntries).toEqual([
+      { ...fuelEntry, station: 'Corner', photos: [kept, dropped] },
+    ]);
+    await repository.saveFuelEntry({ ...fuelEntry, notes: 'Edited', photos: [kept] });
+    expect((await repository.load()).fuelEntries).toEqual([
+      { ...fuelEntry, notes: 'Edited', photos: [kept] },
+    ]);
+    expect(await stored(dropped.path)).toBeUndefined();
+    expect(await stored(kept.path)).toBeInstanceOf(Blob);
+    await repository.deleteFuelEntry({ ...fuelEntry, photos: [kept] });
+    expect((await repository.load()).fuelEntries).toEqual([]);
+    expect(await stored(kept.path)).toBeUndefined();
+  });
+
+  it('rejects invalid fill-ups without saving them', async () => {
+    const { repository } = await setup();
+    await expect(repository.saveFuelEntry({ ...fuelEntry, volumeMilli: 0 })).rejects.toMatchObject({
+      code: 'fuelFields',
+    });
+    expect((await repository.load()).fuelEntries).toEqual([]);
+  });
+
+  it('deletes fill-ups and their photos with the vehicle', async () => {
+    const { repository, upload, stored } = await setup();
+    const photo = await upload('receipt.webp');
+    await repository.saveFuelEntry({ ...fuelEntry, photos: [photo] });
+    await repository.deleteCar(car.id);
+    expect((await repository.load()).fuelEntries).toEqual([]);
+    expect(await stored(photo.path)).toBeUndefined();
+  });
+
+  it('counts fill-up readings in the first due baseline of a new interval-only task', async () => {
+    const { repository } = await setup();
+    await repository.saveFuelEntry({ ...fuelEntry, odometer: 12_345 });
+    await repository.saveSchedule({ ...schedule, firstDueMiles: null, intervalMonths: null });
+    expect((await repository.load()).schedules[0].firstDueMiles).toBe(15_000);
+  });
+});
+
+it('loads guest snapshots saved before fill-ups existed', async () => {
+  await set('garage-guardian:local:v1', { cars: [car], schedules: [], visits: [] });
+  const { LocalRepository } = await import('./repository');
+  const local = new LocalRepository();
+  expect((await local.load()).fuelEntries).toEqual([]);
+  await local.saveFuelEntry(fuelEntry);
+  expect((await local.load()).fuelEntries).toEqual([fuelEntry]);
+});
+
+it('keeps cached fill-ups readable offline but does not queue offline fill-up saves', async () => {
+  const { SupabaseRepository } = await import('./repository');
+  const cloud = fakeSupabase();
+  cloud.emit(account());
+  const repository = new SupabaseRepository(cloud.client, account().id, true);
+  await repository.saveCar(car);
+  await repository.saveFuelEntry(fuelEntry);
+  await repository.load();
+  cloud.execute.mockRejectedValue(new TypeError('Failed to fetch'));
+  expect((await repository.load()).fuelEntries).toEqual([fuelEntry]);
+  await expect(
+    repository.saveFuelEntry({ ...fuelEntry, id: 'offline', odometer: 500 }),
+  ).rejects.toThrow('Failed to fetch');
+  expect((await repository.load()).fuelEntries).toEqual([fuelEntry]);
+});
+
+it.each(['fill-up', 'vehicle'] as const)(
+  'removes fill-ups from the offline cache when a %s is deleted',
+  async (target) => {
+    const { SupabaseRepository } = await import('./repository');
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    const repository = new SupabaseRepository(cloud.client, account().id, true);
+    await repository.saveCar(car);
+    await repository.saveFuelEntry(fuelEntry);
+    await repository.load();
+    const execute = cloud.execute.getMockImplementation()!;
+    // The delete succeeds, then the connection drops before the garage can refresh.
+    cloud.execute.mockImplementation(async (...args) => {
+      const result = await execute(...args);
+      if (args[1] === 'delete') cloud.execute.mockRejectedValue(new TypeError('Failed to fetch'));
+      return result;
+    });
+    if (target === 'fill-up') await repository.deleteFuelEntry(fuelEntry);
+    else await repository.deleteCar(car.id);
+    expect((await repository.load()).fuelEntries).toEqual([]);
   },
 );

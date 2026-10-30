@@ -25,7 +25,7 @@ export function scheduleDefaultsRpc(
     item.interval_months === args.p_interval_months &&
     (item.interval_miles !== null || item.interval_months !== null)
   ) {
-    const reading = (tables.visits ?? [])
+    const reading = [...(tables.visits ?? []), ...(tables.fuel_entries ?? [])]
       .filter((row) => row.car_id === car.id && row.user_id === args.p_user_id)
       .reduce((value, row) => Math.max(value, Number(row.odometer ?? value)), Number(car.odometer));
     item.first_due_miles =
