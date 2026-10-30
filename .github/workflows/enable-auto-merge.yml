@@ -9,6 +9,11 @@ permissions:
   contents: write
   pull-requests: write
 
+# Only the latest push decides whether auto-merge stays on.
+concurrency:
+  group: auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   enable-automerge:
     if: >-
@@ -19,9 +24,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Enable Auto-Merge
+      # Paths in CODEOWNERS need a human to merge them (see REVIEW.md), so auto-merge is
+      # turned off when a PR touches them. Keep this list in sync with .github/CODEOWNERS.
+      - name: Enable or disable auto-merge
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          gh pr merge "$PR_URL" --auto --merge
+          sensitive=$(gh pr diff "$PR_URL" --name-only | grep -E '^(\.github/|REVIEW\.md$|supabase/|src/app/api/|vercel\.json$|src/lib/account/|src/app/\(garage\)/auth/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)' || true)
+          if [ -n "$sensitive" ]; then
+            echo "Sensitive paths changed; a human must merge this PR:"
+            echo "$sensitive"
+            gh pr merge "$PR_URL" --disable-auto || true
+          else
+            gh pr merge "$PR_URL" --auto --merge
+          fi
