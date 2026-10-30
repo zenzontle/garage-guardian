@@ -171,9 +171,7 @@ export function fakeSupabase() {
     })),
   };
   const auth = {
-    lock: true,
     initialize: vi.fn(async () => ({ error: null })),
-    _acquireLock: vi.fn(async <R>(_timeout: number, work: () => Promise<R>) => work()),
     getUser: vi.fn(async () => ({ data: { user }, error: null })),
     resetPasswordForEmail: vi.fn(async () => ({ data: {}, error: null })),
     resend: vi.fn(async () => ({ data: {}, error: null })),
@@ -209,13 +207,6 @@ export function fakeSupabase() {
       return { error: null as Error | null };
     }),
   };
-  Object.assign(auth, {
-    _useSession: async <R>(
-      work: (result: Awaited<ReturnType<typeof auth.getSession>>) => Promise<R>,
-    ) => work(await auth.getSession()),
-    _signOut: (options: { scope: 'local' }) => auth.signOut(options),
-    _updateUser: (attributes: { password: string }) => auth.updateUser(attributes),
-  });
   const storage = { from: vi.fn(() => bucket) };
   const rpc = vi.fn(
     async (

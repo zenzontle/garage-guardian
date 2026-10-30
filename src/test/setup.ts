@@ -9,4 +9,6 @@ afterEach(() => {
   cleanup();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+  // fakeLocks adds Web Locks to jsdom's navigator.
+  delete (navigator as { locks?: unknown }).locks;
 });

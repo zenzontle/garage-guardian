@@ -1,6 +1,7 @@
 'use client';
 
 import { get, update } from 'idb-keyval';
+import { withNamedLock } from '../utils/named-lock';
 import { normalizeSnapshot, type FuelEntry, type Snapshot, type Visit } from '../garage/model';
 import { mergeConversions, receiptInputs, sameInputs, type Currency } from './currency';
 
@@ -8,7 +9,6 @@ type PendingReceipt = { visit: Visit; manualTargets: Currency[] };
 type CachedGarage = { snapshot: Snapshot; pending: PendingReceipt[] };
 const missingVehicleCount = (snapshot: Snapshot, pending: PendingReceipt[]) =>
   pending.filter(({ visit }) => !snapshot.cars.some((car) => car.id === visit.carId)).length;
-const operations = new Map<string, Promise<unknown>>();
 export function connectionFailure(error: unknown) {
   const message =
     error instanceof Error
@@ -28,20 +28,8 @@ export class OfflineReceipts {
   async read() {
     return get<CachedGarage>(this.key);
   }
-  async withLock<T>(action: () => Promise<T>): Promise<T> {
-    const previous = operations.get(this.key);
-    const work = (async () => {
-      await previous?.catch(() => {});
-      if (typeof navigator !== 'undefined' && navigator.locks)
-        return navigator.locks.request(this.key, action);
-      return action();
-    })();
-    operations.set(this.key, work);
-    try {
-      return await work;
-    } finally {
-      if (operations.get(this.key) === work) operations.delete(this.key);
-    }
+  withLock<T>(action: () => Promise<T>): Promise<T> {
+    return withNamedLock(this.key, action);
   }
   async rememberVisit(visit: Visit) {
     await update<CachedGarage | undefined>(this.key, (current) => {

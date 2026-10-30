@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clear } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../../test/fake-supabase';
+import { fakeLocks } from '../../test/fake-locks';
 import en from '../../../messages/en.json';
 import es from '../../../messages/es.json';
 
@@ -406,35 +407,15 @@ describe.each([
     await screen.findByRole('heading', { name: copy.dashboard.title });
     act(() => cloud.emit(account(), 'PASSWORD_RECOVERY'));
     await screen.findByRole('heading', { name: copy.account.resetTitle });
-    // Model the public SDK method taking the lock before reading its session.
-    const signOut = cloud.auth.signOut.getMockImplementation()!;
-    cloud.client.auth.signOut = async (options) => {
-      await cloud.auth._acquireLock(-1, () => signOut({ scope: options?.scope ?? 'global' }));
-      return { error: null };
-    };
-    let release!: () => void;
-    let settled!: () => void;
-    const finished = new Promise<void>((resolve) => {
-      settled = resolve;
-    });
-    cloud.auth._acquireLock.mockImplementationOnce(async (_timeout, work) => {
-      await new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      try {
-        return await work();
-      } finally {
-        settled();
-      }
-    });
+    const held = fakeLocks().hold('garage-guardian:account:');
     const back = screen.getByRole('button', { name: copy.account.backSignin });
     await user.click(back);
-    await waitFor(() => expect(release).toBeTypeOf('function'));
+    await waitFor(() => expect(held.requested).toBe(true));
     expect(back.closest('fieldset')?.disabled).toBe(true);
     act(() => cloud.emit(account('replacement')));
     await act(async () => {
-      release();
-      await finished;
+      held.release();
+      await held.finished;
     });
     expect((await cloud.auth.getSession()).data.session?.user.id).toBe('replacement');
     expect(cloud.auth.signOut).not.toHaveBeenCalled();

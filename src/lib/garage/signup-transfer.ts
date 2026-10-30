@@ -2,6 +2,7 @@
 
 import { del, get, set, update } from 'idb-keyval';
 import { AppError } from '../utils/app-error';
+import { withNamedLock } from '../utils/named-lock';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { LocalRepository, SupabaseRepository, sameRecord } from './repository';
 import { normalizeSnapshot, type Photo, type Snapshot } from './model';
@@ -36,24 +37,8 @@ export async function registerSignup(project: string, user: User, hasSession: bo
 
 // Signup must acquire this before its auth event can reach another tab.
 // Transfer verification and guest cleanup share this lock.
-const transfers = new Map<string, Promise<unknown>>();
-
-export async function withSignupTransferLock<T>(project: string, action: () => Promise<T>) {
-  const key = transferKey(project);
-  const previous = transfers.get(key);
-  const work = (async () => {
-    await previous?.catch(() => undefined);
-    if (typeof navigator !== 'undefined' && navigator.locks) {
-      return navigator.locks.request(key, action);
-    }
-    return action();
-  })();
-  transfers.set(key, work);
-  try {
-    return await work;
-  } finally {
-    if (transfers.get(key) === work) transfers.delete(key);
-  }
+export function withSignupTransferLock<T>(project: string, action: () => Promise<T>) {
+  return withNamedLock(transferKey(project), action);
 }
 
 export async function transferSignupData(

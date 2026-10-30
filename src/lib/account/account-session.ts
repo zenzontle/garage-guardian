@@ -1,48 +1,67 @@
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { AppError, failureOf } from '../utils/app-error';
+import { withNamedLock } from '../utils/named-lock';
 import { sameRecoverySession } from './account-recovery';
 
 // Explicitly shared with client configuration; preserve Supabase's existing key.
 export const accountAuthStorageKey = (project: string) =>
   `sb-${new URL(project).hostname.split('.')[0]}-auth-token`;
 
-// Isolate the SDK's private lock primitives here. Public auth methods reacquire
-// the lock and can deadlock when called from its callback.
-type LockedAuth = Pick<SupabaseClient['auth'], 'initialize' | 'signInWithPassword' | 'signUp'> & {
-  lock: unknown;
-  _acquireLock: <R>(timeout: number, work: () => Promise<R>) => Promise<R>;
-  _useSession: <R>(
-    work: (result: Awaited<ReturnType<SupabaseClient['auth']['getSession']>>) => Promise<R>,
-  ) => Promise<R>;
-  _signOut: SupabaseClient['auth']['signOut'];
-  _updateUser: SupabaseClient['auth']['updateUser'];
-};
+// The client starts initialization once serializeAccountSignIns has wrapped it.
+export const accountAuthOptions = (project: string) => ({
+  storageKey: accountAuthStorageKey(project),
+  skipAutoInitialize: true,
+});
 
-export function serializeAccountSignIns(client: SupabaseClient) {
-  const auth = client.auth as unknown as LockedAuth;
-  // The installed SDK saves password sign-in/signup sessions without acquiring
-  // its optional lock. Serialize those writes with recovery and password completion.
-  if (auth.lock && auth._acquireLock) {
-    const signIn = auth.signInWithPassword.bind(auth);
-    const signUp = auth.signUp.bind(auth);
-    auth.signInWithPassword = async (...args) => {
-      await auth.initialize();
-      return auth._acquireLock(-1, () => signIn(...args));
-    };
-    auth.signUp = async (...args) => {
-      await auth.initialize();
-      return auth._acquireLock(-1, () => signUp(...args));
-    };
-  }
+// The SDK coordinates its own token refreshes without a lock. Every other write
+// to the shared session (initialization, sign-in, sign-out, password completion)
+// takes this app-owned lock so tabs cannot overwrite each other's accounts.
+// A global symbol, so a reloaded module never wraps the same client twice:
+// the lock is not reentrant, and nested wrappers would wait on themselves.
+const lockName = Symbol.for('garage-guardian.accountLock');
+
+type AccountAuth = { [lockName]?: string; _initialize?: () => Promise<unknown> };
+
+export function serializeAccountSignIns(client: SupabaseClient, project: string) {
+  const auth = client.auth;
+  const internal = auth as unknown as AccountAuth;
+  if (internal[lockName]) return client;
+  internal[lockName] = `garage-guardian:account:${accountAuthStorageKey(project)}`;
+  const name = internal[lockName];
+  // Initialization can detect a callback session or clear an invalid one.
+  const initialize = internal._initialize?.bind(auth);
+  if (initialize) internal._initialize = () => withNamedLock(name, initialize);
+  void auth.initialize().catch(() => {});
+  const signIn = auth.signInWithPassword.bind(auth);
+  const signUp = auth.signUp.bind(auth);
+  auth.signInWithPassword = (...args) => withAccountLock(client, () => signIn(...args));
+  auth.signUp = (...args) => withAccountLock(client, () => signUp(...args));
   return client;
 }
 
+function accountLock(client: SupabaseClient, code: 'auth' | 'sessionRevocation') {
+  const name = (client.auth as unknown as AccountAuth)[lockName];
+  if (!name) throw new AppError(code);
+  return name;
+}
+
+export async function withAccountLock<T>(
+  client: SupabaseClient,
+  action: () => Promise<T>,
+  code: 'auth' | 'sessionRevocation' = 'auth',
+): Promise<T> {
+  const name = accountLock(client, code);
+  // Initialization takes the same lock; finish it first.
+  await client.auth.initialize();
+  return withNamedLock(name, action);
+}
+
 async function readBoundSession(
-  auth: LockedAuth,
+  client: SupabaseClient,
   session: Session,
   code: 'auth' | 'sessionRevocation',
 ) {
-  const current = await auth._useSession(async (result) => result);
+  const current = await client.auth.getSession();
   if (current.error) throw new AppError(code);
   if (current.data.session && !sameRecoverySession(session, current.data.session))
     throw new AppError('sessionChanged');
@@ -54,14 +73,9 @@ export async function updateRecoveryPassword(
   session: Session,
   password: string,
 ) {
-  const auth = client.auth as unknown as LockedAuth;
-  if (!auth.lock || !auth._acquireLock || !auth._useSession || !auth._updateUser)
-    throw new AppError('auth');
-  await auth.initialize();
-  await auth._acquireLock(-1, async () => {
-    if (!(await readBoundSession(auth, session, 'auth'))) throw new AppError('recoveryInvalid');
-    // The public method reacquires the lock; use the installed SDK primitive.
-    const { error } = await auth._updateUser({ password });
+  await withAccountLock(client, async () => {
+    if (!(await readBoundSession(client, session, 'auth'))) throw new AppError('recoveryInvalid');
+    const { error } = await client.auth.updateUser({ password });
     if (error) throw new AppError(failureOf({ code: error.code }, 'auth').code);
   });
 }
@@ -70,9 +84,7 @@ export function assertPasswordSignOutSupport(
   client: SupabaseClient,
   code: 'auth' | 'sessionRevocation' = 'auth',
 ) {
-  const auth = client.auth as unknown as LockedAuth;
-  if (!auth.lock || !auth._acquireLock || !auth._useSession || !auth._signOut)
-    throw new AppError(code);
+  accountLock(client, code);
 }
 
 export async function signOutPasswordSession(
@@ -82,21 +94,22 @@ export async function signOutPasswordSession(
 ) {
   const code = scope === 'global' ? 'sessionRevocation' : 'auth';
   try {
-    assertPasswordSignOutSupport(client, code);
-    const auth = client.auth as unknown as LockedAuth;
-    await auth.initialize();
-    await auth._acquireLock(-1, async () => {
-      const readSession = () => readBoundSession(auth, session, code);
-      if (!(await readSession())) {
-        // Local cleanup can already be complete; global revocation needs a token.
-        if (scope === 'global') throw new AppError(code);
-        return;
-      }
-      const { error } = await auth._signOut({ scope }).catch(() => ({ error: true }));
-      const remaining = await readSession();
-      // A lost local logout response is harmless if credentials are gone.
-      if ((error && scope === 'global') || remaining) throw new AppError(code);
-    });
+    await withAccountLock(
+      client,
+      async () => {
+        const readSession = () => readBoundSession(client, session, code);
+        if (!(await readSession())) {
+          // Local cleanup can already be complete; global revocation needs a token.
+          if (scope === 'global') throw new AppError(code);
+          return;
+        }
+        const { error } = await client.auth.signOut({ scope }).catch(() => ({ error: true }));
+        const remaining = await readSession();
+        // A lost local logout response is harmless if credentials are gone.
+        if ((error && scope === 'global') || remaining) throw new AppError(code);
+      },
+      code,
+    );
   } catch (cause) {
     if (cause instanceof AppError && cause.code === 'sessionChanged') throw cause;
     throw new AppError(code);
