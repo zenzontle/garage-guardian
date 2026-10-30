@@ -1,7 +1,7 @@
 'use client';
 
 import { get, update } from 'idb-keyval';
-import { normalizeSnapshot, type Snapshot, type Visit } from '../garage/model';
+import { normalizeSnapshot, type FuelEntry, type Snapshot, type Visit } from '../garage/model';
 import { mergeConversions, receiptInputs, sameInputs, type Currency } from './currency';
 
 type PendingReceipt = { visit: Visit; manualTargets: Currency[] };
@@ -59,6 +59,32 @@ export class OfflineReceipts {
         snapshot: {
           ...current.snapshot,
           visits: [...current.snapshot.visits.filter((entry) => entry.id !== visit.id), merged],
+        },
+      };
+    });
+  }
+  // Fill-ups are cached for offline reading only; they are never queued.
+  async rememberFuelEntry(entry: FuelEntry) {
+    await update<CachedGarage | undefined>(this.key, (current) => {
+      if (!current) return current;
+      const entries = current.snapshot.fuelEntries ?? [];
+      return {
+        ...current,
+        snapshot: {
+          ...current.snapshot,
+          fuelEntries: [...entries.filter((item) => item.id !== entry.id), entry],
+        },
+      };
+    });
+  }
+  async removeFuelEntry(id: string) {
+    await update<CachedGarage | undefined>(this.key, (current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        snapshot: {
+          ...current.snapshot,
+          fuelEntries: (current.snapshot.fuelEntries ?? []).filter((entry) => entry.id !== id),
         },
       };
     });
@@ -157,6 +183,9 @@ export class OfflineReceipts {
         snapshot: {
           ...current.snapshot,
           visits: current.snapshot.visits.filter(keep),
+          fuelEntries: (current.snapshot.fuelEntries ?? []).filter(
+            (entry) => entry.carId !== carId,
+          ),
           pendingSyncCount: pending.length,
           syncConflictCount: missingVehicleCount(current.snapshot, pending),
         },

@@ -12,7 +12,11 @@ type Props = {
   placeholder?: string;
   loading?: boolean;
   failed?: boolean;
-  onRetry: () => void;
+  onRetry?: () => void;
+  required?: boolean;
+  maxLength?: number;
+  // Shown after the label, e.g. "optional".
+  hint?: string;
 };
 
 export function EditableCombobox({
@@ -24,6 +28,9 @@ export function EditableCombobox({
   loading,
   failed,
   onRetry,
+  required = true,
+  maxLength = 50,
+  hint,
 }: Props) {
   const t = useTranslations();
   const id = useId();
@@ -46,7 +53,10 @@ export function EditableCombobox({
 
   return (
     <div className="combobox-field">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={id}>
+        {label}
+        {hint && <span className="optional"> {hint}</span>}
+      </label>
       <div className="combobox-control">
         <input
           ref={input}
@@ -61,8 +71,8 @@ export function EditableCombobox({
           autoComplete="off"
           value={value}
           placeholder={placeholder}
-          required
-          maxLength={50}
+          required={required}
+          maxLength={maxLength}
           onFocus={() => {
             setOpen(true);
             setActive(-1);
@@ -135,7 +145,7 @@ export function EditableCombobox({
           {t('autocomplete.unavailable')}
         </span>
       )}
-      {failed && (
+      {failed && onRetry && (
         <button type="button" className="combobox-retry" onClick={onRetry}>
           {t('autocomplete.retry', { label: label.toLowerCase() })}
         </button>

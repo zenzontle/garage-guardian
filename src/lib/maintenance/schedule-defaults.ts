@@ -1,12 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { addMonths, latestOdometer } from './due';
-import type { Car, ScheduleItem, Snapshot, Visit } from '../garage/model';
+import type { Car, FuelEntry, ScheduleItem, Snapshot, Visit } from '../garage/model';
 
 export function initializeSchedule(
   item: ScheduleItem,
   car: Car,
   visits: Visit[],
   today: string,
+  fuelEntries: FuelEntry[] = [],
 ): ScheduleItem {
   if (
     !item.isActive ||
@@ -15,7 +16,7 @@ export function initializeSchedule(
     (item.intervalMiles === null && item.intervalMonths === null)
   )
     return item;
-  const reading = latestOdometer(car, visits);
+  const reading = latestOdometer(car, visits, fuelEntries);
   return {
     ...item,
     firstDueMiles:
@@ -30,7 +31,7 @@ export function initializeSnapshotSchedules(snapshot: Snapshot, today: string): 
   const cars = new Map(snapshot.cars.map((car) => [car.id, car]));
   const schedules = snapshot.schedules.map((item) => {
     const car = cars.get(item.carId);
-    return car ? initializeSchedule(item, car, snapshot.visits, today) : item;
+    return car ? initializeSchedule(item, car, snapshot.visits, today, snapshot.fuelEntries) : item;
   });
   return schedules.some((item, index) => item !== snapshot.schedules[index])
     ? { ...snapshot, schedules }

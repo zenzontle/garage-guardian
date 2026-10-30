@@ -114,7 +114,12 @@ describe('cloud initialization safeguards', () => {
     cloud.tables.set('schedule_items', new Map([[row.id, row]]));
     return { cloud, row, db: cloud.client as unknown as SupabaseClient };
   }
-  const snapshot = { cars: [{ ...car, odometer: 69000 }], schedules: [intervalOnly], visits: [] };
+  const snapshot = {
+    cars: [{ ...car, odometer: 69000 }],
+    schedules: [intervalOnly],
+    visits: [],
+    fuelEntries: [],
+  };
 
   it.each([
     { first_due_miles: 75000, first_due_date: '2028-01-01' },

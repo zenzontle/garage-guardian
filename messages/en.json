@@ -21,7 +21,7 @@
     "visitFields": "Check the car, odometer, and cost fields.",
     "serviceItem": "Add at least one service item.",
     "itemCosts": "Item costs cannot exceed the visit total.",
-    "photoLimit": "Up to 3 photos can be attached to a visit.",
+    "photoLimit": "Up to 3 photos can be attached.",
     "imageOnly": "Please choose image files only.",
     "photoUnsupported": "This browser cannot process photos.",
     "photoPrepare": "Could not prepare the photo.",
@@ -42,7 +42,9 @@
     "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying.",
     "notificationInput": "Check your reminder preferences and try again.",
     "notificationSave": "Could not load or save reminder preferences. Try again.",
-    "archive": "Could not change vehicle archive status. Try again; cloud changes require an online save."
+    "archive": "Could not change vehicle archive status. Try again; cloud changes require an online save.",
+    "fuelFields": "Check the vehicle, odometer, volume, price, and total fields.",
+    "fuelOdometerOrder": "The odometer cannot be lower than an earlier fill-up or higher than a later one for this vehicle."
   },
   "shared": {
     "language": "Language",
@@ -78,7 +80,9 @@
     "cars": "My cars",
     "history": "Service history",
     "reports": "Reports",
-    "historyShort": "History"
+    "historyShort": "History",
+    "fuel": "Fuel log",
+    "fuelShort": "Fuel"
   },
   "app": {
     "tagline": "CARE FOR THE DRIVE",
@@ -174,7 +178,8 @@
     "viewAll": "View all",
     "noVisits": "No service visits yet",
     "historyPlaceholder": "Your maintenance history will appear here.",
-    "dueCount": "{count, plural, one {# due} other {# due}}"
+    "dueCount": "{count, plural, one {# due} other {# due}}",
+    "logFuel": "Log fuel"
   },
   "car": {
     "description": "Every vehicle’s history and maintenance plan, in one place.",
@@ -398,7 +403,11 @@
   },
   "units": {
     "miles": "miles",
-    "kilometers": "kilometers"
+    "kilometers": "kilometers",
+    "gallons": "gallons",
+    "liters": "liters",
+    "gallonsShort": "gal",
+    "litersShort": "L"
   },
   "notifications": {
     "title": "Email reminders",
@@ -432,7 +441,7 @@
     "deleting": "Deleting…",
     "deleteFailed": "Could not delete this record. Please try again.",
     "deleteTitle": "Delete {name}?",
-    "deleteCar": "This permanently deletes this vehicle, its maintenance tasks, service visits, and photos. This cannot be undone.",
+    "deleteCar": "This permanently deletes this vehicle, its maintenance tasks, service visits, fill-ups, and photos. This cannot be undone.",
     "deleteTask": "This permanently deletes the maintenance task. Existing service history is kept. This cannot be undone.",
     "deleteVisit": "This permanently deletes the service visit and its photos. This cannot be undone.",
     "visitName": "{vehicle} — {date}",
@@ -457,7 +466,12 @@
     "reportSubmitting": "Submitting report with {count, plural, =0 {no screenshots} one {# screenshot} other {# screenshots}}…",
     "reportChecking": "Checking submission status…",
     "carArchived": "Vehicle archived. Reminders are paused.",
-    "carRestored": "Vehicle restored. Reminders have resumed."
+    "carRestored": "Vehicle restored. Reminders have resumed.",
+    "deleteFuel": "This permanently deletes the fill-up and its photos. This cannot be undone.",
+    "fuelName": "{vehicle} fill-up — {date}",
+    "fuelSaved": "Fill-up saved.",
+    "fuelDeleted": "Fill-up deleted.",
+    "savingFuel": "Saving fill-up…"
   },
   "currency": {
     "home": "Home currency",
@@ -498,5 +512,58 @@
     "repeatMonths": "Repeat every {count, plural, one {# month} other {# months}}",
     "inactiveSchedule": "Inactive schedule",
     "archivedView": "Archived"
+  },
+  "fuel": {
+    "eyebrow": "FILL-UPS",
+    "description": "Log each fill-up to track fuel economy and keep your odometer current.",
+    "log": "Log fuel",
+    "edit": "Edit fill-up",
+    "subtitle": "Fill-ups keep the odometer current, so mileage reminders stay accurate.",
+    "odometer": "Odometer ({unit})",
+    "volume": "Volume",
+    "volumeUnit": "Volume unit",
+    "fuelType": "Gas type",
+    "unitPrice": "Price per {unit} ({currency})",
+    "total": "Total ({currency})",
+    "computeHint": "Enter any two of volume, price, and total. The third is calculated.",
+    "fullTank": "Filled the tank",
+    "fullTankHint": "Economy is measured from one full tank to the next.",
+    "missedPrevious": "I missed logging the previous fill-up",
+    "missedPreviousHint": "Economy is skipped for this stretch instead of guessed.",
+    "station": "Station",
+    "stationExample": "e.g. Shell on Main St",
+    "stationSuggestions": "Previous stations",
+    "notesExample": "Anything to remember about this fill-up",
+    "save": "Save fill-up",
+    "types": {
+      "regular": "Regular",
+      "midgrade": "Midgrade",
+      "premium": "Premium",
+      "diesel": "Diesel",
+      "e85": "E85",
+      "other": "Other"
+    },
+    "economy": "Economy",
+    "average": "Average economy",
+    "noEconomy": "Log two full tanks to see fuel economy.",
+    "mpg": "{value} mpg",
+    "litersPer100Km": "{value} L/100 km",
+    "perUnit": "{price}/{unit}",
+    "full": "Full",
+    "partial": "Partial",
+    "missed": "Missed previous",
+    "filterCar": "Filter by vehicle",
+    "empty": "No fill-ups yet",
+    "firstEntry": "Log a fill-up to start tracking fuel economy.",
+    "noMatches": "No fill-ups for this vehicle",
+    "changeFilter": "Choose another vehicle or log a fill-up.",
+    "showing": "Showing {count} of {total, plural, one {# fill-up} other {# fill-ups}}",
+    "price": "Price",
+    "details": "Details",
+    "editEntry": "Edit fill-up",
+    "deleteEntry": "Delete fill-up",
+    "recent": "Recent fill-ups",
+    "viewAll": "View fuel log",
+    "unknown": "Unknown"
   }
 }

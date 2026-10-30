@@ -21,6 +21,7 @@ export function CarsScreen({ carId }: { carId?: string }) {
   const {
     snapshot,
     visits,
+    fuelEntries,
     allDue,
     user,
     repository,
@@ -101,6 +102,7 @@ export function CarsScreen({ carId }: { carId?: string }) {
       archiveError={archiveError}
       onToggleArchived={() => interaction.request(() => void toggleArchived())}
       visits={visits}
+      fuelEntries={fuelEntries}
       allDue={allDue}
       selectedCar={selectedCar}
       onAdd={() => setModal({ kind: 'car' })}
@@ -108,6 +110,7 @@ export function CarsScreen({ carId }: { carId?: string }) {
       onAddSchedule={(id) => setModal({ kind: 'schedule', carId: id })}
       onEditSchedule={(item) => setModal({ kind: 'schedule', carId: item.carId, item })}
       onAddVisit={(id) => setModal({ kind: 'visit', carId: id })}
+      onAddFuel={(id) => setModal({ kind: 'fuel', carId: id })}
       onDeleteCar={(car) =>
         interactions?.confirmDelete({
           title: t('interactions.deleteTitle', { name: car.name }),

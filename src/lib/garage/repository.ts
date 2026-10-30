@@ -26,12 +26,15 @@ import {
   type Conversion,
 } from '../currency/currency';
 import { createClient, navigatorLock, type SupabaseClient } from '@supabase/supabase-js';
+import { checkedFuelEntry } from '../fuel/fuel';
+import { fuelFromRow, fuelToRow } from '../fuel/fuel-rows';
 import {
   EMPTY_SNAPSHOT,
   normalizeCar,
   normalizePlate,
   normalizeSnapshot,
   type Car,
+  type FuelEntry,
   type Photo,
   type ScheduleItem,
   type Snapshot,
@@ -49,7 +52,10 @@ export type Repository = {
   deleteSchedule(id: string): Promise<void>;
   saveVisit(visit: Visit, manualTargets?: Currency[]): Promise<void>;
   deleteVisit(visit: Visit): Promise<void>;
-  uploadPhoto(visitId: string, file: File): Promise<Photo>;
+  saveFuelEntry(entry: FuelEntry): Promise<void>;
+  deleteFuelEntry(entry: FuelEntry): Promise<void>;
+  // Photos are stored under the owning visit's or fill-up's ID.
+  uploadPhoto(recordId: string, file: File): Promise<Photo>;
   photoUrl(photo: Photo): Promise<string>;
   removePhoto(photo: Photo): Promise<void>;
 };
@@ -65,6 +71,7 @@ function snapshotData(snapshot: Snapshot): Snapshot {
     cars: snapshot.cars,
     schedules: snapshot.schedules,
     visits: snapshot.visits,
+    fuelEntries: snapshot.fuelEntries ?? [],
   };
 }
 
@@ -142,13 +149,15 @@ export class LocalRepository implements Repository {
   }
   async deleteCar(id: string) {
     const snapshot = await this.load();
-    for (const visit of snapshot.visits.filter((entry) => entry.carId === id)) {
-      for (const photo of visit.photos) await del(`photo:${photo.path}`);
+    for (const record of [...snapshot.visits, ...snapshot.fuelEntries]) {
+      if (record.carId !== id) continue;
+      for (const photo of record.photos) await del(`photo:${photo.path}`);
     }
     await this.write((current) => {
       current.cars = current.cars.filter((car) => car.id !== id);
       current.schedules = current.schedules.filter((item) => item.carId !== id);
       current.visits = current.visits.filter((visit) => visit.carId !== id);
+      current.fuelEntries = current.fuelEntries.filter((entry) => entry.carId !== id);
     });
   }
   async setCarArchived(id: string, archived: boolean) {
@@ -163,7 +172,9 @@ export class LocalRepository implements Repository {
       const car = snapshot.cars.find((car) => car.id === item.carId);
       snapshot.schedules = upsert(
         snapshot.schedules,
-        car ? initializeSchedule(item, car, snapshot.visits, todayISO()) : item,
+        car
+          ? initializeSchedule(item, car, snapshot.visits, todayISO(), snapshot.fuelEntries)
+          : item,
       );
     });
   }
@@ -194,9 +205,26 @@ export class LocalRepository implements Repository {
       snapshot.visits = snapshot.visits.filter((item) => item.id !== visit.id);
     });
   }
-  async uploadPhoto(visitId: string, file: File): Promise<Photo> {
+  async saveFuelEntry(entry: FuelEntry) {
+    entry = checkedFuelEntry(entry);
+    const previous = (await this.load()).fuelEntries.find((current) => current.id === entry.id);
+    await this.write((snapshot) => {
+      snapshot.fuelEntries = upsert(snapshot.fuelEntries, entry);
+    });
+    for (const photo of previous?.photos ?? []) {
+      if (!entry.photos.some((current) => current.path === photo.path))
+        await this.removePhoto(photo).catch(recordDiagnostic);
+    }
+  }
+  async deleteFuelEntry(entry: FuelEntry) {
+    for (const photo of entry.photos) await del(`photo:${photo.path}`);
+    await this.write((snapshot) => {
+      snapshot.fuelEntries = snapshot.fuelEntries.filter((item) => item.id !== entry.id);
+    });
+  }
+  async uploadPhoto(recordId: string, file: File): Promise<Photo> {
     const id = crypto.randomUUID();
-    const path = `${visitId}/${id}`;
+    const path = `${recordId}/${id}`;
     await set(`photo:${path}`, file);
     return { id, path, name: file.name, contentType: file.type };
   }
@@ -226,6 +254,9 @@ export class LocalRepository implements Repository {
       const changed = <T extends { id: string }>(item: T, originals: T[]) =>
         !originals.some((original) => original.id === item.id && sameRecord(item, original));
       current.visits = current.visits.filter((item) => changed(item, transferred.visits));
+      current.fuelEntries = current.fuelEntries.filter((item) =>
+        changed(item, transferred.fuelEntries),
+      );
       const neededSchedules = new Set(
         current.visits.flatMap((visit) => visit.items.map((item) => item.scheduleItemId)),
       );
@@ -233,7 +264,7 @@ export class LocalRepository implements Repository {
         (item) => changed(item, cleanupSchedules) || neededSchedules.has(item.id),
       );
       const neededCars = new Set(
-        [...current.schedules, ...current.visits].map((item) => item.carId),
+        [...current.schedules, ...current.visits, ...current.fuelEntries].map((item) => item.carId),
       );
       current.cars = current.cars.filter(
         (item) => changed(item, transferred.cars) || neededCars.has(item.id),
@@ -241,10 +272,12 @@ export class LocalRepository implements Repository {
     });
     const current = await this.load();
     const retainedPaths = new Set(
-      current.visits.flatMap((visit) => visit.photos.map((photo) => photo.path)),
+      [...current.visits, ...current.fuelEntries].flatMap((record) =>
+        record.photos.map((photo) => photo.path),
+      ),
     );
-    for (const visit of transferred.visits) {
-      for (const photo of visit.photos)
+    for (const record of [...transferred.visits, ...transferred.fuelEntries]) {
+      for (const photo of record.photos)
         if (!retainedPaths.has(photo.path)) await this.removePhoto(photo);
     }
   }
@@ -415,7 +448,7 @@ export class SupabaseRepository implements Repository {
   }
 
   private async loadOnline(): Promise<Snapshot> {
-    const [cars, schedules, visits, settings] = await Promise.all([
+    const [cars, schedules, visits, fuelEntries, settings] = await Promise.all([
       this.client.from('cars').select('*').eq('user_id', this.userId).order('created_at'),
       this.client.from('schedule_items').select('*').eq('user_id', this.userId).order('created_at'),
       this.client
@@ -423,9 +456,15 @@ export class SupabaseRepository implements Repository {
         .select('*')
         .eq('user_id', this.userId)
         .order('service_date', { ascending: false }),
+      this.client
+        .from('fuel_entries')
+        .select('*')
+        .eq('user_id', this.userId)
+        .order('fuel_date', { ascending: false }),
       this.client.from('garage_settings').select('*').eq('user_id', this.userId).maybeSingle(),
     ]);
-    for (const result of [cars, schedules, visits, settings]) if (result.error) throw result.error;
+    for (const result of [cars, schedules, visits, fuelEntries, settings])
+      if (result.error) throw result.error;
     const snapshot: Snapshot = {
       homeCurrency: currencyOrDefault(settings.data?.home_currency),
       cars: (cars.data ?? []).map((row) =>
@@ -471,6 +510,7 @@ export class SupabaseRepository implements Repository {
         photos: row.photos ?? [],
         createdAt: row.created_at,
       })),
+      fuelEntries: (fuelEntries.data ?? []).map(fuelFromRow),
     };
     return initializeCloudSchedules(this.client, this.userId, snapshot, todayISO());
   }
@@ -508,20 +548,23 @@ export class SupabaseRepository implements Repository {
     }
   }
   private async deleteCarOnline(id: string) {
-    const { data: visits, error: lookupError } = await this.client
-      .from('visits')
-      .select('photos')
-      .eq('user_id', this.userId)
-      .eq('car_id', id);
-    if (lookupError) throw lookupError;
+    // Collect photo paths before the cascade removes the records that reference them.
+    const lookups = await Promise.all(
+      ['visits', 'fuel_entries'].map((table) =>
+        this.client.from(table).select('photos').eq('user_id', this.userId).eq('car_id', id),
+      ),
+    );
+    for (const lookup of lookups) if (lookup.error) throw lookup.error;
     const { error } = await this.client
       .from('cars')
       .delete()
       .eq('user_id', this.userId)
       .eq('id', id);
     if (error) throw error;
-    const paths = (visits ?? []).flatMap((visit) =>
-      (visit.photos as Photo[]).map((photo) => photo.path),
+    const paths = lookups.flatMap((lookup) =>
+      (lookup.data ?? []).flatMap((record) =>
+        ((record.photos as Photo[] | null) ?? []).map((photo) => photo.path),
+      ),
     );
     if (paths.length) await this.client.storage.from('visit-photos').remove(paths);
     await this.offline?.remove(undefined, id);
@@ -610,9 +653,46 @@ export class SupabaseRepository implements Repository {
         .from('visit-photos')
         .remove(visit.photos.map((photo) => photo.path));
   }
-  async uploadPhoto(visitId: string, file: File): Promise<Photo> {
+  // Fill-ups have no offline queue yet: an offline save surfaces the connection error.
+  async saveFuelEntry(entry: FuelEntry) {
+    return this.withReceiptLock(() => this.saveFuelEntryOnline(entry));
+  }
+  private async saveFuelEntryOnline(entry: FuelEntry) {
+    entry = checkedFuelEntry(entry);
+    const { data: previous, error: lookupError } = await this.client
+      .from('fuel_entries')
+      .select('photos')
+      .eq('user_id', this.userId)
+      .eq('id', entry.id)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    const { error } = await this.client.from('fuel_entries').upsert(fuelToRow(entry, this.userId));
+    if (error) throw error;
+    await this.offline?.rememberFuelEntry(entry).catch(recordDiagnostic);
+    for (const photo of (previous?.photos as Photo[] | undefined) ?? []) {
+      if (!entry.photos.some((current) => current.path === photo.path))
+        await this.removePhoto(photo).catch(recordDiagnostic);
+    }
+  }
+  async deleteFuelEntry(entry: FuelEntry) {
+    return this.withReceiptLock(() => this.deleteFuelEntryOnline(entry));
+  }
+  private async deleteFuelEntryOnline(entry: FuelEntry) {
+    const { error } = await this.client
+      .from('fuel_entries')
+      .delete()
+      .eq('user_id', this.userId)
+      .eq('id', entry.id);
+    if (error) throw error;
+    await this.offline?.removeFuelEntry(entry.id);
+    if (entry.photos.length)
+      await this.client.storage
+        .from('visit-photos')
+        .remove(entry.photos.map((photo) => photo.path));
+  }
+  async uploadPhoto(recordId: string, file: File): Promise<Photo> {
     const id = crypto.randomUUID();
-    const path = `${this.userId}/${visitId}/${id}.webp`;
+    const path = `${this.userId}/${recordId}/${id}.webp`;
     const { error } = await this.client.storage
       .from('visit-photos')
       .upload(path, file, { contentType: file.type, upsert: false });

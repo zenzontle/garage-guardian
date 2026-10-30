@@ -2,7 +2,7 @@
 
 ## Distance units
 
-Choose **Miles** (default) or **Kilometers** when adding a car. The distance unit is read-only in **Edit car**. Odometer readings, maintenance intervals, and service history use that vehicle’s chosen unit. Each car starts with a 30-day upcoming window and a distance window of **500 miles** or **1,000 kilometers**, adjustable in **Edit car**. Distance reminders use the latest entered odometer rather than an estimate. Existing vehicles remain Miles with their saved readings and reminder settings unchanged. CSV exports include a numeric Odometer column and a per-row Distance unit (`mi` or `km`).
+Choose **Miles** (default) or **Kilometers** when adding a car. The distance unit is read-only in **Edit car**. Odometer readings, maintenance intervals, and service history use that vehicle’s chosen unit. Each car starts with a 30-day upcoming window and a distance window of **500 miles** or **1,000 kilometers**, adjustable in **Edit car**. Distance reminders use the latest entered odometer (the highest of the car's reading, service visits, and [fill-ups](fuel.md)) rather than an estimate. Existing vehicles remain Miles with their saved readings and reminder settings unchanged. CSV exports include a numeric Odometer column and a per-row Distance unit (`mi` or `km`).
 
 In the database, all distance fields (including legacy `*_miles` columns) use the parent vehicle’s unit. The app writes the 500-mile or 1,000-kilometer reminder default explicitly. Migration `0003_vehicle_distance_units.sql` adds the unit with a Miles default.
 

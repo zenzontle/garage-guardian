@@ -2,6 +2,7 @@ export const workspacePaths = {
   dashboard: '/',
   cars: '/cars',
   history: '/history',
+  fuel: '/fuel',
   reports: '/reports',
 } as const;
 
@@ -13,12 +14,17 @@ export function carPath(id: string) {
   return `/cars/${encodeURIComponent(id)}`;
 }
 
+export function fuelPath(carId?: string) {
+  return carId ? `/fuel?${new URLSearchParams({ car: carId })}` : '/fuel';
+}
+
 export function workspaceScreen(pathname: string): WorkspaceScreen {
   if (pathname === '/settings/account') return 'account';
   if (pathname === '/settings/security') return 'security';
   if (pathname === '/settings/notifications') return 'notifications';
   if (pathname === '/cars' || pathname.startsWith('/cars/')) return 'cars';
   if (pathname === '/history') return 'history';
+  if (pathname === '/fuel') return 'fuel';
   if (pathname === '/reports') return 'reports';
   return 'dashboard';
 }
@@ -57,6 +63,7 @@ export const reportPaths = [
   '/cars',
   '/cars/[carId]',
   '/history',
+  '/fuel',
   '/reports',
   '/settings/notifications',
   '/settings/account',

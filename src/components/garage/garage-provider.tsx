@@ -14,7 +14,8 @@ import { getAllDue } from '@/lib/maintenance/due';
 import { useGarageSession } from '@/lib/garage/use-garage-session';
 import { currencyOrDefault } from '@/lib/currency/currency';
 import { useBackgroundConversions } from '@/lib/currency/use-background-conversions';
-import type { Car, ScheduleItem, Visit } from '@/lib/garage/model';
+import type { Car, FuelEntry, ScheduleItem, Visit } from '@/lib/garage/model';
+import { sortFuelEntries } from '@/lib/fuel/fuel';
 import { todayISO } from '@/lib/utils/today-iso';
 import { useInteractions } from '../interaction/interaction-provider';
 import { useFormInteraction } from '../interaction/use-form-interaction';
@@ -23,6 +24,7 @@ type ModalState =
   | { kind: 'car'; item?: Car }
   | { kind: 'schedule'; item?: ScheduleItem; carId: string }
   | { kind: 'visit'; item?: Visit; carId?: string }
+  | { kind: 'fuel'; item?: FuelEntry; carId?: string }
   | { kind: 'account'; section?: 'security' }
   | null;
 
@@ -76,6 +78,7 @@ function useGarageState() {
         garage.snapshot.schedules,
         garage.snapshot.visits,
         todayISO(),
+        garage.snapshot.fuelEntries,
       ),
     [garage.snapshot],
   );
@@ -85,6 +88,10 @@ function useGarageState() {
         (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
       ),
     [garage.snapshot.visits],
+  );
+  const fuelEntries = useMemo(
+    () => sortFuelEntries(garage.snapshot.fuelEntries),
+    [garage.snapshot.fuelEntries],
   );
 
   async function perform(action: () => Promise<void>) {
@@ -100,6 +107,7 @@ function useGarageState() {
     currentPath,
     allDue,
     visits,
+    fuelEntries,
     modal,
     setModal,
     notice,

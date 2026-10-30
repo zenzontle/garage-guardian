@@ -13,6 +13,7 @@ export function reminderStore() {
     cars: [],
     schedule_items: [],
     visits: [],
+    fuel_entries: [],
   };
   const calls: { table: string; operation: string; filters: [string, string, unknown][] }[] = [];
   let failOutcome = false;

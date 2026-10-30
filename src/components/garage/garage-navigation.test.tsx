@@ -294,6 +294,7 @@ it('retraces screens and vehicles with Back/Forward without reloading the garage
 
 it.each([
   ['/history', 'Service history'],
+  ['/fuel', 'Fuel log'],
   ['/reports', 'Reports'],
 ])('loads and reloads %s directly', async (url, title) => {
   testRouter.reset(url);
@@ -362,7 +363,7 @@ it('closes dialogs and the mobile menu on browser navigation', async () => {
   expect(screen.queryByRole('dialog')).toBeNull();
 });
 
-it.each(['/', '/cars', '/history', '/reports'])(
+it.each(['/', '/cars', '/history', '/fuel', '/reports'])(
   'closes the mobile drawer when its active link is selected at %s',
   async (url) => {
     testRouter.reset(url);

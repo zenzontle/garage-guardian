@@ -21,7 +21,7 @@
     "visitFields": "Revisa los campos de auto, odómetro y costo.",
     "serviceItem": "Añade al menos una tarea de servicio.",
     "itemCosts": "Los costos de las tareas no pueden superar el total de la visita.",
-    "photoLimit": "Puedes adjuntar hasta 3 fotos a una visita.",
+    "photoLimit": "Puedes adjuntar hasta 3 fotos.",
     "imageOnly": "Elige solo archivos de imagen.",
     "photoUnsupported": "Este navegador no puede procesar fotos.",
     "photoPrepare": "No se pudo preparar la foto. Prueba con otra imagen.",
@@ -42,7 +42,9 @@
     "accountSessionCleanup": "Es posible que la solicitud se haya completado, pero no se pudo cerrar la sesión temporal de verificación. Comprueba tu cuenta antes de reintentar.",
     "notificationInput": "Revisa tus preferencias de recordatorios e inténtalo de nuevo.",
     "notificationSave": "No se pudieron cargar o guardar las preferencias de recordatorios. Inténtalo de nuevo.",
-    "archive": "No se pudo cambiar el estado del vehículo. Inténtalo de nuevo; los cambios en la nube requieren conexión."
+    "archive": "No se pudo cambiar el estado del vehículo. Inténtalo de nuevo; los cambios en la nube requieren conexión.",
+    "fuelFields": "Revisa el vehículo, el odómetro, el volumen, el precio y el total.",
+    "fuelOdometerOrder": "El odómetro no puede ser menor que el de una carga anterior ni mayor que el de una posterior de este vehículo."
   },
   "shared": {
     "language": "Idioma",
@@ -78,7 +80,9 @@
     "cars": "Mis autos",
     "history": "Historial de servicio",
     "reports": "Informes",
-    "historyShort": "Historial"
+    "historyShort": "Historial",
+    "fuel": "Combustible",
+    "fuelShort": "Combustible"
   },
   "app": {
     "tagline": "CUIDA CADA RECORRIDO",
@@ -174,7 +178,8 @@
     "viewAll": "Ver todo",
     "noVisits": "Aún no hay visitas de servicio",
     "historyPlaceholder": "Tu historial de mantenimiento aparecerá aquí.",
-    "dueCount": "{count, plural, one {# pendiente} other {# pendientes}}"
+    "dueCount": "{count, plural, one {# pendiente} other {# pendientes}}",
+    "logFuel": "Registrar carga"
   },
   "car": {
     "description": "El historial y el plan de mantenimiento de cada vehículo, en un solo lugar.",
@@ -398,7 +403,11 @@
   },
   "units": {
     "miles": "millas",
-    "kilometers": "kilómetros"
+    "kilometers": "kilómetros",
+    "gallons": "galones",
+    "liters": "litros",
+    "gallonsShort": "gal",
+    "litersShort": "L"
   },
   "notifications": {
     "title": "Recordatorios por correo",
@@ -432,7 +441,7 @@
     "deleting": "Eliminando…",
     "deleteFailed": "No se pudo eliminar este registro. Inténtalo de nuevo.",
     "deleteTitle": "¿Eliminar {name}?",
-    "deleteCar": "Esto elimina permanentemente el vehículo, sus tareas de mantenimiento, visitas de servicio y fotos. No se puede deshacer.",
+    "deleteCar": "Esto elimina permanentemente el vehículo, sus tareas de mantenimiento, visitas de servicio, cargas de combustible y fotos. No se puede deshacer.",
     "deleteTask": "Esto elimina permanentemente la tarea de mantenimiento. El historial de servicio se conserva. No se puede deshacer.",
     "deleteVisit": "Esto elimina permanentemente la visita de servicio y sus fotos. No se puede deshacer.",
     "visitName": "{vehicle} — {date}",
@@ -457,7 +466,12 @@
     "reportSubmitting": "Enviando reporte con {count, plural, =0 {ninguna captura} one {# captura} other {# capturas}}…",
     "reportChecking": "Consultando el estado del envío…",
     "carArchived": "Vehículo archivado. Los recordatorios están pausados.",
-    "carRestored": "Vehículo restaurado. Los recordatorios se han reanudado."
+    "carRestored": "Vehículo restaurado. Los recordatorios se han reanudado.",
+    "deleteFuel": "Esto elimina permanentemente la carga de combustible y sus fotos. No se puede deshacer.",
+    "fuelName": "la carga de {vehicle} — {date}",
+    "fuelSaved": "Carga de combustible guardada.",
+    "fuelDeleted": "Carga de combustible eliminada.",
+    "savingFuel": "Guardando carga…"
   },
   "currency": {
     "home": "Moneda principal",
@@ -498,5 +512,58 @@
     "repeatMonths": "Repetir cada {count, plural, one {# mes} other {# meses}}",
     "inactiveSchedule": "Programa inactivo",
     "archivedView": "Archivados"
+  },
+  "fuel": {
+    "eyebrow": "CARGAS DE COMBUSTIBLE",
+    "description": "Registra cada carga para medir el rendimiento y mantener el odómetro al día.",
+    "log": "Registrar carga",
+    "edit": "Editar carga",
+    "subtitle": "Las cargas mantienen el odómetro al día, así los recordatorios por distancia son precisos.",
+    "odometer": "Odómetro ({unit})",
+    "volume": "Volumen",
+    "volumeUnit": "Unidad de volumen",
+    "fuelType": "Tipo de combustible",
+    "unitPrice": "Precio por {unit} ({currency})",
+    "total": "Total ({currency})",
+    "computeHint": "Ingresa dos de volumen, precio y total. El tercero se calcula.",
+    "fullTank": "Llené el tanque",
+    "fullTankHint": "El rendimiento se mide de un tanque lleno al siguiente.",
+    "missedPrevious": "No registré la carga anterior",
+    "missedPreviousHint": "Se omite el rendimiento de este tramo en lugar de estimarlo.",
+    "station": "Gasolinera",
+    "stationExample": "p. ej., Pemex Centro",
+    "stationSuggestions": "Gasolineras anteriores",
+    "notesExample": "Cualquier detalle para recordar sobre esta carga",
+    "save": "Guardar carga",
+    "types": {
+      "regular": "Regular",
+      "midgrade": "Intermedia",
+      "premium": "Premium",
+      "diesel": "Diésel",
+      "e85": "E85",
+      "other": "Otro"
+    },
+    "economy": "Rendimiento",
+    "average": "Rendimiento promedio",
+    "noEconomy": "Registra dos tanques llenos para ver el rendimiento.",
+    "mpg": "{value} mpg",
+    "litersPer100Km": "{value} L/100 km",
+    "perUnit": "{price}/{unit}",
+    "full": "Lleno",
+    "partial": "Parcial",
+    "missed": "Faltó la anterior",
+    "filterCar": "Filtrar por vehículo",
+    "empty": "Aún no hay cargas",
+    "firstEntry": "Registra una carga para empezar a medir el rendimiento.",
+    "noMatches": "No hay cargas de este vehículo",
+    "changeFilter": "Elige otro vehículo o registra una carga.",
+    "showing": "Mostrando {count} de {total, plural, one {# carga} other {# cargas}}",
+    "price": "Precio",
+    "details": "Detalles",
+    "editEntry": "Editar carga",
+    "deleteEntry": "Eliminar carga",
+    "recent": "Cargas recientes",
+    "viewAll": "Ver registro de combustible",
+    "unknown": "Desconocido"
   }
 }

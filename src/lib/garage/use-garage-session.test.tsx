@@ -82,6 +82,7 @@ it('bootstraps a recovery callback processed by the SDK before the hook subscrib
     cars: [car],
     schedules: [],
     visits: [],
+    fuelEntries: [],
   });
   const marker = localStorage.getItem(`garage-guardian:recovery:${project}`)!;
   expect(marker).not.toContain(session.access_token);
@@ -582,7 +583,13 @@ it('moves guest data after immediate signup, then uses only cloud storage and lo
   });
   await waitFor(() => expect(hook.result.current.repository).not.toBeNull());
   expect(hook.result.current.snapshot.cars).toEqual([car]);
-  expect(await local.load()).toEqual({ homeCurrency: 'USD', cars: [], schedules: [], visits: [] });
+  expect(await local.load()).toEqual({
+    homeCurrency: 'USD',
+    cars: [],
+    schedules: [],
+    visits: [],
+    fuelEntries: [],
+  });
   await act(async () => {
     await hook.result.current.run(() =>
       hook.result.current.repository!.saveCar({ ...car, name: 'Cloud change' }),
@@ -922,7 +929,7 @@ it('serializes refresh and mutations and keeps the last snapshot while refreshin
   expect(action).not.toHaveBeenCalled();
   expect(load).toHaveBeenCalledTimes(1);
   await act(async () => {
-    release({ cars: [car], schedules: [], visits: [] });
+    release({ cars: [car], schedules: [], visits: [], fuelEntries: [] });
     await refresh;
   });
   expect(hook.result.current.refreshing).toBe(false);

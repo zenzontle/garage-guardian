@@ -3,7 +3,7 @@ import { clear, get, set } from 'idb-keyval';
 import { LocalRepository, SupabaseRepository } from './repository';
 import { pendingTransfer, registerSignup, transferSignupData } from './signup-transfer';
 import { account, fakeSupabase } from '../../test/fake-supabase';
-import { car, schedule, visit } from '../../test/fixtures';
+import { car, fuelEntry, schedule, visit } from '../../test/fixtures';
 import { addMonths } from '../maintenance/due';
 import { todayISO } from '../utils/today-iso';
 
@@ -112,6 +112,7 @@ describe('signup transfer', () => {
         cars: edit === 'none' ? [] : [car],
         schedules: edit === 'none' ? [] : edit === 'new task' ? [guest.schedules[1]] : [edited],
         visits: [],
+        fuelEntries: [],
       });
       expect(await get(`photo:${photo.path}`)).toBeUndefined();
       expect(cloud.from).not.toHaveBeenCalled();
@@ -165,6 +166,7 @@ describe('signup transfer', () => {
         cars: edit === 'none' ? [] : [car],
         schedules: edit === 'none' ? [] : [edited],
         visits: [],
+        fuelEntries: [],
       });
       expect(await get(`photo:${photo.path}`)).toBeUndefined();
       expect(cloud.tables.get('schedule_items')!.get(schedule.id)).toMatchObject({
@@ -223,6 +225,7 @@ describe('signup transfer', () => {
       cars: [],
       schedules: [],
       visits: [],
+      fuelEntries: [],
     });
     expect(await pendingTransfer(project)).toBeUndefined();
   });
@@ -270,6 +273,7 @@ describe('signup transfer', () => {
         cars: [],
         schedules: [],
         visits: [],
+        fuelEntries: [],
       });
       expect(await pendingTransfer(project)).toBeUndefined();
     },
@@ -296,6 +300,7 @@ describe('signup transfer', () => {
         cars: [],
         schedules: [],
         visits: [],
+        fuelEntries: [],
       });
       expect(await pendingTransfer(project)).toBeUndefined();
       if (status !== 'uploaded') {
@@ -331,6 +336,7 @@ describe('signup transfer', () => {
       cars: [],
       schedules: [],
       visits: [],
+      fuelEntries: [],
     });
     expect(await pendingTransfer(project)).toBeUndefined();
   });
@@ -372,6 +378,7 @@ describe('signup transfer', () => {
       cars: [car],
       schedules: [schedule],
       visits: [visit],
+      fuelEntries: [],
     });
     await registerSignup(project, account(), true);
     await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
@@ -394,12 +401,14 @@ describe('signup transfer', () => {
       cars: [metric],
       schedules: [schedule],
       visits: [visit],
+      fuelEntries: [],
     });
     expect(await local.load()).toEqual({
       homeCurrency: 'USD',
       cars: [],
       schedules: [],
       visits: [],
+      fuelEntries: [],
     });
   });
 
@@ -423,6 +432,7 @@ describe('signup transfer', () => {
       cars: [],
       schedules: [],
       visits: [],
+      fuelEntries: [],
     });
     expect(await get(`photo:${photo.path}`)).toBeUndefined();
     expect(await pendingTransfer(project)).toBeUndefined();
@@ -472,7 +482,7 @@ describe('signup transfer', () => {
     cloud.emit(account());
     const load = vi
       .spyOn(SupabaseRepository.prototype, 'load')
-      .mockResolvedValueOnce({ cars: [], schedules: [], visits: [] });
+      .mockResolvedValueOnce({ cars: [], schedules: [], visits: [], fuelEntries: [] });
     await registerSignup(project, account(), true);
     await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
       'could not be verified',
@@ -522,6 +532,7 @@ describe('signup transfer', () => {
       cars: [],
       schedules: [],
       visits: [],
+      fuelEntries: [],
     });
   });
 
@@ -620,5 +631,78 @@ describe('signup transfer', () => {
     expect(remaining.cars).toEqual([car]);
     expect(remaining.schedules).toEqual([schedule]);
     expect(await local.readPhoto(edited.photos[0])).toBeInstanceOf(Blob);
+  });
+});
+
+describe('signup transfer of fill-ups', () => {
+  async function seedFuel() {
+    const { local, photo } = await seedLocal();
+    const fuelPhoto = await local.uploadPhoto(
+      fuelEntry.id,
+      new File(['pump receipt'], 'pump.webp', { type: 'image/webp' }),
+    );
+    await local.saveFuelEntry({ ...fuelEntry, photos: [fuelPhoto] });
+    return { local, photo, fuelPhoto };
+  }
+
+  it('uploads and verifies fill-ups with their photos, then clears the browser copy', async () => {
+    const { local, fuelPhoto } = await seedFuel();
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    await registerSignup(project, account(), true);
+    const progress = vi.fn();
+    await transferSignupData(cloud.client, project, account().id, () => {}, progress);
+    const cloudPath = `${account().id}/${fuelEntry.id}/${fuelPhoto.id}.webp`;
+    const saved = await new SupabaseRepository(cloud.client, account().id).load();
+    expect(saved.fuelEntries).toEqual([
+      { ...fuelEntry, photos: [{ ...fuelPhoto, path: cloudPath }] },
+    ]);
+    expect(await cloud.photos.get(cloudPath)!.text()).toBe('pump receipt');
+    expect(progress).toHaveBeenCalledWith({ phase: 'uploading', current: 2, total: 2 });
+    expect((await local.load()).fuelEntries).toEqual([]);
+    expect(await get(`photo:${fuelPhoto.path}`)).toBeUndefined();
+    expect(await pendingTransfer(project)).toBeUndefined();
+  });
+
+  it('keeps local fill-ups and photos when the uploaded copy cannot be verified', async () => {
+    const { local, fuelPhoto } = await seedFuel();
+    const before = await local.load();
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    await registerSignup(project, account(), true);
+    const load = SupabaseRepository.prototype.load;
+    vi.spyOn(SupabaseRepository.prototype, 'load').mockImplementationOnce(async function (
+      this: InstanceType<typeof SupabaseRepository>,
+    ) {
+      const snapshot = await load.call(this);
+      return { ...snapshot, fuelEntries: [] };
+    });
+    await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
+      'upload could not be verified',
+    );
+    expect(await local.load()).toEqual(before);
+    expect(await local.readPhoto(fuelPhoto)).toBeInstanceOf(Blob);
+    expect((await pendingTransfer(project))?.status).toBe('uploading');
+  });
+
+  it('keeps a fill-up edited during the transfer and the vehicle it needs', async () => {
+    const { local } = await seedFuel();
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    await registerSignup(project, account(), true);
+    const save = SupabaseRepository.prototype.saveFuelEntry;
+    vi.spyOn(SupabaseRepository.prototype, 'saveFuelEntry').mockImplementationOnce(async function (
+      this: InstanceType<typeof SupabaseRepository>,
+      entry,
+    ) {
+      await save.call(this, entry);
+      await local.saveFuelEntry({ ...entry, notes: 'Edited in another tab', photos: [] });
+    });
+    await transferSignupData(cloud.client, project, account().id);
+    const remaining = await local.load();
+    expect(remaining.fuelEntries).toMatchObject([
+      { id: fuelEntry.id, notes: 'Edited in another tab' },
+    ]);
+    expect(remaining.cars.map((item) => item.id)).toEqual([car.id]);
   });
 });

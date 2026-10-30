@@ -9,13 +9,14 @@ import {
   CarFront,
   Check,
   CircleAlert,
+  Fuel,
   Plus,
   ReceiptText,
   Settings2,
   Wrench,
 } from 'lucide-react';
 import { latestOdometer, type DueItem } from '@/lib/maintenance/due';
-import { type Car, type Visit } from '@/lib/garage/model';
+import { type Car, type FuelEntry, type Visit } from '@/lib/garage/model';
 import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
 import { Stat } from '../ui/stat';
@@ -26,16 +27,20 @@ import type { Currency } from '@/lib/currency/currency';
 export function Dashboard({
   cars,
   visits,
+  fuelEntries = [],
   allDue,
   onAddCar,
   onAddVisit,
+  onAddFuel,
   homeCurrency = 'USD',
 }: {
   cars: Car[];
   visits: Visit[];
+  fuelEntries?: FuelEntry[];
   allDue: DueItem[];
   onAddCar: () => void;
   onAddVisit: () => void;
+  onAddFuel?: () => void;
   homeCurrency?: Currency;
 }) {
   const t = useTranslations();
@@ -56,10 +61,18 @@ export function Dashboard({
         title={t('dashboard.title')}
         description={t('dashboard.description')}
         action={
-          <button className="button primary" onClick={activeCars.length ? onAddVisit : onAddCar}>
-            <Plus size={18} />
-            {activeCars.length ? t('shared.logService') : t('dashboard.firstCar')}
-          </button>
+          <div className="account-actions">
+            {activeCars.length > 0 && onAddFuel && (
+              <button className="button secondary" onClick={onAddFuel}>
+                <Fuel size={18} />
+                {t('dashboard.logFuel')}
+              </button>
+            )}
+            <button className="button primary" onClick={activeCars.length ? onAddVisit : onAddCar}>
+              <Plus size={18} />
+              {activeCars.length ? t('shared.logService') : t('dashboard.firstCar')}
+            </button>
+          </div>
         }
       />
       {cars.length === 0 ? (
@@ -199,7 +212,10 @@ export function Dashboard({
                         <strong>{car.name}</strong>
                         <small>
                           {car.year} {car.make} {car.model} ·{' '}
-                          {formatDistance(latestOdometer(car, visits), car.distanceUnit)}
+                          {formatDistance(
+                            latestOdometer(car, visits, fuelEntries),
+                            car.distanceUnit,
+                          )}
                         </small>
                       </span>
                       {count > 0 && (

@@ -14,6 +14,7 @@
 | [Vehicles](vehicles.md)                           | Distance units, license plates, archiving, make/model suggestions                     |
 | [Vehicle catalog](vehicle-catalog.md)             | Catalog data source and provenance, regeneration, deployment                          |
 | [Maintenance schedules](maintenance-schedules.md) | Repeat intervals, first due points, optional visit odometer                           |
+| [Fuel log](fuel.md)                               | Fill-up fields, units, fuel economy, odometer readings, deployment                    |
 | [Multi-currency](multi-currency.md)               | Receipt currencies, conversions, offline account receipts, home-currency reports      |
 | [Account management](account-management.md)       | Password recovery, email/password changes, account API, smoke test                    |
 | [Account reminders](account-reminders.md)         | Weekly email digests: deployment, delivery semantics, API, operations                 |

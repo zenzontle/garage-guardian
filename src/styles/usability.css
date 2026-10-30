@@ -269,3 +269,6 @@
 .button.danger:hover {
   background: var(--surface-raised);
 }
+.fuel-date {
+  white-space: nowrap;
+}

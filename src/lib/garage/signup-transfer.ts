@@ -4,7 +4,7 @@ import { del, get, set, update } from 'idb-keyval';
 import { AppError } from '../utils/app-error';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { LocalRepository, SupabaseRepository, sameRecord } from './repository';
-import { normalizeSnapshot, type Snapshot } from './model';
+import { normalizeSnapshot, type Photo, type Snapshot } from './model';
 import { initializeSnapshotSchedules } from '../maintenance/schedule-defaults';
 import { todayISO } from '../utils/today-iso';
 import { CURRENCIES } from '../currency/currency';
@@ -105,7 +105,10 @@ async function runTransfer(
     onProgress?.({ phase: 'records' });
     assertActive();
     await cloud.saveHomeCurrency(expected.homeCurrency ?? 'USD');
-    const total = expected.visits.reduce((sum, visit) => sum + visit.photos.length, 0);
+    const total = [...expected.visits, ...expected.fuelEntries].reduce(
+      (sum, record) => sum + record.photos.length,
+      0,
+    );
     let completed = 0;
     // Each await is a cancellation boundary: never continue under another session.
     for (const car of expected.cars) {
@@ -116,11 +119,11 @@ async function runTransfer(
       assertActive();
       await cloud.saveSchedule(item);
     }
-    for (const visit of expected.visits) {
-      for (const photo of visit.photos) {
+    const uploadPhotos = async (record: { id: string; photos: Photo[] }) => {
+      for (const photo of record.photos) {
         assertActive();
         const file = await local.readPhoto(photo);
-        const path = `${userId}/${visit.id}/${photo.id}.webp`;
+        const path = `${userId}/${record.id}/${photo.id}.webp`;
         assertActive();
         onProgress?.({ phase: 'uploading', current: completed + 1, total });
         const { error } = await client.storage
@@ -147,18 +150,25 @@ async function runTransfer(
       }
       assertActive();
       onProgress?.({ phase: 'records' });
+    };
+    for (const visit of expected.visits) {
+      await uploadPhotos(visit);
       await cloud.saveVisit(visit, [...CURRENCIES]);
+    }
+    for (const entry of expected.fuelEntries) {
+      await uploadPhotos(entry);
+      await cloud.saveFuelEntry(entry);
     }
     assertActive();
     onProgress?.({ phase: 'verifying' });
     const saved = await cloud.load();
     if (saved.homeCurrency !== expected.homeCurrency) throw new AppError('transferVerification');
-    for (const key of ['cars', 'schedules', 'visits'] as const) {
+    for (const key of ['cars', 'schedules', 'visits', 'fuelEntries'] as const) {
       for (const item of expected[key]) {
         if (
           !sameRecord(
             item,
-            saved[key].find((entry) => entry.id === item.id),
+            (saved[key] as { id: string }[]).find((entry) => entry.id === item.id),
           )
         ) {
           throw new AppError('transferVerification');
