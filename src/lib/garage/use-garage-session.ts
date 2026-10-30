@@ -25,6 +25,7 @@ import {
   assertPasswordSignOutSupport,
   signOutPasswordSession,
   updateRecoveryPassword,
+  withAccountLock,
 } from '../account/account-session';
 import en from '../../../messages/en.json';
 
@@ -357,7 +358,7 @@ export function useGarageSession() {
     if (!supabase) return true;
     if (accountLock.current) return false;
     try {
-      const { error } = await supabase.auth.signOut({ scope });
+      const { error } = await withAccountLock(supabase, () => supabase!.auth.signOut({ scope }));
       if (error) {
         setError(failureOf(error, 'auth'));
         return false;

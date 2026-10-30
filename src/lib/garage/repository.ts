@@ -2,7 +2,7 @@
 
 import { del, get, set, update } from 'idb-keyval';
 import { AppError } from '../utils/app-error';
-import { accountAuthStorageKey, serializeAccountSignIns } from '../account/account-session';
+import { accountAuthOptions, serializeAccountSignIns } from '../account/account-session';
 import { bootstrapRecovery } from '../account/account-recovery';
 import { recordDiagnostic } from '../feedback/diagnostics';
 import {
@@ -25,7 +25,7 @@ import {
   type Currency,
   type Conversion,
 } from '../currency/currency';
-import { createClient, navigatorLock, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { checkedFuelEntry } from '../fuel/fuel';
 import { fuelFromRow, fuelToRow } from '../fuel/fuel-rows';
 import {
@@ -720,15 +720,9 @@ export const supabase = isCloudConfigured
       createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-        {
-          auth: {
-            storageKey: accountAuthStorageKey(process.env.NEXT_PUBLIC_SUPABASE_URL!),
-            lock: typeof navigator !== 'undefined' && navigator.locks ? navigatorLock : undefined,
-            // A timeout must never steal a lock from an in-flight account cleanup.
-            lockAcquireTimeout: -1,
-          },
-        },
+        { auth: accountAuthOptions(process.env.NEXT_PUBLIC_SUPABASE_URL!) },
       ),
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
     )
   : null;
 

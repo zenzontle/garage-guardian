@@ -1,17 +1,15 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import {
-  createClient,
-  navigatorLock,
-  processLock,
-  type SupabaseClient,
-} from '@supabase/supabase-js';
-import {
+  accountAuthOptions,
   accountAuthStorageKey,
+  assertPasswordSignOutSupport,
   serializeAccountSignIns,
   signOutPasswordSession,
   updateRecoveryPassword,
 } from './account-session';
 import { account } from '../../test/fake-supabase';
+import { fakeLocks } from '../../test/fake-locks';
 
 const project = 'https://account-session.supabase.co';
 beforeEach(() => localStorage.clear());
@@ -31,9 +29,10 @@ function storedClient(projectUrl = project) {
     }),
   );
   const auth = {
-    lock: true,
     initialize: vi.fn(async () => ({ error: null })),
-    _acquireLock: vi.fn(async <R>(_timeout: number, work: () => Promise<R>) => work()),
+    signInWithPassword: vi.fn(),
+    signUp: vi.fn(),
+    updateUser: vi.fn(async () => ({ data: { user: account() }, error: null })),
     signOut: vi.fn<(options?: { scope: 'local' }) => Promise<{ error: Error | null }>>(
       async () => ({ error: null }),
     ),
@@ -42,27 +41,24 @@ function storedClient(projectUrl = project) {
       error: null,
     })),
   };
-  Object.assign(auth, {
-    _useSession: async <R>(
-      work: (result: Awaited<ReturnType<typeof auth.getSession>>) => Promise<R>,
-    ) => work(await auth.getSession()),
-    _signOut: (options: { scope: 'local' }) => auth.signOut(options),
-    _updateUser: vi.fn(async () => ({ data: { user: account() }, error: null })),
-  });
-  return { auth, key, client: { auth } as unknown as SupabaseClient };
+  const client = serializeAccountSignIns({ auth } as unknown as SupabaseClient, projectUrl);
+  return { auth, key, client };
 }
 
 it('preserves the SDK’s existing storage key and can load its persisted session before cleanup', async () => {
   const existingProject = 'https://existing-session.supabase.co';
   const { key } = storedClient(existingProject);
-  const existing = createClient(existingProject, 'test-key', {
-    auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
-    global: {
-      fetch: vi.fn(
-        async () => new Response(JSON.stringify({ message: 'Session expired' }), { status: 404 }),
-      ),
-    },
-  });
+  const existing = serializeAccountSignIns(
+    createClient(existingProject, 'test-key', {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false },
+      global: {
+        fetch: vi.fn(
+          async () => new Response(JSON.stringify({ message: 'Session expired' }), { status: 404 }),
+        ),
+      },
+    }),
+    existingProject,
+  );
   expect((await existing.auth.getSession()).data.session?.user.id).toBe(account().id);
   await signOutPasswordSession(existing, (await existing.auth.getSession()).data.session!, 'local');
   expect(localStorage.getItem(key)).toBeNull();
@@ -91,30 +87,21 @@ it.each(
           release = () => resolve(new Response(JSON.stringify(replacement)));
         }),
     );
-    vi.stubGlobal('navigator', {
-      locks: {
-        request: (
-          name: string,
-          _options: unknown,
-          work: (lock: { name: string }) => Promise<unknown>,
-        ) => processLock(name, -1, () => work({ name })),
-      },
-    });
-    const requested = vi.fn();
-    const lock: typeof navigatorLock = (name, timeout, work) => {
-      requested(name);
-      return navigatorLock(name, timeout, work);
-    };
+    const { request: requested } = fakeLocks();
     const logoutFetch = vi.fn();
-    const boundClient = createClient(sessionProject, 'test-key', {
-      auth: { autoRefreshToken: false, detectSessionInUrl: false, lock },
-      global: { fetch: logoutFetch },
-    });
+    const boundClient = serializeAccountSignIns(
+      createClient(sessionProject, 'test-key', {
+        auth: { autoRefreshToken: false, detectSessionInUrl: false },
+        global: { fetch: logoutFetch },
+      }),
+      sessionProject,
+    );
     const otherTab = serializeAccountSignIns(
       createClient(sessionProject, 'test-key', {
-        auth: { autoRefreshToken: false, detectSessionInUrl: false, lock },
+        auth: { autoRefreshToken: false, detectSessionInUrl: false },
         global: { fetch },
       }),
+      sessionProject,
     );
     await Promise.all([boundClient.auth.initialize(), otherTab.auth.initialize()]);
     const originalSession = (await boundClient.auth.getSession()).data.session!;
@@ -194,7 +181,6 @@ it('holds the shared lock until local removal finishes before another client can
     auth: {
       autoRefreshToken: false,
       detectSessionInUrl: false,
-      lock: processLock,
       storage: {
         getItem: (name) => localStorage.getItem(name),
         setItem: (name, value) => localStorage.setItem(name, value),
@@ -211,12 +197,14 @@ it('holds the shared lock until local removal finishes before another client can
     },
     global: { fetch: vi.fn(async () => new Response('{}', { status: 404 })) },
   });
+  serializeAccountSignIns(boundClient, sessionProject);
   const fetch = vi.fn(async () => new Response(JSON.stringify(replacement)));
   const otherTab = serializeAccountSignIns(
     createClient(sessionProject, 'test-key', {
-      auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
+      auth: { autoRefreshToken: false, detectSessionInUrl: false },
       global: { fetch },
     }),
+    sessionProject,
   );
   await Promise.all([boundClient.auth.initialize(), otherTab.auth.initialize()]);
   const cleanup = signOutPasswordSession(
@@ -239,7 +227,7 @@ it('holds the shared lock until local removal finishes before another client can
 });
 
 it.each(['local', 'global', 'reset'] as const)(
-  'fails closed for %s cleanup when no shared auth lock is configured',
+  'fails closed for %s cleanup when the client has no account lock',
   async (scope) => {
     const sessionProject = 'https://no-lock.supabase.co';
     const { key } = storedClient(sessionProject);
@@ -291,16 +279,20 @@ it('holds the auth lock through the recovery password update before another clie
         release = () => resolve(new Response(JSON.stringify({ user: account() })));
       }),
   );
-  const recovery = createClient(sessionProject, 'test-key', {
-    auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
-    global: { fetch: updateFetch },
-  });
+  const recovery = serializeAccountSignIns(
+    createClient(sessionProject, 'test-key', {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false },
+      global: { fetch: updateFetch },
+    }),
+    sessionProject,
+  );
   const signInFetch = vi.fn(async () => new Response(JSON.stringify(replacement)));
   const otherTab = serializeAccountSignIns(
     createClient(sessionProject, 'test-key', {
-      auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
+      auth: { autoRefreshToken: false, detectSessionInUrl: false },
       global: { fetch: signInFetch },
     }),
+    sessionProject,
   );
   await Promise.all([recovery.auth.initialize(), otherTab.auth.initialize()]);
   const session = (await recovery.auth.getSession()).data.session!;
@@ -330,36 +322,69 @@ it('rejects a missing recovery session before calling the password update primit
   const { client, auth, key } = storedClient();
   const session = (await auth.getSession()).data.session;
   localStorage.removeItem(key);
-  const updateUser = vi.spyOn(
-    client.auth as unknown as { _updateUser: typeof client.auth.updateUser },
-    '_updateUser',
-  );
   await expect(updateRecoveryPassword(client, session, 'new-password')).rejects.toMatchObject({
     code: 'recoveryInvalid',
   });
-  expect(updateUser).not.toHaveBeenCalled();
+  expect(auth.updateUser).not.toHaveBeenCalled();
 });
 
 it('translates a provider password rejection while preserving the recovery session', async () => {
   const sessionProject = 'https://recovery-weak-password.supabase.co';
   const { key } = storedClient(sessionProject);
-  const client = createClient(sessionProject, 'test-key', {
-    auth: { autoRefreshToken: false, detectSessionInUrl: false, lock: processLock },
-    global: {
-      fetch: vi.fn(
-        async () =>
-          new Response(JSON.stringify({ code: 'weak_password', msg: 'Password rejected' }), {
-            status: 422,
-            headers: { 'X-Supabase-Api-Version': '2024-01-01' },
-          }),
-      ),
-    },
-  });
+  const client = serializeAccountSignIns(
+    createClient(sessionProject, 'test-key', {
+      auth: { autoRefreshToken: false, detectSessionInUrl: false },
+      global: {
+        fetch: vi.fn(
+          async () =>
+            new Response(JSON.stringify({ code: 'weak_password', msg: 'Password rejected' }), {
+              status: 422,
+              headers: { 'X-Supabase-Api-Version': '2024-01-01' },
+            }),
+        ),
+      },
+    }),
+    sessionProject,
+  );
   const session = (await client.auth.getSession()).data.session!;
   await expect(updateRecoveryPassword(client, session, 'weak-password')).rejects.toMatchObject({
     code: 'weakPassword',
   });
   expect((await client.auth.getSession()).data.session?.user.id).toBe(session.user.id);
   expect(JSON.parse(localStorage.getItem(key)!).user.id).toBe(session.user.id);
+  await client.auth.stopAutoRefresh();
+});
+
+it.each(['auth', 'sessionRevocation'] as const)(
+  'reports %s for password changes only when the client has no account lock',
+  async (code) => {
+    const { client } = storedClient();
+    expect(() => assertPasswordSignOutSupport(client, code)).not.toThrow();
+    const unregistered = { auth: {} } as unknown as SupabaseClient;
+    expect(() => assertPasswordSignOutSupport(unregistered, code)).toThrow(
+      expect.objectContaining({ code }),
+    );
+  },
+);
+
+it('initializes the session under the account lock', async () => {
+  const sessionProject = 'https://initialize-lock.supabase.co';
+  storedClient(sessionProject);
+  const held = fakeLocks().hold('garage-guardian:account:');
+  const client = serializeAccountSignIns(
+    createClient(sessionProject, 'test-key', {
+      auth: { ...accountAuthOptions(sessionProject), autoRefreshToken: false },
+      global: { fetch: vi.fn() },
+    }),
+    sessionProject,
+  );
+  let initialized = false;
+  const initializing = client.auth.initialize().then(() => (initialized = true));
+  await vi.waitFor(() => expect(held.requested).toBe(true));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(initialized).toBe(false);
+  held.release();
+  await initializing;
+  expect((await client.auth.getSession()).data.session?.user.id).toBe(account().id);
   await client.auth.stopAutoRefresh();
 });

@@ -4,17 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clear, get, set } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
 import { account, fakeSupabase } from '../../test/fake-supabase';
+import { fakeLocks } from '../../test/fake-locks';
 import { car, schedule, visit } from '../../test/fixtures';
 
-vi.mock('@supabase/supabase-js', async (importOriginal) => {
-  const { navigatorLock } = await importOriginal<typeof import('@supabase/supabase-js')>();
-  return { createClient: vi.fn(), navigatorLock };
-});
+vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 const project = 'https://garage.supabase.co';
 let cloud: ReturnType<typeof fakeSupabase>;
+let locks: ReturnType<typeof fakeLocks>;
 
 beforeEach(async () => {
-  sharedTransferLock();
+  locks = fakeLocks();
   await clear();
   localStorage.clear();
   sessionStorage.clear();
@@ -63,7 +62,7 @@ it('bootstraps a recovery callback processed by the SDK before the hook subscrib
   vi.mocked(createClient).mockImplementationOnce((url, key, options) =>
     sdk.createClient(url, key, {
       ...options,
-      auth: { ...options?.auth, lock: sdk.processLock, autoRefreshToken: false },
+      auth: { ...options?.auth, autoRefreshToken: false },
       global: { fetch },
     }),
   );
@@ -255,27 +254,13 @@ it('blocks account mutations during a failed signup transfer', async () => {
   });
 });
 
-function sharedTransferLock() {
-  let tail = Promise.resolve();
-  const request = vi.fn((_key: string, work: () => Promise<unknown>) => {
-    const pending = tail.then(work);
-    tail = pending.then(
-      () => undefined,
-      () => undefined,
-    );
-    return pending;
-  });
-  vi.stubGlobal('navigator', { locks: { request } });
-  return request;
-}
-
 it('holds the transfer lock across signup’s auth event and marker registration', async () => {
   const { LocalRepository } = await import('./repository');
   const { withSignupTransferLock, pendingTransfer } = await import('./signup-transfer');
   await new LocalRepository().saveCar(car);
   const signupTab = await openGarage();
   const otherTab = await openGarage();
-  sharedTransferLock();
+  locks = fakeLocks();
   const signUp = cloud.auth.signUp.getMockImplementation()!;
   let release!: () => void;
   const competingTransfer = vi.fn(async () => {
@@ -420,13 +405,7 @@ it.each(['password', 'recovery'] as const)(
       'fetch',
       vi.fn(async () => new Response('{}')),
     );
-    let release!: () => void;
-    cloud.auth._acquireLock.mockImplementationOnce(async (_timeout, work) => {
-      await new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      return work();
-    });
+    const held = locks.hold('garage-guardian:account:');
     let work!: Promise<void>;
     act(() => {
       work =
@@ -435,10 +414,10 @@ it.each(['password', 'recovery'] as const)(
           : hook.result.current.resetPassword('new-password', 'new-password');
     });
     const outcome = work.catch((error: unknown) => error);
-    await waitFor(() => expect(release).toBeTypeOf('function'));
+    await waitFor(() => expect(held.requested).toBe(true));
     act(() => cloud.emit(account('replacement')));
     await act(async () => {
-      release();
+      held.release();
       expect(await outcome).toMatchObject({ code: 'sessionChanged' });
     });
     expect(cloud.auth.signOut).not.toHaveBeenCalled();
@@ -475,41 +454,6 @@ it('does not revoke a replacement account after a password request finishes unde
   expect(cloud.auth.signOut).not.toHaveBeenCalled();
   expect(hook.result.current.user?.id).toBe('replacement');
 });
-
-it.each(['lock', '_acquireLock', '_useSession', '_signOut'])(
-  'rejects password changes before the PATCH when Auth %s is unavailable',
-  async (capability) => {
-    cloud.emit(account());
-    const hook = await openGarage();
-    const repository = hook.result.current.repository;
-    const auth = cloud.client.auth as unknown as Record<string, unknown>;
-    const original = auth[capability];
-    auth[capability] = undefined;
-    const request = vi.fn(async () => new Response('{}'));
-    vi.stubGlobal('fetch', request);
-
-    await act(async () => {
-      await expect(
-        hook.result.current.changePassword('password', 'new-password', 'new-password'),
-      ).rejects.toMatchObject({ code: 'auth' });
-    });
-
-    expect(request).not.toHaveBeenCalled();
-    expect(cloud.auth.signOut).not.toHaveBeenCalled();
-    expect(hook.result.current.user?.id).toBe(account().id);
-    expect(hook.result.current.repository).toBe(repository);
-    expect(hook.result.current.accountNotice).toBeNull();
-    expect(hook.result.current.accountBusy).toBe(false);
-
-    auth[capability] = original;
-    await act(async () =>
-      hook.result.current.changePassword('password', 'new-password', 'new-password'),
-    );
-    expect(request).toHaveBeenCalledTimes(1);
-    expect(hook.result.current.user).toBeNull();
-    expect(hook.result.current.accountNotice).toBe('passwordChanged');
-  },
-);
 
 it('returns to sign-in after account password changes without altering signup transfer markers', async () => {
   cloud.emit(account());
