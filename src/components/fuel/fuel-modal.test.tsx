@@ -46,10 +46,13 @@ it('calculates the price from volume and total, and the volume from price and to
   fireEvent.change(field('Volume'), { target: { value: '5' } });
   fireEvent.change(field('Total (USD)'), { target: { value: '17.50' } });
   expect(field('Price per gal (USD)').value).toBe('3.5');
-  // The last two typed amounts win: price and total now calculate the volume.
-  fireEvent.change(field('Price per gal (USD)'), { target: { value: '3.5' } });
-  fireEvent.change(field('Total (USD)'), { target: { value: '35' } });
+  // Typing over the calculated price keeps it; then the last two typed amounts, price and
+  // total, calculate the volume.
+  fireEvent.change(field('Price per gal (USD)'), { target: { value: '3.6' } });
+  expect(field('Volume').value).toBe('5');
+  fireEvent.change(field('Total (USD)'), { target: { value: '36' } });
   expect(field('Volume').value).toBe('10');
+  expect(field('Price per gal (USD)').value).toBe('3.6');
 });
 
 it('starts from the latest odometer and the last fill-up for the car', () => {
