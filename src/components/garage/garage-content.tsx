@@ -308,6 +308,18 @@ export function GarageContent({ children }: { children: ReactNode }) {
               if (result.refreshed && !modal.item && currentPath.current === pathname)
                 router.push(carPath(car.id));
             }}
+            onToggleArchived={
+              modal.item
+                ? async () => {
+                    const car = modal.item!;
+                    await garage.setCarArchived(car.id, !car.isArchived);
+                    interactions?.notify(
+                      car.isArchived ? 'interactions.carRestored' : 'interactions.carArchived',
+                    );
+                    setModal(null);
+                  }
+                : undefined
+            }
           />
         )}
         {modal?.kind === 'schedule' && (

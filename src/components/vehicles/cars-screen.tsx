@@ -41,15 +41,13 @@ export function CarsScreen({ carId }: { carId?: string }) {
   const [archiveError, setArchiveError] = useState<AppFailure | null>(null);
   const interaction = useFormInteraction(null, { busy });
 
-  async function toggleArchived() {
-    if (!selectedCar || !interaction.begin()) return;
+  async function restore() {
+    if (!selectedCar?.isArchived || !interaction.begin()) return;
     setBusy(true);
     setArchiveError(null);
     try {
-      await setCarArchived(selectedCar.id, !selectedCar.isArchived);
-      interactions?.notify(
-        selectedCar.isArchived ? 'interactions.carRestored' : 'interactions.carArchived',
-      );
+      await setCarArchived(selectedCar.id, false);
+      interactions?.notify('interactions.carRestored');
     } catch (cause) {
       setArchiveError(failureOf(cause, 'archive'));
     } finally {
@@ -100,7 +98,7 @@ export function CarsScreen({ carId }: { carId?: string }) {
       schedules={snapshot.schedules}
       archiveBusy={busy}
       archiveError={archiveError}
-      onToggleArchived={() => interaction.request(() => void toggleArchived())}
+      onRestore={() => interaction.request(() => void restore())}
       visits={visits}
       fuelEntries={fuelEntries}
       allDue={allDue}
