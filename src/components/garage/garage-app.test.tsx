@@ -110,7 +110,7 @@ describe.each([
     });
     await user.click(task.getByRole('button', { name: 'Guardar tarea' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    await user.click(screen.getByRole('button', { name: 'Registrar servicio' }));
+    await user.click(screen.getAllByRole('button', { name: 'Registrar servicio' })[0]);
     const visitElement = screen.getByRole('dialog'),
       visitDialog = within(visitElement);
     fireEvent.change(visitDialog.getByLabelText('Fecha'), { target: { value: '2026-09-25' } });
