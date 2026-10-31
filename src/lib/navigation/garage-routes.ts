@@ -14,6 +14,10 @@ export function carPath(id: string) {
   return `/cars/${encodeURIComponent(id)}`;
 }
 
+export function historyPath(carId?: string) {
+  return carId ? `/history?${new URLSearchParams({ car: carId })}` : '/history';
+}
+
 export function fuelPath(carId?: string) {
   return carId ? `/fuel?${new URLSearchParams({ car: carId })}` : '/fuel';
 }

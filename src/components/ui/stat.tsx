@@ -13,7 +13,7 @@ export function Stat({
   label: string;
   value: string;
   detail: string;
-  tone?: 'blue' | 'orange' | 'yellow' | 'muted';
+  tone?: 'blue' | 'orange' | 'yellow' | 'muted' | 'fuel' | 'vehicle' | 'spend';
 }) {
   return (
     <div className={`stat-card stat-${tone}`}>

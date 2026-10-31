@@ -9,10 +9,10 @@ export function GarageMobileNavigation({ page }: { page: Page }) {
   const t = useTranslations();
   return (
     <nav className="mobile-tabs" aria-label={t('app.mobileNavigation')}>
-      {navigation.map(({ id, icon: Icon }) => (
+      {navigation.map(({ id, icon: Icon, tone }) => (
         <Link
           key={id}
-          className={page === id ? 'active' : ''}
+          className={`${tone} ${page === id ? 'active' : ''}`}
           href={workspacePaths[id]}
           aria-current={page === id ? 'page' : undefined}
         >

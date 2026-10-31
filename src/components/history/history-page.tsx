@@ -17,6 +17,8 @@ export function HistoryPage({
   cars,
   visits,
   repository,
+  carId,
+  onCarChange,
   onAdd,
   onEdit,
   onDelete,
@@ -25,13 +27,14 @@ export function HistoryPage({
   cars: Car[];
   visits: Visit[];
   repository: Repository;
+  carId: string;
+  onCarChange: (carId: string) => void;
   onAdd: () => void;
   onEdit: (visit: Visit) => void;
   onDelete: (visit: Visit) => void;
   homeCurrency?: Currency;
 }) {
   const t = useTranslations();
-  const [carId, setCarId] = useState('');
   const [query, setQuery] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -114,7 +117,7 @@ export function HistoryPage({
             <select
               aria-label={t('history.filterCar')}
               value={carId}
-              onChange={(e) => setCarId(e.target.value)}
+              onChange={(e) => onCarChange(e.target.value)}
             >
               <option value="">{t('shared.allCars')}</option>
               {cars.map((car) => (

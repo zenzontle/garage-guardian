@@ -202,6 +202,7 @@
     "latestVisits": "Latest visits",
     "noVisits": "No visits logged",
     "historyHint": "Log maintenance to start this car’s history.",
+    "viewHistory": "View service history",
     "delete": "Delete car and records",
     "confirmDelete": "Delete {name} and all its records? This cannot be undone.",
     "confirmDeleteTask": "Delete {name} from this car's schedule?",
