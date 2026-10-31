@@ -14,6 +14,8 @@ Migration `0004_car_plate.sql` adds the column and a matching 20-character datab
 
 ## Archiving
 
+Archive or restore a vehicle from **Edit car**. Archived vehicles also show **Restore vehicle** in their header. The **Active**/**Archived** filter on Cars appears only once at least one vehicle is archived.
+
 Archiving removes a vehicle from active counts and reminder digests while its history, receipts, schedules, and spending remain available. Archiving does not reset schedules, odometers, service history, photo storage, or account notification preferences. Restore resumes calculations from saved dates and odometers, so a restored overdue vehicle returns with its original overdue targets. Cloud archive/restore requires a successful online save; guest changes persist locally.
 
 Apply `supabase/migrations/0011_archive_vehicles.sql` before deploying vehicle archiving, and run `supabase/tests/archive_vehicles.sql` against staging. Then verify archive/restore with a guest garage and a cloud account: archive an overdue vehicle, verify it disappears from active counts and digests while history, receipts, schedules, and spending remain available, and restore it to confirm its original overdue targets return. Check both languages and desktop/mobile controls. Reminder handling of archived vehicles is described in [account reminders](account-reminders.md#scheduling-and-delivery-semantics).

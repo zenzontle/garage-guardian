@@ -1284,6 +1284,9 @@ td strong {
   bottom: 0;
   background: var(--surface);
 }
+.modal-footer-start {
+  margin-right: auto;
+}
 .items-editor {
   border: 1px solid var(--line);
   border-radius: 9px;

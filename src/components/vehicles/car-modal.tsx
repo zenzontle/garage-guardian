@@ -24,10 +24,12 @@ export function CarModal({
   item,
   onClose,
   onSave,
+  onToggleArchived,
 }: {
   item?: Car;
   onClose: () => void;
   onSave: (item: Car, starter: boolean) => Promise<void>;
+  onToggleArchived?: () => Promise<void>;
 }) {
   const t = useTranslations();
   const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>(
@@ -49,7 +51,9 @@ export function CarModal({
   const [reminderMiles, setReminderMiles] = useState(
     String(item?.reminderMiles ?? defaultReminderDistance(distanceUnit)),
   );
-  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const busy = saving || archiving;
   const [formError, setFormError] = useState<AppFailure | null>(null);
   const catalog = useVehicleCatalog(isCloudConfigured, make);
   const interaction = useFormInteraction(
@@ -66,7 +70,7 @@ export function CarModal({
       return;
     }
     if (!interaction.begin()) return;
-    setBusy(true);
+    setSaving(true);
     try {
       await onSave(
         {
@@ -91,7 +95,21 @@ export function CarModal({
       setFormError(failureOf(cause, 'save'));
     } finally {
       interaction.end();
-      setBusy(false);
+      setSaving(false);
+    }
+  }
+  async function toggleArchived() {
+    if (!onToggleArchived || !interaction.begin()) return;
+    setFormError(null);
+    setArchiving(true);
+    try {
+      await onToggleArchived();
+      interaction.accept();
+    } catch (cause) {
+      setFormError(failureOf(cause, 'archive'));
+    } finally {
+      interaction.end();
+      setArchiving(false);
     }
   }
   return (
@@ -274,11 +292,30 @@ export function CarModal({
             )}
           </div>
           <div className="modal-footer">
+            {item && onToggleArchived && (
+              <button
+                type="button"
+                className="button secondary modal-footer-start"
+                onClick={() => interaction.request(() => void toggleArchived())}
+                disabled={busy}
+                aria-busy={archiving}
+              >
+                {t(
+                  archiving
+                    ? item.isArchived
+                      ? 'archive.restoring'
+                      : 'archive.archiving'
+                    : item.isArchived
+                      ? 'archive.restore'
+                      : 'archive.archive',
+                )}
+              </button>
+            )}
             <button type="button" className="button secondary" onClick={close}>
               {t('shared.cancel')}
             </button>
             <button className="button primary" disabled={busy}>
-              {busy ? t('shared.saving') : item ? t('shared.saveChanges') : t('car.saveNew')}
+              {saving ? t('shared.saving') : item ? t('shared.saveChanges') : t('car.saveNew')}
             </button>
           </div>
         </fieldset>

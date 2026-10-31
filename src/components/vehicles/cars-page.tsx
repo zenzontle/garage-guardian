@@ -30,7 +30,7 @@ export function CarsPage({
   schedules,
   archiveBusy,
   archiveError,
-  onToggleArchived,
+  onRestore,
   visits,
   fuelEntries,
   allDue,
@@ -50,7 +50,7 @@ export function CarsPage({
   schedules: ScheduleItem[];
   archiveBusy: boolean;
   archiveError: AppFailure | null;
-  onToggleArchived: () => void;
+  onRestore: () => void;
   visits: Visit[];
   fuelEntries: FuelEntry[];
   allDue: DueItem[];
@@ -86,22 +86,24 @@ export function CarsPage({
           </button>
         }
       />
-      <nav className="car-switcher" aria-label={t('archive.views')}>
-        <Link
-          className={`car-tab ${!archived ? 'active' : ''}`}
-          href="/cars"
-          aria-current={!archived ? 'page' : undefined}
-        >
-          {t('archive.active')}
-        </Link>
-        <Link
-          className={`car-tab ${archived ? 'active' : ''}`}
-          href="/cars?view=archived"
-          aria-current={archived ? 'page' : undefined}
-        >
-          {t('archive.archivedView')}
-        </Link>
-      </nav>
+      {(hasArchived || archived) && (
+        <nav className="car-switcher" aria-label={t('archive.views')}>
+          <Link
+            className={`car-tab ${!archived ? 'active' : ''}`}
+            href="/cars"
+            aria-current={!archived ? 'page' : undefined}
+          >
+            {t('archive.active')}
+          </Link>
+          <Link
+            className={`car-tab ${archived ? 'active' : ''}`}
+            href="/cars?view=archived"
+            aria-current={archived ? 'page' : undefined}
+          >
+            {t('archive.archivedView')}
+          </Link>
+        </nav>
+      )}
       {!car ? (
         <EmptyPanel
           icon={<CarFront size={25} />}
@@ -204,22 +206,16 @@ export function CarsPage({
               {car.plate && <p className="car-plate">{t('car.plate', { plate: car.plate })}</p>}
             </div>
             <div className="car-header-actions">
-              <button
-                className="button secondary"
-                onClick={onToggleArchived}
-                disabled={archiveBusy}
-                aria-busy={archiveBusy}
-              >
-                {t(
-                  archiveBusy
-                    ? car.isArchived
-                      ? 'archive.restoring'
-                      : 'archive.archiving'
-                    : car.isArchived
-                      ? 'archive.restore'
-                      : 'archive.archive',
-                )}
-              </button>
+              {car.isArchived && (
+                <button
+                  className="button secondary"
+                  onClick={onRestore}
+                  disabled={archiveBusy}
+                  aria-busy={archiveBusy}
+                >
+                  {t(archiveBusy ? 'archive.restoring' : 'archive.restore')}
+                </button>
+              )}
               <button
                 disabled={archiveBusy}
                 className="button secondary"

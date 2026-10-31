@@ -52,13 +52,23 @@ async function setup(mode: 'local' | 'cloud', archived = false) {
   };
 }
 
+async function openEditCar(user: ReturnType<typeof userEvent.setup>, copy: typeof en = en) {
+  await user.click(await screen.findByRole('button', { name: copy.car.edit }));
+  return within(screen.getByRole('dialog'));
+}
+
 it('keeps the selected vehicle in its new view after a committed archive fails to refresh', async () => {
   const { prototype, user } = await setup('local');
-  const button = await screen.findByRole('button', { name: en.archive.archive });
+  await screen.findByRole('button', { name: en.car.edit });
+  expect(screen.queryByRole('navigation', { name: en.archive.views })).toBeNull();
+  expect(screen.queryByRole('button', { name: en.archive.archive })).toBeNull();
+  const dialog = await openEditCar(user);
   vi.spyOn(prototype, 'load').mockRejectedValueOnce(new Error('Refresh failed'));
-  await user.click(button);
-  await screen.findByRole('button', { name: en.archive.restore });
-  expect(screen.getByText(en.interactions.carArchived)).toBeDefined();
+  await user.click(dialog.getByRole('button', { name: en.archive.archive }));
+  await screen.findByText(en.interactions.carArchived);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(screen.getByRole('button', { name: en.archive.restore })).toBeDefined();
+  expect(screen.getByRole('navigation', { name: en.archive.views })).toBeDefined();
   expect(testRouter.url).toBe(`/cars/${car.id}`);
 });
 
@@ -70,21 +80,22 @@ it.each([
   async (mode, locale, copy) => {
     localStorage.setItem('garage-guardian:locale', locale);
     const { backend, user } = await setup(mode);
-    const archive = await screen.findByRole('button', { name: copy.archive.archive });
-    archive.focus();
+    const editor = await openEditCar(user, copy);
+    editor.getByRole('button', { name: copy.archive.archive }).focus();
     await user.keyboard('{Enter}');
-    await screen.findByRole('button', { name: copy.archive.restore });
+    // The header updates before the refresh settles; the toast and closed dialog follow it.
+    await screen.findByText(copy.interactions.carArchived);
     expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('button', { name: copy.archive.restore })).toBeDefined();
     expect(screen.getByText(copy.archive.paused)).toBeDefined();
-    expect(screen.getByText(copy.interactions.carArchived)).toBeDefined();
     expect(testRouter.url).toBe(`/cars/${car.id}`);
     expect(
       screen.getByRole('link', { name: copy.archive.archivedView }).getAttribute('aria-current'),
     ).toBe('page');
     expect(screen.getByText(copy.archive.scheduleSaved)).toBeDefined();
     expect(document.querySelector('.schedule-row .status-pill')).toBeNull();
-    await user.click(screen.getByRole('button', { name: copy.car.edit }));
-    const dialog = within(screen.getByRole('dialog'));
+    const dialog = await openEditCar(user, copy);
+    expect(dialog.getByRole('button', { name: copy.archive.restore })).toBeDefined();
     fireEvent.change(dialog.getByLabelText(copy.car.nickname), {
       target: { value: 'Edited archived' },
     });
@@ -95,11 +106,11 @@ it.each([
       isArchived: true,
     });
     await user.click(screen.getByRole('button', { name: copy.archive.restore }));
-    await screen.findByRole('button', { name: copy.archive.archive });
-    expect(screen.getByText(copy.interactions.carRestored)).toBeDefined();
-    expect(
-      screen.getByRole('link', { name: copy.archive.active }).getAttribute('aria-current'),
-    ).toBe('page');
+    await screen.findByText(copy.interactions.carRestored);
+    expect(screen.queryByRole('button', { name: copy.archive.restore })).toBeNull();
+    expect(screen.queryByText(copy.archive.paused)).toBeNull();
+    expect(screen.queryByRole('navigation', { name: copy.archive.views })).toBeNull();
+    expect(testRouter.url).toBe(`/cars/${car.id}`);
   },
 );
 
@@ -161,7 +172,9 @@ it.each([false, true])(
       reject = no;
     });
     const save = vi.spyOn(prototype, 'setCarArchived').mockReturnValueOnce(failure);
-    const button = await screen.findByRole('button', {
+    // Archiving lives in Edit car; archived vehicles also offer Restore in their header.
+    const scope = archived ? screen : await openEditCar(user);
+    const button = await scope.findByRole('button', {
       name: archived ? en.archive.restore : en.archive.archive,
     });
     await user.dblClick(button);
@@ -172,7 +185,8 @@ it.each([false, true])(
     await screen.findByText(en.errors.archive);
     expect((await backend.load()).cars[0].isArchived).toBe(archived);
     await user.click(button);
-    await screen.findByRole('button', { name: archived ? en.archive.archive : en.archive.restore });
+    await screen.findByText(archived ? en.interactions.carRestored : en.interactions.carArchived);
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect((await backend.load()).cars[0].isArchived).toBe(!archived);
   },
 );
