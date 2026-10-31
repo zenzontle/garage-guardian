@@ -28,6 +28,10 @@
   --pink-hover: #f7bdd6;
   --pink-soft: #42243a;
   --on-pink: #2e0f20;
+  --lime: #b5dd6a;
+  --lime-hover: #cbe894;
+  --lime-soft: #2a3a1a;
+  --on-lime: #1a2608;
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 * {
@@ -218,6 +222,12 @@ a {
   --accent-hover: var(--pink-hover);
   --accent-soft: var(--pink-soft);
   --on-accent: var(--on-pink);
+}
+.tone-home {
+  --accent: var(--lime);
+  --accent-hover: var(--lime-hover);
+  --accent-soft: var(--lime-soft);
+  --on-accent: var(--on-lime);
 }
 .summary-icon,
 .vehicle-icon,
