@@ -10,25 +10,13 @@ export const REPORT_LIMITS = {
 };
 export const SUBMISSION_RETENTION_MS = 24 * 60 * 60_000;
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
-export const GITHUB_ASSET_URL = /^https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+$/;
-export function isRepositoryIssueUrl(value: string, repository: string): boolean {
-  try {
-    const url = new URL(value);
-    const [, owner, repo, kind, number, extra] = url.pathname.split('/');
-    return (
-      url.origin === 'https://github.com' &&
-      !url.username &&
-      !url.password &&
-      !url.search &&
-      !url.hash &&
-      `${owner}/${repo}`.toLowerCase() === repository.toLowerCase() &&
-      kind === 'issues' &&
-      /^\d+$/.test(number ?? '') &&
-      extra === undefined
-    );
-  } catch {
-    return false;
-  }
+// Linear serves uploads privately to workspace members.
+export const LINEAR_ASSET_URL =
+  /^https:\/\/uploads\.linear\.app(?:\/[A-Za-z0-9_-][A-Za-z0-9._-]*){1,4}$/;
+// A Linear issue identifier: team key and number, for example FB-12.
+export const ISSUE_REFERENCE = /^[A-Z][A-Z0-9]{0,6}-\d+$/;
+export function isIssueReference(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= 32 && ISSUE_REFERENCE.test(value);
 }
 const text = (max: number) =>
   z
@@ -42,7 +30,6 @@ const text = (max: number) =>
 export const publicMetadataSchema = z.strictObject({
   release: text(160),
   environment: text(60),
-  repository: text(100),
   reporterId: z.string().regex(/^reporter-[a-f0-9]{24}$/),
   browserOS: text(512),
 });
@@ -147,11 +134,14 @@ export function redact(value: string): string {
       // After quoted-value cleaning, remove every cookie pair through the end of the header line.
       .replace(/\b(cookie)[ \t]*[:=][^\r\n]*/gi, '$1=[REDACTED]')
       .replace(/\b(?:Bearer\s+)[\w.\-+/=]+/gi, 'Bearer [REDACTED]')
-      .replace(/\b(?:eyJ[\w-]+\.[\w-]+\.[\w-]+|(?:gh[pousr]_|github_pat_)[\w]+)\b/g, '[TOKEN]')
+      .replace(
+        /\b(?:eyJ[\w-]+\.[\w-]+\.[\w-]+|(?:gh[pousr]_|github_pat_|lin_api_)[\w]+)\b/g,
+        '[TOKEN]',
+      )
       .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[EMAIL]')
       .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '[ID]')
       .replace(/\b[A-HJ-NPR-Z0-9]{17}\b/gi, '[VIN]')
-      // eslint-disable-next-line no-control-regex -- Remove non-printable characters from public diagnostics.
+      // eslint-disable-next-line no-control-regex -- Remove non-printable characters from diagnostics.
       .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '')
   );
 }
@@ -191,10 +181,10 @@ export function formatIssue(report: FeedbackReport, screenshots: string[] = []):
         `${new Date(entry.timestamp).toISOString()} [${entry.source}] ${entry.message}${entry.stack ? `\n${entry.stack}` : ''}`,
     )
     .join('\n\n');
-  return `## Description\n${literal(report.description)}\n\n## App context\n${literal(details)}\n\n## Recent errors\n${literal(errors || 'No errors included.')}\n\n## Screenshots\n${screenshots.length ? screenshots.map((url, index) => (url ? `![Screenshot ${index + 1}](${url})` : `Screenshot ${index + 1} (reviewed attachment)`)).join('\n\n') : 'No screenshots included.'}\n\n<!-- garage-feedback:${m.reporterId}:${report.submissionId} -->`;
+  return `## Description\n${literal(report.description)}\n\n## App context\n${literal(details)}\n\n## Recent errors\n${literal(errors || 'No errors included.')}\n\n## Screenshots\n${screenshots.length ? screenshots.map((url, index) => (url ? `![Screenshot ${index + 1}](${url})` : `Screenshot ${index + 1} (reviewed attachment)`)).join('\n\n') : 'No screenshots included.'}`;
 }
 export function fitsIssueBody(report: FeedbackReport): boolean {
-  // Reserve two maximum-length asset URLs so the public preview and final body fit.
+  // Reserve two maximum-length asset URLs so the preview and final body fit.
   return (
     formatIssue(report, Array(2).fill('x'.repeat(REPORT_LIMITS.assetUrl))).length <=
     REPORT_LIMITS.issueBody

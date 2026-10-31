@@ -4,20 +4,17 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { ReportError, identifier, type ReportConfig } from './server-config';
 import {
-  GITHUB_ASSET_URL,
+  ISSUE_REFERENCE,
+  LINEAR_ASSET_URL,
   REPORT_LIMITS,
   SUBMISSION_RETENTION_MS,
-  isRepositoryIssueUrl,
 } from './shared';
 
 const receiptSchema = z.strictObject({
   hash: z.string().min(1).max(128),
   state: z.enum(['uploading', 'creating', 'unknown', 'failed', 'succeeded']),
-  assets: z.array(z.string().max(REPORT_LIMITS.assetUrl).regex(GITHUB_ASSET_URL)).max(2),
-  issueUrl: z
-    .string()
-    .regex(/^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+$/)
-    .optional(),
+  assets: z.array(z.string().max(REPORT_LIMITS.assetUrl).regex(LINEAR_ASSET_URL)).max(2),
+  issueReference: z.string().max(32).regex(ISSUE_REFERENCE).optional(),
   createdAt: z.number().int().nonnegative(),
 });
 export type Receipt = z.infer<typeof receiptSchema>;
@@ -104,10 +101,10 @@ export function reportStore(config: ReportConfig) {
     async get(userId: string, submissionId: string): Promise<Receipt | null> {
       const value = await redis.get(receiptKey(userId, submissionId));
       if (value === null) return null;
-      const receipt = receiptSchema.parse(value);
-      if (receipt.issueUrl && !isRepositoryIssueUrl(receipt.issueUrl, config.repository))
+      const receipt = receiptSchema.safeParse(value);
+      if (!receipt.success)
         throw new ReportError(503, 'INVALID_RECEIPT', 'Submission status is unavailable.');
-      return receipt;
+      return receipt.data;
     },
     async claim(userId: string, submissionId: string, receipt: Receipt): Promise<boolean> {
       return (

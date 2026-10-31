@@ -94,22 +94,26 @@ beforeEach(() => {
   provider.mode = 'ok';
 });
 describe('shared rate limits', () => {
-  it('reads successful receipts regardless of repository casing and refuses other repositories', async () => {
-    const store = reportStore({ ...config, repository: 'ZenZontle/Garage-Guardian' });
+  it('reads successful receipts and refuses malformed issue references', async () => {
+    const store = reportStore(config);
     const receipt = {
       hash: 'hash',
       state: 'succeeded' as const,
-      assets: [],
+      assets: ['https://uploads.linear.app/org/asset/file'],
       createdAt: Date.now(),
-      issueUrl: 'https://github.com/zenzontle/garage-guardian/issues/12',
+      issueReference: 'FB-12',
     };
     await store.claim('user', 'uuid', receipt);
     expect(await store.get('user', 'uuid')).toEqual(receipt);
-    await store.save('user', 'uuid', {
-      ...receipt,
-      issueUrl: 'https://github.com/other/repo/issues/12',
-    });
-    await expect(store.get('user', 'uuid')).rejects.toHaveProperty('code', 'INVALID_RECEIPT');
+    for (const invalid of [
+      { issueReference: 'https://linear.app/team/issue/FB-12' },
+      { issueReference: 'fb-12' },
+      { assets: ['https://linear.com/user-attachments/assets/abc'] },
+      { issueUrl: 'https://linear.com/zenzontle/garage-guardian/issues/12' },
+    ]) {
+      await store.save('user', 'uuid', { ...receipt, ...invalid });
+      await expect(store.get('user', 'uuid')).rejects.toHaveProperty('code', 'INVALID_RECEIPT');
+    }
   });
   it('enforces user limits across instances independently of IPs', async () => {
     for (let index = 0; index < 3; index++)
@@ -246,50 +250,35 @@ describe('shared rate limits', () => {
     const receipt = {
       hash: 'hash',
       state: 'uploading' as const,
-      assets: ['https://github.com/user-attachments/assets/first'],
+      assets: ['https://uploads.linear.app/org/first'],
       createdAt: now,
     };
-    const github = {
-      upload: vi.fn(async () => 'https://github.com/user-attachments/assets/second'),
-      create: vi.fn(async () => 'https://github.com/zenzontle/garage-guardian/issues/1'),
+    const linear = {
+      issueId: vi.fn(() => 'b3a37ad0-6f5a-4ca8-96e1-499b169767df'),
+      upload: vi.fn(async () => 'https://uploads.linear.app/org/second'),
+      create: vi.fn(async () => 'FB-1'),
       reconcile: vi.fn(async () => null),
     };
     await first.lock('user', value.submissionId);
     await first.claim('user', value.submissionId, receipt);
     now += (LOCK_TTL - 1) * 1000;
     expect(
-      (
-        await reconcileReceipt(
-          second,
-          github,
-          'user',
-          value.submissionId,
-          receipt,
-          value.metadata.reporterId,
-        )
-      ).state,
+      (await reconcileReceipt(second, linear, 'user', value.submissionId, receipt)).state,
     ).toBe('uploading');
-    expect(github.create).not.toHaveBeenCalled();
+    expect(linear.create).not.toHaveBeenCalled();
     now += 2000;
-    const recovered = await reconcileReceipt(
-      second,
-      github,
-      'user',
-      value.submissionId,
-      receipt,
-      value.metadata.reporterId,
-    );
+    const recovered = await reconcileReceipt(second, linear, 'user', value.submissionId, receipt);
     expect(recovered).toEqual({ ...receipt, state: 'failed' });
     expect(provider.expires.values().next().value).toBe(receipt.createdAt + RECEIPT_TTL * 1000);
-    const result = await submitReport(second, github, 'user', 'ip', {
+    const result = await submitReport(second, linear, 'user', 'ip', {
       report: value,
       images: [new Uint8Array([1]), new Uint8Array([2])],
       hash: 'hash',
     });
     expect(result.status).toBe(201);
-    expect(github.upload).toHaveBeenCalledExactlyOnceWith(new Uint8Array([2]), 1);
-    expect(github.create).toHaveBeenCalledTimes(1);
-    expect(github.reconcile).not.toHaveBeenCalled();
+    expect(linear.upload).toHaveBeenCalledExactlyOnceWith(new Uint8Array([2]), 1);
+    expect(linear.create).toHaveBeenCalledTimes(1);
+    expect(linear.reconcile).not.toHaveBeenCalled();
   });
   it('does not let an expired lease owner release a newer lease', async () => {
     let now = Date.now();

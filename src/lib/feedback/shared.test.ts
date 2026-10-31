@@ -4,7 +4,8 @@ import {
   cleanDiagnostic,
   fitsIssueBody,
   formatIssue,
-  isRepositoryIssueUrl,
+  isIssueReference,
+  LINEAR_ASSET_URL,
   feedbackTitle,
   issueTitle,
   redact,
@@ -151,27 +152,36 @@ describe('public report diagnostics', () => {
     expect(fitsIssueBody(draft)).toBe(true);
     expect(formatIssue(draft).length).toBeLessThan(REPORT_LIMITS.issueBody);
   });
-  it('compares issue repository names without casing while enforcing the URL boundary', () => {
-    expect(
-      isRepositoryIssueUrl(
-        'https://github.com/ZenZontle/Garage-Guardian/issues/12',
-        'zenzontle/garage-guardian',
-      ),
-    ).toBe(true);
+  it('accepts only Linear issue identifiers and private Linear asset URLs', () => {
+    for (const value of ['FB-12', 'FBT-1', 'A-0', 'ABC1234-99'])
+      expect(isIssueReference(value)).toBe(true);
+    for (const value of [
+      'fb-12',
+      'FB12',
+      'FB-',
+      '1FB-2',
+      'ABCDEFGH-1',
+      'FB-12 ',
+      'https://linear.app/team/issue/FB-12',
+      'https://github.com/zenzontle/garage-guardian/issues/12',
+      12,
+      null,
+    ])
+      expect(isIssueReference(value)).toBe(false);
+    expect(LINEAR_ASSET_URL.test('https://uploads.linear.app/org-id/file-id/asset-id')).toBe(true);
     for (const url of [
-      'https://evil.test/zenzontle/garage-guardian/issues/12',
-      'https://github.com/zenzontle/other/issues/12',
-      'https://github.com/zenzontle/garage-guardian/issues/12/extra',
-      'https://github.com/zenzontle/garage-guardian/issues/12?token=x',
-      'https://token@github.com/zenzontle/garage-guardian/issues/12',
-      'not a URL',
-    ]) {
-      expect(isRepositoryIssueUrl(url, 'zenzontle/garage-guardian')).toBe(false);
-    }
+      'https://github.com/user-attachments/assets/abc',
+      'http://uploads.linear.app/org/file',
+      'https://uploads.linear.app.evil.test/org/file',
+      'https://uploads.linear.app/org/file?token=x',
+      'https://uploads.linear.app/../file',
+      'https://uploads.linear.app/org/file)@mention',
+    ])
+      expect(LINEAR_ASSET_URL.test(url)).toBe(false);
   });
   it('strips URL credentials/queries/fragments and redacts recognizable secrets and identifiers', () => {
     const result = redact(
-      'https://user:pass@example.com/cars?token=secret#email /cars?query-private#fragment-private 192.168.1.20 token=abc password:hello test@example.org Bearer eyJabc.abcdef.signature 1HGCM82633A004352 github_pat_12345 {"access_token":"private-session"} b3a37ad0-6f5a-4ca8-96e1-499b169767df',
+      'https://user:pass@example.com/cars?token=secret#email /cars?query-private#fragment-private 192.168.1.20 token=abc password:hello test@example.org Bearer eyJabc.abcdef.signature 1HGCM82633A004352 github_pat_12345 lin_api_AbC123xyz {"access_token":"private-session"} b3a37ad0-6f5a-4ca8-96e1-499b169767df',
     );
     expect(result).toContain('https://example.com/cars');
     for (const privateValue of [
@@ -186,6 +196,7 @@ describe('public report diagnostics', () => {
       'eyJabc',
       '1HGCM82633A004352',
       'github_pat_12345',
+      'lin_api_AbC123xyz',
       'private-session',
       'b3a37ad0-6f5a-4ca8-96e1-499b169767df',
     ])
@@ -275,6 +286,8 @@ describe('public report diagnostics', () => {
     draft.description = '```\n<img src="https://evil.test">\n![x](https://evil.test) @someone\n```';
     const issue = formatIssue(draft);
     expect(issue).toContain('````text\n```');
+    expect(issue).not.toContain('<!--');
+    expect(issue).not.toContain(draft.submissionId);
     expect(issueTitle('@someone found a <b>bug</b>')).toBe('[Feedback] @​someone found a bbug/b');
     expect(feedbackTitle('  Date resets\n\nWhen I save a visit')).toBe('Date resets');
     expect(feedbackTitle('Hi\nthe date resets')).toBe('Hi the date resets');

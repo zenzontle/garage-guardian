@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import { REPORT_LIMITS, cleanDiagnostic } from './shared';
-import { GitHubFailure } from './github';
+import { DeliveryFailure } from './linear';
 import {
   decodeReport,
   readReport as parseReport,
@@ -24,11 +24,13 @@ function request(value: unknown = report(), files: File[] = []) {
 }
 function adapter() {
   return {
+    issueId: vi.fn((userId: string, submissionId: string) => `issue:${userId}:${submissionId}`),
     upload: vi.fn(
-      async (_bytes: Uint8Array, index: number) =>
-        `https://github.com/user-attachments/assets/${index}`,
+      async (_bytes: Uint8Array, index: number) => `https://uploads.linear.app/org/${index}`,
     ),
-    create: vi.fn(async () => 'https://github.com/zenzontle/garage-guardian/issues/1'),
+    create: vi.fn<(title: string, body: string, issueId: string) => Promise<string>>(
+      async () => 'FB-1',
+    ),
     reconcile: vi.fn(async (): Promise<string | null> => null),
   };
 }
@@ -170,7 +172,7 @@ describe('submission validation', () => {
   });
 });
 
-describe('GitHub delivery and retries', () => {
+describe('Linear delivery and retries', () => {
   const input = () => ({
     report: report(),
     images: [new Uint8Array([1]), new Uint8Array([2])],
@@ -178,49 +180,52 @@ describe('GitHub delivery and retries', () => {
   });
   it('publishes once under concurrent duplicate submissions and replays success', async () => {
     const store = memoryStore(),
-      github = adapter(),
+      linear = adapter(),
       value = input();
     const results = await Promise.allSettled([
-      submitReport(store, github, 'user', 'ip', value),
-      submitReport(store, github, 'user', 'ip', value),
+      submitReport(store, linear, 'user', 'ip', value),
+      submitReport(store, linear, 'user', 'ip', value),
     ]);
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
-    expect(github.create).toHaveBeenCalledTimes(1);
-    expect(github.create.mock.calls[0]).toBeDefined();
-    const replay = await submitReport(store, github, 'user', 'ip', value);
+    expect(linear.create).toHaveBeenCalledTimes(1);
+    expect(linear.create.mock.calls[0][1]).toContain(
+      '![Screenshot 1](https://uploads.linear.app/org/0)',
+    );
+    expect(linear.create.mock.calls[0][2]).toBe(`issue:user:${value.report.submissionId}`);
+    const replay = await submitReport(store, linear, 'user', 'ip', value);
     expect(replay.status).toBe(201);
-    expect(github.create).toHaveBeenCalledTimes(1);
+    expect(linear.create).toHaveBeenCalledTimes(1);
     await expect(
-      submitReport(store, github, 'user', 'ip', { ...value, hash: 'changed' }),
+      submitReport(store, linear, 'user', 'ip', { ...value, hash: 'changed' }),
     ).rejects.toHaveProperty('code', 'DRAFT_CHANGED');
     expect(await store.get('different-user', value.report.submissionId)).toBeNull();
   });
   it('reuses successful attachments after a partial upload failure', async () => {
     const store = memoryStore(),
-      github = adapter(),
+      linear = adapter(),
       value = input();
-    github.upload
-      .mockResolvedValueOnce('https://github.com/user-attachments/assets/first')
-      .mockRejectedValueOnce(new GitHubFailure(false));
-    await expect(submitReport(store, github, 'user', 'ip', value)).rejects.toHaveProperty(
+    linear.upload
+      .mockResolvedValueOnce('https://uploads.linear.app/org/first')
+      .mockRejectedValueOnce(new DeliveryFailure(false));
+    await expect(submitReport(store, linear, 'user', 'ip', value)).rejects.toHaveProperty(
       'code',
-      'GITHUB_FAILED',
+      'DELIVERY_FAILED',
     );
-    expect(github.create).not.toHaveBeenCalled();
-    await submitReport(store, github, 'user', 'ip', value);
-    expect(github.upload).toHaveBeenCalledTimes(3);
-    expect(github.create).toHaveBeenCalledTimes(1);
+    expect(linear.create).not.toHaveBeenCalled();
+    await submitReport(store, linear, 'user', 'ip', value);
+    expect(linear.upload).toHaveBeenCalledTimes(3);
+    expect(linear.create).toHaveBeenCalledTimes(1);
   });
   it('reconciles ambiguous creation instead of creating another issue', async () => {
     const store = memoryStore(),
-      github = adapter(),
+      linear = adapter(),
       value = input();
-    github.create.mockRejectedValueOnce(new GitHubFailure(true));
-    expect((await submitReport(store, github, 'user', 'ip', value)).status).toBe(202);
-    expect((await submitReport(store, github, 'user', 'ip', value)).status).toBe(202);
-    github.reconcile.mockResolvedValueOnce('https://github.com/zenzontle/garage-guardian/issues/1');
-    expect((await submitReport(store, github, 'user', 'ip', value)).status).toBe(201);
-    expect(github.create).toHaveBeenCalledTimes(1);
+    linear.create.mockRejectedValueOnce(new DeliveryFailure(true));
+    expect((await submitReport(store, linear, 'user', 'ip', value)).status).toBe(202);
+    expect((await submitReport(store, linear, 'user', 'ip', value)).status).toBe(202);
+    linear.reconcile.mockResolvedValueOnce('FB-1');
+    expect((await submitReport(store, linear, 'user', 'ip', value)).status).toBe(201);
+    expect(linear.create).toHaveBeenCalledTimes(1);
   });
   it.each([
     ['creating', 'status'],
@@ -231,12 +236,12 @@ describe('GitHub delivery and retries', () => {
     'preserves reconciliation success against a concurrent stale %s %s check',
     async (state, contender) => {
       const store = memoryStore(),
-        github = adapter(),
+        linear = adapter(),
         value = input();
       const receipt = { hash: value.hash, state, assets: [], createdAt: Date.now() };
       await store.claim('user', value.report.submissionId, receipt);
-      let resolveFound!: (url: string) => void,
-        resolveMissing!: (url: null) => void,
+      let resolveFound!: (reference: string) => void,
+        resolveMissing!: (reference: null) => void,
         started!: () => void;
       const found = new Promise<string>((resolve) => {
         resolveFound = resolve;
@@ -247,92 +252,64 @@ describe('GitHub delivery and retries', () => {
       const checking = new Promise<void>((resolve) => {
         started = resolve;
       });
-      github.reconcile
+      linear.reconcile
         .mockImplementationOnce(() => {
           started();
           return found;
         })
         .mockImplementationOnce(() => missing);
-      const first = reconcileReceipt(
-        store,
-        github,
-        'user',
-        value.report.submissionId,
-        receipt,
-        metadata.reporterId,
-      );
+      const first = reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt);
       await checking;
       const second =
         contender === 'status'
-          ? reconcileReceipt(
-              store,
-              github,
-              'user',
-              value.report.submissionId,
-              receipt,
-              metadata.reporterId,
-            )
-          : replayReport(store, github, 'user', value.report, value.hash);
-      // Let the concurrent check start before GitHub confirms the first result.
+          ? reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt)
+          : replayReport(store, linear, 'user', value.report, value.hash);
+      // Let the concurrent check start before Linear confirms the first result.
       await new Promise((resolve) => setTimeout(resolve, 0));
-      const issueUrl = 'https://github.com/zenzontle/garage-guardian/issues/1';
-      resolveFound(issueUrl);
-      expect(await first).toMatchObject({ state: 'succeeded', issueUrl });
+      const issueReference = 'FB-1';
+      resolveFound(issueReference);
+      expect(await first).toMatchObject({ state: 'succeeded', issueReference });
       resolveMissing(null);
       await second;
       expect(await store.get('user', value.report.submissionId)).toMatchObject({
         state: 'succeeded',
-        issueUrl,
+        issueReference,
       });
       expect(
-        await reconcileReceipt(
-          store,
-          github,
-          'user',
-          value.report.submissionId,
-          receipt,
-          metadata.reporterId,
-        ),
-      ).toMatchObject({ state: 'succeeded', issueUrl });
-      expect(github.reconcile).toHaveBeenCalledTimes(1);
-      expect(github.create).not.toHaveBeenCalled();
+        await reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt),
+      ).toMatchObject({ state: 'succeeded', issueReference });
+      expect(linear.reconcile).toHaveBeenCalledTimes(1);
+      expect(linear.create).not.toHaveBeenCalled();
     },
   );
   it('keeps status reconciliation out of an active issue creation lease', async () => {
     const store = memoryStore(),
-      github = adapter(),
+      linear = adapter(),
       value = input();
-    let finish!: (url: string) => void, started!: () => void;
+    let finish!: (reference: string) => void, started!: () => void;
     const creating = new Promise<string>((resolve) => {
       finish = resolve;
     });
     const pending = new Promise<void>((resolve) => {
       started = resolve;
     });
-    github.create.mockImplementationOnce(() => {
+    linear.create.mockImplementationOnce(() => {
       started();
       return creating;
     });
-    const submission = submitReport(store, github, 'user', 'ip', value);
+    const submission = submitReport(store, linear, 'user', 'ip', value);
     await pending;
     const receipt = (await store.get('user', value.report.submissionId))!;
     expect(
-      await reconcileReceipt(
-        store,
-        github,
-        'user',
-        value.report.submissionId,
-        receipt,
-        metadata.reporterId,
-      ),
+      await reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt),
     ).toEqual(receipt);
-    expect(github.reconcile).not.toHaveBeenCalled();
-    finish('https://github.com/zenzontle/garage-guardian/issues/1');
+    expect(linear.reconcile).not.toHaveBeenCalled();
+    finish('FB-1');
     expect((await submission).status).toBe(201);
   });
-  it('allows reconciliation to retry after a GitHub lookup failure', async () => {
+  it('allows reconciliation to retry after a Linear lookup failure', async () => {
     const store = memoryStore(),
-      github = adapter(),
+      linear = adapter(),
       value = input();
     const receipt = {
       hash: value.hash,
@@ -341,35 +318,19 @@ describe('GitHub delivery and retries', () => {
       createdAt: Date.now(),
     };
     await store.claim('user', value.report.submissionId, receipt);
-    github.reconcile
-      .mockRejectedValueOnce(new GitHubFailure(true))
-      .mockResolvedValueOnce('https://github.com/zenzontle/garage-guardian/issues/1');
+    linear.reconcile.mockRejectedValueOnce(new DeliveryFailure(true)).mockResolvedValueOnce('FB-1');
     await expect(
-      reconcileReceipt(
-        store,
-        github,
-        'user',
-        value.report.submissionId,
-        receipt,
-        metadata.reporterId,
-      ),
-    ).rejects.toBeInstanceOf(GitHubFailure);
+      reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt),
+    ).rejects.toBeInstanceOf(DeliveryFailure);
     expect(await store.get('user', value.report.submissionId)).toEqual(receipt);
     expect(
-      await reconcileReceipt(
-        store,
-        github,
-        'user',
-        value.report.submissionId,
-        receipt,
-        metadata.reporterId,
-      ),
+      await reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt),
     ).toMatchObject({ state: 'succeeded' });
-    expect(github.reconcile).toHaveBeenCalledTimes(2);
+    expect(linear.reconcile).toHaveBeenCalledTimes(2);
   });
   it('returns an uncertain receipt discovered after replay without re-entering its submission lease', async () => {
     const store = memoryStore(),
-      github = adapter(),
+      linear = adapter(),
       value = input();
     const receipt = {
       hash: value.hash,
@@ -379,28 +340,21 @@ describe('GitHub delivery and retries', () => {
     };
     await store.claim('user', value.report.submissionId, receipt);
     store.get = vi.fn(store.get).mockResolvedValueOnce(null);
-    const response = await submitReport(store, github, 'user', 'ip', value);
+    const response = await submitReport(store, linear, 'user', 'ip', value);
     expect(response.status).toBe(202);
     expect(await response.json()).toEqual({ state: 'unknown' });
-    expect(github.reconcile).not.toHaveBeenCalled();
-    expect(github.create).not.toHaveBeenCalled();
-    github.reconcile.mockResolvedValueOnce('https://github.com/zenzontle/garage-guardian/issues/1');
+    expect(linear.reconcile).not.toHaveBeenCalled();
+    expect(linear.create).not.toHaveBeenCalled();
+    linear.reconcile.mockResolvedValueOnce('FB-1');
     expect(
-      await reconcileReceipt(
-        store,
-        github,
-        'user',
-        value.report.submissionId,
-        receipt,
-        metadata.reporterId,
-      ),
+      await reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt),
     ).toMatchObject({ state: 'succeeded' });
   });
   it.each(['creating', 'unknown'] as const)(
     're-reads an uploading receipt under the lease before recovering a now-%s submission',
     async (state) => {
       const store = memoryStore(),
-        github = adapter(),
+        linear = adapter(),
         value = input();
       const stale = {
         hash: value.hash,
@@ -411,25 +365,23 @@ describe('GitHub delivery and retries', () => {
       await store.claim('user', value.report.submissionId, { ...stale, state });
       const result = await reconcileReceipt(
         store,
-        github,
+        linear,
         'user',
         value.report.submissionId,
         stale,
-        metadata.reporterId,
       );
       expect(result.state).toBe('unknown');
       expect((await store.get('user', value.report.submissionId))?.state).toBe('unknown');
-      expect(github.reconcile).toHaveBeenCalledExactlyOnceWith(
-        value.report.submissionId,
-        metadata.reporterId,
+      expect(linear.reconcile).toHaveBeenCalledExactlyOnceWith(
+        `issue:user:${value.report.submissionId}`,
       );
-      expect(github.upload).not.toHaveBeenCalled();
-      expect(github.create).not.toHaveBeenCalled();
+      expect(linear.upload).not.toHaveBeenCalled();
+      expect(linear.create).not.toHaveBeenCalled();
     },
   );
   it('does not make an uploading receipt retryable when the lease check fails', async () => {
     const store = memoryStore(),
-      github = adapter(),
+      linear = adapter(),
       value = input();
     const receipt = {
       hash: value.hash,
@@ -440,25 +392,18 @@ describe('GitHub delivery and retries', () => {
     await store.claim('user', value.report.submissionId, receipt);
     store.lock = vi.fn().mockRejectedValue(new Error('Redis unavailable'));
     await expect(
-      reconcileReceipt(
-        store,
-        github,
-        'user',
-        value.report.submissionId,
-        receipt,
-        metadata.reporterId,
-      ),
+      reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt),
     ).rejects.toThrow('Redis unavailable');
     expect(await store.get('user', value.report.submissionId)).toEqual(receipt);
-    expect(github.upload).not.toHaveBeenCalled();
-    expect(github.create).not.toHaveBeenCalled();
+    expect(linear.upload).not.toHaveBeenCalled();
+    expect(linear.create).not.toHaveBeenCalled();
   });
-  it('blocks GitHub writes when rate limiting fails', async () => {
+  it('blocks Linear writes when rate limiting fails', async () => {
     const store = memoryStore(),
-      github = adapter();
+      linear = adapter();
     store.limit = vi.fn().mockRejectedValue(new Error('Redis unavailable'));
-    await expect(submitReport(store, github, 'user', 'ip', input())).rejects.toThrow();
-    expect(github.upload).not.toHaveBeenCalled();
-    expect(github.create).not.toHaveBeenCalled();
+    await expect(submitReport(store, linear, 'user', 'ip', input())).rejects.toThrow();
+    expect(linear.upload).not.toHaveBeenCalled();
+    expect(linear.create).not.toHaveBeenCalled();
   });
 });

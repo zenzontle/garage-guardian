@@ -45,7 +45,7 @@ Shipped migrations are never edited; schema changes go in a new numbered file.
 | ------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                          | Accounts and cloud sync                              |
 | `SUPABASE_SECRET_KEY`, `REMINDERS_ENABLED`, `BREVO_*`, `CRON_SECRET`, `REMINDER_APP_ORIGIN` | [Account reminders](account-reminders.md#deployment) |
-| `FEEDBACK_ENABLED`, `FEEDBACK_*`, `UPSTASH_REDIS_REST_*`                                    | [Feedback](feedback.md#deployment-setup)             |
+| `FEEDBACK_ENABLED`, `FEEDBACK_LINEAR_*`, `FEEDBACK_*`, `UPSTASH_REDIS_REST_*`               | [Private feedback](feedback.md#deployment-setup)     |
 
 ## Guest data and signup
 
