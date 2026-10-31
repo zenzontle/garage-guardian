@@ -110,7 +110,7 @@ describe.each([
     });
     await user.click(task.getByRole('button', { name: 'Guardar tarea' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    await user.click(screen.getByRole('button', { name: 'Registrar servicio' }));
+    await user.click(screen.getAllByRole('button', { name: 'Registrar servicio' })[0]);
     const visitElement = screen.getByRole('dialog'),
       visitDialog = within(visitElement);
     fireEvent.change(visitDialog.getByLabelText('Fecha'), { target: { value: '2026-09-25' } });
@@ -513,7 +513,7 @@ describe.each([
     await user.click(dialog.getByRole('button', { name: 'Save task' }));
     await screen.findByText('at 1,100 km');
     expect(screen.getByText('Coming up')).toBeDefined();
-    await user.click(screen.getByRole('button', { name: 'Log service' }));
+    await user.click(screen.getAllByRole('button', { name: 'Log service' })[0]);
     dialog = within(screen.getByRole('dialog', { name: 'Log service' }));
     expect((dialog.getByLabelText('Odometer (kilometers)') as HTMLInputElement).value).toBe('100');
     fireEvent.change(dialog.getByLabelText('Odometer (kilometers)'), { target: { value: '1200' } });

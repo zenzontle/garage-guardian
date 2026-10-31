@@ -92,7 +92,7 @@ export function ReportsPage({
                 <h2>{t('reports.overTime')}</h2>
               </div>
             </div>
-            <div className="bar-chart">
+            <div className="bar-chart tone-spend">
               {totals.byMonth.map(([month, amount]) => (
                 <div className="bar-row" key={month}>
                   <span>{formatMonth(month)}</span>
@@ -143,11 +143,13 @@ export function ReportsPage({
           </section>
         </div>
       ) : (
-        <EmptyPanel
-          icon={<DollarSign size={24} />}
-          title={t('reports.empty')}
-          description={t('reports.emptyHint')}
-        />
+        <div className="tone-spend">
+          <EmptyPanel
+            icon={<DollarSign size={24} />}
+            title={t('reports.empty')}
+            description={t('reports.emptyHint')}
+          />
+        </div>
       )}
     </>
   );

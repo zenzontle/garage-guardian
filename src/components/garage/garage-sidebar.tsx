@@ -79,10 +79,10 @@ export function GarageSidebar({
       </div>
       <div className="sidebar-label">{t('app.workspace')}</div>
       <nav aria-label={t('app.mainNavigation')}>
-        {navigation.map(({ id, icon: Icon }) => (
+        {navigation.map(({ id, icon: Icon, tone }) => (
           <Link
             key={id}
-            className={`nav-link ${page === id ? 'active' : ''}`}
+            className={`nav-link ${tone} ${page === id ? 'active' : ''}`}
             href={workspacePaths[id]}
             onClick={onNavigate}
             aria-current={page === id ? 'page' : undefined}

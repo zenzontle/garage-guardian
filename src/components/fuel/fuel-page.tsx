@@ -68,7 +68,7 @@ export function FuelPage({
         title={t('navigation.fuel')}
         description={t('fuel.description')}
         action={
-          <button className="button primary" onClick={onAdd} disabled={!cars.length}>
+          <button className="button primary tone-fuel" onClick={onAdd} disabled={!cars.length}>
             <Plus size={18} />
             {t('fuel.log')}
           </button>
@@ -85,13 +85,13 @@ export function FuelPage({
                 label={car.name}
                 value={fuel.economy(economy.average, economy.unit)}
                 detail={economy.average === null ? t('fuel.noEconomy') : t('fuel.average')}
-                tone="muted"
+                tone="fuel"
               />
             );
           })}
         </div>
       )}
-      <div className="panel table-panel">
+      <div className="panel table-panel tone-fuel">
         <div className="table-toolbar history-toolbar">
           <label className="history-filter">
             <span>{t('fuel.filterCar')}</span>

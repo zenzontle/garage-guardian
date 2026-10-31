@@ -202,6 +202,7 @@
     "latestVisits": "Últimas visitas",
     "noVisits": "No hay visitas registradas",
     "historyHint": "Registra un servicio para empezar el historial de este auto.",
+    "viewHistory": "Ver historial de servicio",
     "delete": "Eliminar auto y registros",
     "confirmDelete": "¿Eliminar {name} y todos sus registros? Esta acción no se puede deshacer.",
     "confirmDeleteTask": "¿Eliminar {name} del plan de mantenimiento de este auto?",

@@ -16,6 +16,18 @@
   --orange-soft: #432e24;
   --yellow: #e8c67d;
   --yellow-soft: #3a3220;
+  --teal: #5fd4a8;
+  --teal-hover: #86e2bf;
+  --teal-soft: #173a31;
+  --on-teal: #06261c;
+  --violet: #b8a4ff;
+  --violet-hover: #cfc2ff;
+  --violet-soft: #2c2650;
+  --on-violet: #1a1240;
+  --pink: #f3a0c4;
+  --pink-hover: #f7bdd6;
+  --pink-soft: #42243a;
+  --on-pink: #2e0f20;
   --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 * {
@@ -149,6 +161,10 @@ a {
     background 0.15s,
     color 0.15s;
 }
+.nav-link > svg,
+.mobile-tabs a > svg {
+  color: var(--accent);
+}
 .nav-link:hover {
   background: var(--surface-raised);
   color: var(--accent);
@@ -177,6 +193,31 @@ a {
   border: 1px solid var(--line);
   background: var(--bg);
   border-radius: 11px;
+}
+/* Each area of the garage gets its own hue by remapping the accent inside it. */
+.tone-fuel,
+.stat-fuel {
+  --accent: var(--teal);
+  --accent-hover: var(--teal-hover);
+  --accent-soft: var(--teal-soft);
+  --on-accent: var(--on-teal);
+}
+.tone-vehicle,
+.stat-vehicle,
+.summary-icon,
+.vehicle-icon,
+.car-header-icon {
+  --accent: var(--violet);
+  --accent-hover: var(--violet-hover);
+  --accent-soft: var(--violet-soft);
+  --on-accent: var(--on-violet);
+}
+.tone-spend,
+.stat-spend {
+  --accent: var(--pink);
+  --accent-hover: var(--pink-hover);
+  --accent-soft: var(--pink-soft);
+  --on-accent: var(--on-pink);
 }
 .summary-icon,
 .vehicle-icon,
@@ -700,6 +741,11 @@ a {
   margin: 3px 0 0;
   font-size: 0.875rem;
   color: var(--muted);
+}
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
 }
 .recent-panel {
   padding: 24px;
@@ -1351,6 +1397,7 @@ td strong {
     grid-template-columns: repeat(2, 1fr);
   }
   .dashboard-grid,
+  .recent-grid,
   .car-content-grid,
   .report-grid {
     grid-template-columns: 1fr;

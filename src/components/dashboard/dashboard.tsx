@@ -1,7 +1,7 @@
 'use client';
 
 import Link from '../interaction/guarded-link';
-import { carPath } from '@/lib/navigation/garage-routes';
+import { carPath, fuelPath } from '@/lib/navigation/garage-routes';
 import { useTranslations } from 'next-intl';
 import {
   ArrowRight,
@@ -21,6 +21,7 @@ import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
 import { Stat } from '../ui/stat';
 import { DueRow } from './due-row';
+import { useFuelDisplay } from '../fuel/use-fuel-display';
 import { reportTotals } from '@/lib/reports/reports';
 import type { Currency } from '@/lib/currency/currency';
 
@@ -45,6 +46,7 @@ export function Dashboard({
 }) {
   const t = useTranslations();
   const { number, money, displayDate, formatDistance } = useDisplay();
+  const fuel = useFuelDisplay();
   const activeCars = cars.filter((car) => !car.isArchived);
   const due = allDue.filter((item) => item.status === 'due');
   const upcoming = allDue.filter((item) => item.status === 'upcoming');
@@ -63,7 +65,7 @@ export function Dashboard({
         action={
           <div className="account-actions">
             {activeCars.length > 0 && onAddFuel && (
-              <button className="button secondary" onClick={onAddFuel}>
+              <button className="button primary tone-fuel" onClick={onAddFuel}>
                 <Fuel size={18} />
                 {t('dashboard.logFuel')}
               </button>
@@ -109,6 +111,7 @@ export function Dashboard({
               label={t('dashboard.vehicles')}
               value={number(activeCars.length)}
               detail={t('app.inGarage')}
+              tone="vehicle"
             />
             <Stat
               icon={<CircleAlert size={20} />}
@@ -133,7 +136,7 @@ export function Dashboard({
                   ? t('currency.incomplete', { count: spending.pendingCount })
                   : t('dashboard.allVehicles')
               }
-              tone="muted"
+              tone="spend"
             />
           </div>
           <div className="dashboard-grid">
@@ -231,50 +234,96 @@ export function Dashboard({
               </button>
             </section>
           </div>
-          <section className="panel recent-panel">
-            <div className="section-heading">
-              <div>
-                <span className="eyebrow">{t('dashboard.activity')}</span>
-                <h2>{t('dashboard.recent')}</h2>
-              </div>
-              <Link className="text-link" href="/history">
-                {t('dashboard.viewAll')}
-                <ArrowRight size={16} />
-              </Link>
-            </div>
-            {visits.length ? (
-              <div className="recent-list">
-                {visits.slice(0, 5).map((visit) => (
-                  <div className="recent-row" key={visit.id}>
-                    <span className="service-icon">
-                      <Wrench size={18} />
-                    </span>
-                    <span className="recent-main">
-                      <strong>
-                        {visit.items.map((item) => item.name).join(', ') ||
-                          t('shared.serviceVisit')}
-                      </strong>
-                      <small>
-                        {cars.find((car) => car.id === visit.carId)?.name} ·{' '}
-                        {cars.find((car) => car.id === visit.carId)?.isArchived &&
-                          `${t('archive.archived')} · `}
-                        {displayDate(visit.date)}
-                      </small>
-                    </span>
-                    <strong>{money(visit.totalCostCents, visit.currency ?? 'USD')}</strong>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="panel-empty">
-                <Wrench size={20} />
+          <div className="recent-grid">
+            <section className="panel recent-panel">
+              <div className="section-heading">
                 <div>
-                  <strong>{t('dashboard.noVisits')}</strong>
-                  <p>{t('dashboard.historyPlaceholder')}</p>
+                  <span className="eyebrow">{t('dashboard.activity')}</span>
+                  <h2>{t('dashboard.recent')}</h2>
                 </div>
+                <Link className="text-link" href="/history">
+                  {t('dashboard.viewAll')}
+                  <ArrowRight size={16} />
+                </Link>
               </div>
-            )}
-          </section>
+              {visits.length ? (
+                <div className="recent-list">
+                  {visits.slice(0, 5).map((visit) => (
+                    <div className="recent-row" key={visit.id}>
+                      <span className="service-icon">
+                        <Wrench size={18} />
+                      </span>
+                      <span className="recent-main">
+                        <strong>
+                          {visit.items.map((item) => item.name).join(', ') ||
+                            t('shared.serviceVisit')}
+                        </strong>
+                        <small>
+                          {cars.find((car) => car.id === visit.carId)?.name} ·{' '}
+                          {cars.find((car) => car.id === visit.carId)?.isArchived &&
+                            `${t('archive.archived')} · `}
+                          {displayDate(visit.date)}
+                        </small>
+                      </span>
+                      <strong>{money(visit.totalCostCents, visit.currency ?? 'USD')}</strong>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="panel-empty">
+                  <Wrench size={20} />
+                  <div>
+                    <strong>{t('dashboard.noVisits')}</strong>
+                    <p>{t('dashboard.historyPlaceholder')}</p>
+                  </div>
+                </div>
+              )}
+            </section>
+            <section className="panel recent-panel tone-fuel">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">{t('fuel.eyebrow')}</span>
+                  <h2>{t('fuel.recent')}</h2>
+                </div>
+                <Link className="text-link" href={fuelPath()}>
+                  {t('fuel.viewAll')}
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
+              {fuelEntries.length ? (
+                <div className="recent-list">
+                  {fuelEntries.slice(0, 5).map((entry) => {
+                    const car = cars.find((item) => item.id === entry.carId);
+                    return (
+                      <div className="recent-row" key={entry.id}>
+                        <span className="service-icon">
+                          <Fuel size={18} />
+                        </span>
+                        <span className="recent-main">
+                          <strong>
+                            {fuel.volume(entry)} · {t(`fuel.types.${entry.fuelType}`)}
+                          </strong>
+                          <small>
+                            {car?.name} · {car?.isArchived && `${t('archive.archived')} · `}
+                            {displayDate(entry.date)}
+                          </small>
+                        </span>
+                        <strong>{fuel.total(entry)}</strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="panel-empty">
+                  <Fuel size={20} />
+                  <div>
+                    <strong>{t('fuel.empty')}</strong>
+                    <p>{t('fuel.firstEntry')}</p>
+                  </div>
+                </div>
+              )}
+            </section>
+          </div>
         </>
       )}
     </>

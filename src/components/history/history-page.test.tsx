@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState, type ComponentProps } from 'react';
 import { NextIntlClientProvider } from 'next-intl';
 import { beforeEach, expect, it, vi } from 'vitest';
 import en from '../../../messages/en.json';
@@ -8,6 +9,13 @@ import { car, visit } from '@/test/fixtures';
 import { LocalRepository } from '@/lib/garage/repository';
 import type { Car, Visit } from '@/lib/garage/model';
 import { HistoryPage } from './history-page';
+
+function FilteredHistoryPage(
+  props: Omit<ComponentProps<typeof HistoryPage>, 'carId' | 'onCarChange'>,
+) {
+  const [carId, setCarId] = useState('');
+  return <HistoryPage {...props} carId={carId} onCarChange={setCarId} />;
+}
 
 beforeEach(() => vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', ''));
 const metric: Car = { ...car, id: 'metric', name: 'Metric driver', distanceUnit: 'kilometers' };
@@ -29,7 +37,7 @@ function setup(visits = [{ ...visit, odometer: 1000 }, later]) {
   const props = { cars: [car, metric], visits, repository, onAdd: vi.fn(), onEdit, onDelete };
   const view = render(
     <NextIntlClientProvider locale="en" messages={en}>
-      <HistoryPage {...props} />
+      <FilteredHistoryPage {...props} />
     </NextIntlClientProvider>,
   );
   return {
@@ -156,7 +164,7 @@ it('downloads photos and localizes an existing photo error without losing expans
   await cards.findByRole('alert');
   rerender(
     <NextIntlClientProvider locale="es" messages={es}>
-      <HistoryPage {...props} />
+      <FilteredHistoryPage {...props} />
     </NextIntlClientProvider>,
   );
   expect(cards.getByRole('alert').textContent).toContain('foto');
@@ -171,7 +179,7 @@ it('handles an empty history and records whose vehicle is unavailable', () => {
   expect(screen.getByRole('button', { name: 'Export CSV' })).toHaveProperty('disabled', true);
   rerender(
     <NextIntlClientProvider locale="en" messages={en}>
-      <HistoryPage {...props} visits={[{ ...visit, carId: 'missing' }]} />
+      <FilteredHistoryPage {...props} visits={[{ ...visit, carId: 'missing' }]} />
     </NextIntlClientProvider>,
   );
   const cards = within(screen.getByRole('list', { name: 'Service history' }));

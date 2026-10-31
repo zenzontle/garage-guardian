@@ -1,7 +1,7 @@
 'use client';
 
 import Link from '../interaction/guarded-link';
-import { carPath, fuelPath } from '@/lib/navigation/garage-routes';
+import { carPath, fuelPath, historyPath } from '@/lib/navigation/garage-routes';
 import { useTranslations } from 'next-intl';
 import {
   ArrowRight,
@@ -232,7 +232,7 @@ export function CarsPage({
               </button>
               <button
                 disabled={archiveBusy}
-                className="button secondary"
+                className="button primary tone-fuel"
                 onClick={() => onAddFuel(car.id)}
               >
                 <Fuel size={16} />
@@ -408,6 +408,20 @@ export function CarsPage({
                   </div>
                 </div>
               )}
+              <div className="account-actions">
+                <button
+                  disabled={archiveBusy}
+                  className="text-link"
+                  onClick={() => onAddVisit(car.id)}
+                >
+                  <Plus size={16} />
+                  {t('shared.logService')}
+                </button>
+                <Link className="text-link" href={historyPath(car.id)}>
+                  {t('car.viewHistory')}
+                  <ArrowRight size={16} />
+                </Link>
+              </div>
               <button
                 disabled={archiveBusy}
                 className="text-link danger-text"
@@ -417,10 +431,10 @@ export function CarsPage({
                 {t('car.delete')}
               </button>
             </section>
-            <section className="panel">
+            <section className="panel tone-fuel">
               <div className="section-heading">
                 <div>
-                  <span className="eyebrow">{t('navigation.fuelShort')}</span>
+                  <span className="eyebrow">{t('fuel.eyebrow')}</span>
                   <h2>{t('fuel.recent')}</h2>
                 </div>
                 <span className="count-badge">{number(carFuel.length)}</span>

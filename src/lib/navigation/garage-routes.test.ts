@@ -3,6 +3,7 @@ import {
   accountPath,
   carPath,
   fuelPath,
+  historyPath,
   reportPath,
   reportPaths,
   validatedReturnTo,
@@ -71,6 +72,8 @@ describe('garage URLs', () => {
     expect(carPath('café')).toBe('/cars/caf%C3%A9');
     expect(fuelPath('a b&c')).toBe('/fuel?car=a+b%26c');
     expect(fuelPath()).toBe('/fuel');
+    expect(historyPath('a b&c')).toBe('/history?car=a+b%26c');
+    expect(historyPath()).toBe('/history');
   });
   it('classifies the fuel log for navigation and feedback without its vehicle filter', () => {
     expect(workspaceScreen('/fuel')).toBe('fuel');
