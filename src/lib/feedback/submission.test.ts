@@ -372,7 +372,9 @@ describe('Linear delivery and retries', () => {
       );
       expect(result.state).toBe('unknown');
       expect((await store.get('user', value.report.submissionId))?.state).toBe('unknown');
-      expect(linear.reconcile).toHaveBeenCalledExactlyOnceWith(value.report.submissionId);
+      expect(linear.reconcile).toHaveBeenCalledExactlyOnceWith(
+        `issue:user:${value.report.submissionId}`,
+      );
       expect(linear.upload).not.toHaveBeenCalled();
       expect(linear.create).not.toHaveBeenCalled();
     },

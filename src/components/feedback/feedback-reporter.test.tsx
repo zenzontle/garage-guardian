@@ -257,7 +257,9 @@ describe('authenticated private feedback reporter', () => {
       expect(url).toBe('/api/feedback');
       expect(init.method).toBe('POST');
       const report = JSON.parse(init.body.get('report'));
-      expect(preview).toContain(report.submissionId);
+      // The retry sends the same reviewed draft that was previewed.
+      expect(preview).toContain(report.description);
+      expect(preview).toContain(report.diagnostics[0].message);
       expect(report.diagnostics).toHaveLength(1);
     },
   );
@@ -411,7 +413,7 @@ describe('authenticated private feedback reporter', () => {
     expect(screen.getByRole('dialog').textContent).toContain('Enviar comentarios');
     expect(screen.getByRole('alert').textContent).toContain('Escribe una descripción');
     expect(screen.getByText(/^Ejemplo:/)).toBeDefined();
-    expect(screen.getByRole('dialog').textContent).toContain('serán públicos');
+    expect(screen.getByRole('dialog').textContent).toContain('de forma privada al desarrollador');
     await user.type(
       screen.getByLabelText('Descripción'),
       'Mis pasos originales para reproducir el error.',
