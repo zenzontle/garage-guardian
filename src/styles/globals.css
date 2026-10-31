@@ -1281,6 +1281,16 @@ td strong {
   color: var(--muted);
   font-size: 0.875rem;
 }
+.info-callout.warning {
+  border-color: var(--orange);
+  background: var(--orange-soft);
+  color: var(--text);
+  /* Clears the sticky modal footer when scrolled into view. */
+  scroll-margin-bottom: 96px;
+}
+.info-callout.warning svg {
+  color: var(--orange);
+}
 .info-callout svg {
   flex: none;
 }
