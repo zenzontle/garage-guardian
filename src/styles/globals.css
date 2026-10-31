@@ -1870,11 +1870,10 @@ textarea::placeholder {
   display: flex;
   align-items: center;
 }
-.feedback-modal .checkbox-line {
-  align-items: flex-start;
-}
-.feedback-modal .info-callout {
-  margin: 0;
+.feedback-report-contents {
+  margin: 8px 0 12px;
+  font-size: 0.875rem;
+  color: var(--muted);
 }
 .feedback-modal h3 {
   overflow-wrap: anywhere;

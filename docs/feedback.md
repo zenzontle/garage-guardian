@@ -22,7 +22,7 @@ A missing or malformed Linear key or team ID keeps reporting unavailable (`NOT_C
 
 ## Who can see reports
 
-Users review the complete report text and each screenshot, can remove diagnostic entries or all diagnostics, and must acknowledge a warning not to include passwords, tokens or personal details before sending. Nothing is uploaded while editing/reviewing. Issues and uploaded screenshots are visible only to members of the feedback workspace; nothing is published to the web, and reporters see only the issue identifier (for example `FB-12`).
+Users review the complete report text and each screenshot, and can remove diagnostic entries or all diagnostics before sending. The form says, below the description, what the report includes. Nothing is uploaded while editing/reviewing. Issues and uploaded screenshots are visible only to members of the feedback workspace; nothing is published to the web, and reporters see only the issue identifier (for example `FB-12`).
 
 This setup guards against two risks of the earlier public GitHub destination. Sign-up is open, so any signed-in user could have posted text and images that were public immediately under the maintainer's account. And screenshot upload needed a token with push access to the code repository, so a leaked deployment setting could have exposed the code. The Linear key can only read and create issues in one team of a separate workspace, and nothing reaches GitHub.
 

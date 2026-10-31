@@ -111,6 +111,13 @@ describe('authenticated private feedback reporter', () => {
     expect(within(dialog).queryByLabelText('Title')).toBeNull();
     expect(screen.getByLabelText('Description').getAttribute('placeholder')).toBeNull();
     expect(screen.getByText(/^Example:/)).toBeDefined();
+    expect(
+      screen.getByLabelText('Description').getAttribute('aria-describedby')!.split(' '),
+    ).toContain('feedback-report-contents');
+    expect(document.getElementById('feedback-report-contents')!.textContent).toMatch(
+      /^The report also includes any screenshots you add, the app version/,
+    );
+    expect(dialog.textContent).not.toContain('sent privately to the developer.');
     await review(user);
     expect(
       screen.getByRole('heading', {
@@ -141,7 +148,6 @@ describe('authenticated private feedback reporter', () => {
       target: { value: large.description },
     });
     await user.click(screen.getByRole('button', { name: 'Review report' }));
-    await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: 'Send report' }));
     expect(screen.getByRole('alert').textContent).toContain('Remove some diagnostics');
     expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(0);
@@ -149,7 +155,6 @@ describe('authenticated private feedback reporter', () => {
     expect(screen.getByRole('alert').textContent).toContain('Elimina algunos diagnósticos');
     switchLocale('en');
     await user.click(screen.getByRole('button', { name: 'Remove all diagnostics' }));
-    await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(
       Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
     );
@@ -166,7 +171,7 @@ describe('authenticated private feedback reporter', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(screen.queryByRole('button', { name: 'Send feedback' })).toBeNull();
   });
-  it('previews diagnostics and screen state, requires acknowledgment, and uses a bearer session', async () => {
+  it('previews diagnostics and screen state without an acknowledgment step, and uses a bearer session', async () => {
     const user = await openReport();
     recordDiagnostic('token=secret broken layout');
     await review(user);
@@ -174,10 +179,10 @@ describe('authenticated private feedback reporter', () => {
     expect(screen.getByText(/Screen: cars/)).toBeDefined();
     expect(screen.getByText(/Dialog: add-car/)).toBeDefined();
     const button = screen.getByRole('button', { name: 'Send report' }) as HTMLButtonElement;
-    expect(button.disabled).toBe(true);
+    expect(button.disabled).toBe(false);
+    expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByText('token=secret broken layout')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Remove all diagnostics' }));
-    await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(
       Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
     );
@@ -216,7 +221,6 @@ describe('authenticated private feedback reporter', () => {
   it('keeps the same draft across transport failures and checks status instead of reposting', async () => {
     const user = await openReport();
     await review(user);
-    await user.click(screen.getByRole('checkbox'));
     fetchMock.mockRejectedValueOnce(new Error('network error'));
     await user.click(screen.getByRole('button', { name: 'Send report' }));
     await screen.findByRole('alert');
@@ -232,7 +236,6 @@ describe('authenticated private feedback reporter', () => {
       const user = await openReport();
       recordDiagnostic('Synthetic error');
       await review(user);
-      await user.click(screen.getByRole('checkbox'));
       const preview = screen.getByText(/Release:/).textContent;
       const callsBeforePublish = fetchMock.mock.calls.length;
       failSessionLookup(failure);
@@ -268,7 +271,6 @@ describe('authenticated private feedback reporter', () => {
     async (failure) => {
       const user = await openReport();
       await review(user);
-      await user.click(screen.getByRole('checkbox'));
       fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
       await user.click(screen.getByRole('button', { name: 'Send report' }));
       const callsBeforeCheck = fetchMock.mock.calls.length;
@@ -297,7 +299,6 @@ describe('authenticated private feedback reporter', () => {
     const user = await openReport();
     recordDiagnostic('Synthetic error');
     await review(user);
-    await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ code }, { status: 503 }));
     await user.click(screen.getByRole('button', { name: 'Send report' }));
     await screen.findByRole('alert');
@@ -325,7 +326,6 @@ describe('authenticated private feedback reporter', () => {
       const user = await openReport();
       recordDiagnostic('Synthetic error');
       await review(user);
-      await user.click(screen.getByRole('checkbox'));
       fetchMock.mockResolvedValueOnce(Response.json({ code: 'PREVIEW_CHANGED' }, { status: 409 }));
       if (failure === 'network') fetchMock.mockRejectedValueOnce(new Error('network error'));
       else if (failure === 'non-json') fetchMock.mockResolvedValueOnce(new Response('Not JSON'));
@@ -356,7 +356,6 @@ describe('authenticated private feedback reporter', () => {
   it('never invites a new POST when a previously uncertain receipt disappears', async () => {
     const user = await openReport();
     await review(user);
-    await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
     await user.click(screen.getByRole('button', { name: 'Send report' }));
     fetchMock.mockResolvedValueOnce(Response.json({ code: 'NOT_FOUND' }, { status: 404 }));
@@ -370,7 +369,6 @@ describe('authenticated private feedback reporter', () => {
     const user = await openReport();
     recordDiagnostic('Synthetic error');
     await review(user);
-    await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
     await user.click(screen.getByRole('button', { name: 'Send report' }));
     const submission = JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report'));
@@ -413,7 +411,7 @@ describe('authenticated private feedback reporter', () => {
     expect(screen.getByRole('dialog').textContent).toContain('Enviar comentarios');
     expect(screen.getByRole('alert').textContent).toContain('Escribe una descripción');
     expect(screen.getByText(/^Ejemplo:/)).toBeDefined();
-    expect(screen.getByRole('dialog').textContent).toContain('de forma privada al desarrollador');
+    expect(screen.getByRole('dialog').textContent).toContain('El reporte también incluye');
     await user.type(
       screen.getByLabelText('Descripción'),
       'Mis pasos originales para reproducir el error.',
@@ -424,7 +422,6 @@ describe('authenticated private feedback reporter', () => {
     );
     switchLocale('es');
     await user.click(screen.getByRole('button', { name: 'Revisar reporte' }));
-    await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(
       Response.json(
         { code: 'RATE_LIMITED', error: 'English provider text' },

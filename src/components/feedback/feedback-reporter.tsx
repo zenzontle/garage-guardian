@@ -84,7 +84,6 @@ export function FeedbackReporter({
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const filesRef = useRef<Screenshot[]>([]);
   const [draft, setDraft] = useState<FeedbackReport | null>(null);
-  const [acknowledged, setAcknowledged] = useState(false);
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -158,7 +157,6 @@ export function FeedbackReporter({
     setScreenshots([]);
     setDescription('');
     setDraft(null);
-    setAcknowledged(false);
     setSent(false);
     setIssueReference('');
     setStatus(null);
@@ -219,14 +217,13 @@ export function FeedbackReporter({
       return;
     }
     setDraft(candidate.data);
-    setAcknowledged(false);
     setSent(false);
     setError(null);
     setStatus(null);
     setIssueReference('');
   }
   async function deliver(check = false) {
-    if (!draft || !acknowledged || busy) return;
+    if (!draft || busy) return;
     if (!check && !sent && !fitsIssueBody(draft)) {
       setError({ code: 'ISSUE_TOO_LARGE' });
       return;
@@ -273,7 +270,6 @@ export function FeedbackReporter({
           if (fresh.ok && configuration.enabled === true && parsed.success) {
             setMetadata(parsed.data);
             setDraft(null);
-            setAcknowledged(false);
             setSent(false);
           }
         }
@@ -362,7 +358,6 @@ export function FeedbackReporter({
               </div>
               <div className="modal-body form-stack">
                 <fieldset className="interaction-fields" disabled={busy}>
-                  <p className="info-callout">{t('privateWarning')}</p>
                   {!draft ? (
                     <FeedbackFields
                       description={description}
@@ -374,10 +369,7 @@ export function FeedbackReporter({
                       draft={draft}
                       screenshotCount={screenshots.length}
                       disabled={sent || busy}
-                      onDraftChange={(next) => {
-                        setDraft(next);
-                        setAcknowledged(false);
-                      }}
+                      onDraftChange={setDraft}
                     />
                   )}
                   <FeedbackScreenshots
@@ -388,20 +380,8 @@ export function FeedbackReporter({
                       URL.revokeObjectURL(screenshots[index].url);
                       setScreenshots(screenshots.filter((_, position) => position !== index));
                       if (draft) setDraft({ ...draft, submissionId: crypto.randomUUID() });
-                      setAcknowledged(false);
                     }}
                   />
-                  {draft && (
-                    <label className="checkbox-line">
-                      <input
-                        type="checkbox"
-                        checked={acknowledged}
-                        disabled={sent || busy}
-                        onChange={(event) => setAcknowledged(event.target.checked)}
-                      />
-                      {t('acknowledgment')}
-                    </label>
-                  )}
                   {error && (
                     <p className="error-text" role="alert">
                       {t(`errors.${error.code}`)}
@@ -430,10 +410,7 @@ export function FeedbackReporter({
                       <button
                         className="button secondary"
                         disabled={busy}
-                        onClick={() => {
-                          setDraft(null);
-                          setAcknowledged(false);
-                        }}
+                        onClick={() => setDraft(null)}
                       >
                         {t('edit')}
                       </button>
@@ -441,7 +418,7 @@ export function FeedbackReporter({
                     {!issueReference && (
                       <button
                         className="button primary"
-                        disabled={!acknowledged || busy}
+                        disabled={busy}
                         onClick={() => void deliver()}
                       >
                         {busy ? t('waiting') : sent ? t('checkStatus') : t('send')}
