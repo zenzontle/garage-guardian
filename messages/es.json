@@ -502,6 +502,8 @@
     "restore": "Restaurar vehículo",
     "archiving": "Archivando…",
     "restoring": "Restaurando…",
+    "confirm": "¿Archivar este vehículo? Sus recordatorios se pausarán y pasará a la vista de archivados. Su historial se conserva y puedes restaurarlo cuando quieras.",
+    "keep": "Mantener activo",
     "paused": "Los recordatorios están pausados. Puedes editar servicios, recibos y programas de mantenimiento. Restaura este vehículo para reanudar los recordatorios.",
     "scheduleSaved": "Programa guardado · recordatorios pausados",
     "emptyTitle": "No hay vehículos archivados",

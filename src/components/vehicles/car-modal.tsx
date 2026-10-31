@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, TriangleAlert } from 'lucide-react';
 import { isCloudConfigured } from '@/lib/garage/repository';
 import {
   normalizePlate,
@@ -19,6 +19,9 @@ import { failureOf, type AppFailure } from '@/lib/utils/app-error';
 import { Modal } from '../ui/modal';
 import { useFormInteraction } from '../interaction/use-form-interaction';
 import { stepDistanceInput } from '../ui/step-distance-input';
+
+// The form scrolls inside the modal; bring the archive warning up beside its buttons once.
+const revealWarning = (node: HTMLElement | null) => node?.scrollIntoView?.({ block: 'nearest' });
 
 export function CarModal({
   item,
@@ -53,6 +56,8 @@ export function CarModal({
   );
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const [keptActive, setKeptActive] = useState(false);
   const busy = saving || archiving;
   const [formError, setFormError] = useState<AppFailure | null>(null);
   const catalog = useVehicleCatalog(isCloudConfigured, make);
@@ -285,39 +290,75 @@ export function CarModal({
                 <span>{t('car.starterHint')}</span>
               </div>
             )}
+            {confirmingArchive && (
+              <div className="info-callout warning" role="alert" ref={revealWarning}>
+                <TriangleAlert size={18} aria-hidden="true" />
+                <span>{t('archive.confirm')}</span>
+              </div>
+            )}
             {formError && (
               <p className="error-text" role="alert">
                 {t(`errors.${formError.code}`, formError.values)}
               </p>
             )}
           </div>
-          <div className="modal-footer">
-            {item && onToggleArchived && (
+          {confirmingArchive ? (
+            <div key="confirm-archive" className="modal-footer">
               <button
                 type="button"
-                className="button secondary modal-footer-start"
+                className="button secondary"
+                onClick={() => {
+                  setConfirmingArchive(false);
+                  setKeptActive(true);
+                }}
+                // The archive button that opened this warning is gone; keep focus in the footer.
+                autoFocus
+              >
+                {t('archive.keep')}
+              </button>
+              <button
+                type="button"
+                className="button danger"
                 onClick={() => interaction.request(() => void toggleArchived())}
                 disabled={busy}
                 aria-busy={archiving}
               >
-                {t(
-                  archiving
-                    ? item.isArchived
-                      ? 'archive.restoring'
-                      : 'archive.archiving'
-                    : item.isArchived
-                      ? 'archive.restore'
-                      : 'archive.archive',
-                )}
+                {t(archiving ? 'archive.archiving' : 'archive.archive')}
               </button>
-            )}
-            <button type="button" className="button secondary" onClick={close}>
-              {t('shared.cancel')}
-            </button>
-            <button className="button primary" disabled={busy}>
-              {saving ? t('shared.saving') : item ? t('shared.saveChanges') : t('car.saveNew')}
-            </button>
-          </div>
+            </div>
+          ) : (
+            <div key="edit" className="modal-footer">
+              {item && onToggleArchived && (
+                <button
+                  type="button"
+                  className="button secondary modal-footer-start"
+                  onClick={() =>
+                    item.isArchived
+                      ? interaction.request(() => void toggleArchived())
+                      : setConfirmingArchive(true)
+                  }
+                  disabled={busy}
+                  aria-busy={archiving}
+                  // Returning from the warning remounts this footer; focus goes back where it began.
+                  autoFocus={keptActive}
+                >
+                  {t(
+                    archiving
+                      ? 'archive.restoring'
+                      : item.isArchived
+                        ? 'archive.restore'
+                        : 'archive.archive',
+                  )}
+                </button>
+              )}
+              <button type="button" className="button secondary" onClick={close}>
+                {t('shared.cancel')}
+              </button>
+              <button className="button primary" disabled={busy}>
+                {saving ? t('shared.saving') : item ? t('shared.saveChanges') : t('car.saveNew')}
+              </button>
+            </div>
+          )}
         </fieldset>
       </form>
     </Modal>

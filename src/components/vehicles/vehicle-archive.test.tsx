@@ -57,6 +57,17 @@ async function openEditCar(user: ReturnType<typeof userEvent.setup>, copy: typeo
   return within(screen.getByRole('dialog'));
 }
 
+// Archiving asks first; the warning's confirm button replaces the one that opened it.
+async function requestArchive(
+  user: ReturnType<typeof userEvent.setup>,
+  dialog: ReturnType<typeof within>,
+  copy: typeof en = en,
+) {
+  await user.click(dialog.getByRole('button', { name: copy.archive.archive }));
+  dialog.getByText(copy.archive.confirm);
+  return dialog.getByRole('button', { name: copy.archive.archive });
+}
+
 it('keeps the selected vehicle in its new view after a committed archive fails to refresh', async () => {
   const { prototype, user } = await setup('local');
   await screen.findByRole('button', { name: en.car.edit });
@@ -64,7 +75,7 @@ it('keeps the selected vehicle in its new view after a committed archive fails t
   expect(screen.queryByRole('button', { name: en.archive.archive })).toBeNull();
   const dialog = await openEditCar(user);
   vi.spyOn(prototype, 'load').mockRejectedValueOnce(new Error('Refresh failed'));
-  await user.click(dialog.getByRole('button', { name: en.archive.archive }));
+  await user.click(await requestArchive(user, dialog));
   await screen.findByText(en.interactions.carArchived);
   expect(screen.queryByRole('dialog')).toBeNull();
   expect(screen.getByRole('button', { name: en.archive.restore })).toBeDefined();
@@ -76,13 +87,20 @@ it.each([
   ['local', 'en', en],
   ['cloud', 'es', es],
 ] as const)(
-  'archives/restores %s in %s without confirmation, retains selected details, and preserves edits',
+  'archives after confirming and restores %s in %s without one, retains selected details, and preserves edits',
   async (mode, locale, copy) => {
     localStorage.setItem('garage-guardian:locale', locale);
     const { backend, user } = await setup(mode);
     const editor = await openEditCar(user, copy);
     editor.getByRole('button', { name: copy.archive.archive }).focus();
     await user.keyboard('{Enter}');
+    const keep = editor.getByRole('button', { name: copy.archive.keep });
+    expect(document.activeElement).toBe(keep);
+    await user.click(keep);
+    expect(document.activeElement).toBe(editor.getByRole('button', { name: copy.archive.archive }));
+    expect(editor.queryByText(copy.archive.confirm)).toBeNull();
+    expect((await backend.load()).cars[0].isArchived).toBe(false);
+    await user.click(await requestArchive(user, editor, copy));
     // The header updates before the refresh settles; the toast and closed dialog follow it.
     await screen.findByText(copy.interactions.carArchived);
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -173,10 +191,9 @@ it.each([false, true])(
     });
     const save = vi.spyOn(prototype, 'setCarArchived').mockReturnValueOnce(failure);
     // Archiving lives in Edit car; archived vehicles also offer Restore in their header.
-    const scope = archived ? screen : await openEditCar(user);
-    const button = await scope.findByRole('button', {
-      name: archived ? en.archive.restore : en.archive.archive,
-    });
+    const button = archived
+      ? await screen.findByRole('button', { name: en.archive.restore })
+      : await requestArchive(user, await openEditCar(user));
     await user.dblClick(button);
     expect(save).toHaveBeenCalledTimes(1);
     expect((button as HTMLButtonElement).disabled).toBe(true);

@@ -502,6 +502,8 @@
     "restore": "Restore vehicle",
     "archiving": "Archiving…",
     "restoring": "Restoring…",
+    "confirm": "Archive this vehicle? Its reminders will pause, and it moves to the Archived view. Its history stays, and you can restore it anytime.",
+    "keep": "Keep active",
     "paused": "Reminders are paused. Service records, receipts, and schedules remain editable. Restore this vehicle to resume reminders.",
     "scheduleSaved": "Saved schedule · reminders paused",
     "emptyTitle": "No archived vehicles",
