@@ -4,7 +4,7 @@ export type { WorkspaceScreen as Page } from '@/lib/navigation/garage-routes';
 
 // Service keeps the base accent; the other areas carry their own hue.
 export const navigation = [
-  { id: 'dashboard', icon: House, tone: '' },
+  { id: 'dashboard', icon: House, tone: 'tone-home' },
   { id: 'cars', icon: CarFront, tone: 'tone-vehicle' },
   { id: 'fuel', icon: Fuel, tone: 'tone-fuel' },
   { id: 'history', icon: ClipboardList, tone: '' },
