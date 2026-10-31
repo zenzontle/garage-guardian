@@ -17,7 +17,7 @@ import {
   IMAGE_TYPES,
   REPORT_LIMITS,
   fitsIssueBody,
-  isRepositoryIssueUrl,
+  isIssueReference,
   publicMetadataSchema,
   reportSchema,
   type FeedbackReport,
@@ -90,7 +90,7 @@ export function FeedbackReporter({
   const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState<keyof typeof en.feedback.statuses | null>(null);
   const [error, setError] = useState<ReporterProblem | null>(null);
-  const [issueUrl, setIssueUrl] = useState('');
+  const [issueReference, setIssueReference] = useState('');
   const [launcherTarget, setLauncherTarget] = useState<Element | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);
@@ -145,7 +145,7 @@ export function FeedbackReporter({
         modified: file.lastModified,
       })),
     },
-    { busy, enabled: !issueUrl, onDiscard: reset },
+    { busy, enabled: !issueReference, onDiscard: reset },
   );
 
   if (!metadata || !userId) return null;
@@ -160,7 +160,7 @@ export function FeedbackReporter({
     setDraft(null);
     setAcknowledged(false);
     setSent(false);
-    setIssueUrl('');
+    setIssueReference('');
     setStatus(null);
     setError(null);
   }
@@ -223,7 +223,7 @@ export function FeedbackReporter({
     setSent(false);
     setError(null);
     setStatus(null);
-    setIssueUrl('');
+    setIssueReference('');
   }
   async function deliver(check = false) {
     if (!draft || !acknowledged || busy) return;
@@ -256,7 +256,7 @@ export function FeedbackReporter({
           !checking &&
           ([401, 404, 413, 415, 422, 429].includes(response.status) ||
             [
-              'GITHUB_FAILED',
+              'DELIVERY_FAILED',
               'LIMITER_UNAVAILABLE',
               'AUTH_UNAVAILABLE',
               'IP_UNAVAILABLE',
@@ -283,14 +283,10 @@ export function FeedbackReporter({
           Number.isInteger(wait) && wait > 0 && wait <= 86400 ? wait : undefined,
         );
       }
-      if (
-        result.state === 'succeeded' &&
-        typeof result.issueUrl === 'string' &&
-        isRepositoryIssueUrl(result.issueUrl, metadata!.repository)
-      ) {
-        setIssueUrl(result.issueUrl);
+      if (result.state === 'succeeded' && isIssueReference(result.issueReference)) {
+        setIssueReference(result.issueReference);
         interaction.accept();
-        setStatus('published');
+        setStatus('sent');
       } else if (result.state === 'failed') {
         setSent(false);
         setStatus('failed');
@@ -322,7 +318,7 @@ export function FeedbackReporter({
       data-tooltip={t('launch')}
       onKeyDown={(event) => trapFocus(event, launcherTarget)}
       onClick={() => {
-        if (issueUrl) reset();
+        if (issueReference) reset();
         setOpen(true);
       }}
     >
@@ -354,7 +350,6 @@ export function FeedbackReporter({
               <div className="modal-header">
                 <div>
                   <h2 id="feedback-title">{draft ? t('reviewTitle') : t('launch')}</h2>
-                  <p>{t('repository', { repository: metadata.repository })}</p>
                 </div>
                 <button
                   className="icon-button"
@@ -367,7 +362,7 @@ export function FeedbackReporter({
               </div>
               <div className="modal-body form-stack">
                 <fieldset className="interaction-fields" disabled={busy}>
-                  <p className="info-callout">{t('publicWarning')}</p>
+                  <p className="info-callout">{t('privateWarning')}</p>
                   {!draft ? (
                     <FeedbackFields
                       description={description}
@@ -421,16 +416,7 @@ export function FeedbackReporter({
                     </p>
                   )}
                   {status && <p role="status">{t(`statuses.${status}`)}</p>}
-                  {issueUrl && (
-                    <a
-                      className="text-link"
-                      href={issueUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {t('issueLink')}
-                    </a>
-                  )}
+                  {issueReference && <p>{t('received', { reference: issueReference })}</p>}
                 </fieldset>
               </div>
               <div className="modal-footer">
@@ -452,16 +438,16 @@ export function FeedbackReporter({
                         {t('edit')}
                       </button>
                     )}
-                    {!issueUrl && (
+                    {!issueReference && (
                       <button
                         className="button primary"
                         disabled={!acknowledged || busy}
                         onClick={() => void deliver()}
                       >
-                        {busy ? t('waiting') : sent ? t('checkStatus') : t('publish')}
+                        {busy ? t('waiting') : sent ? t('checkStatus') : t('send')}
                       </button>
                     )}
-                    {issueUrl && (
+                    {issueReference && (
                       <button className="button primary" onClick={close}>
                         {t('done')}
                       </button>

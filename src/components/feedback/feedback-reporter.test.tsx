@@ -57,7 +57,7 @@ function failSessionLookup(failure: 'missing' | 'rejected') {
     auth.getSession.mockRejectedValueOnce(new Error('private storage failure'));
   else auth.getSession.mockResolvedValueOnce({ data: { session: null } });
 }
-describe('authenticated public feedback reporter', () => {
+describe('authenticated private feedback reporter', () => {
   it('protects report drafts on Escape and clears them only after explicit discard', async () => {
     const user = await openReport();
     await user.type(screen.getByLabelText('Description'), 'Unsaved report');
@@ -142,7 +142,7 @@ describe('authenticated public feedback reporter', () => {
     });
     await user.click(screen.getByRole('button', { name: 'Review report' }));
     await user.click(screen.getByRole('checkbox'));
-    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await user.click(screen.getByRole('button', { name: 'Send report' }));
     expect(screen.getByRole('alert').textContent).toContain('Remove some diagnostics');
     expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(0);
     switchLocale('es');
@@ -151,13 +151,10 @@ describe('authenticated public feedback reporter', () => {
     await user.click(screen.getByRole('button', { name: 'Remove all diagnostics' }));
     await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(
-      Response.json(
-        { state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` },
-        { status: 201 },
-      ),
+      Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
     );
-    await user.click(screen.getByRole('button', { name: 'Publish report' }));
-    await screen.findByRole('link', { name: 'View GitHub issue' });
+    await user.click(screen.getByRole('button', { name: 'Send report' }));
+    await screen.findByText('Report FB-9 received');
     expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report')).diagnostics).toEqual([]);
   });
   it('does not fetch or display for guests and hides disabled deployments', async () => {
@@ -173,22 +170,23 @@ describe('authenticated public feedback reporter', () => {
     const user = await openReport();
     recordDiagnostic('token=secret broken layout');
     await review(user);
-    expect(screen.getByText(/Complete public issue text/)).toBeDefined();
+    expect(screen.getByText(/Complete report text/)).toBeDefined();
     expect(screen.getByText(/Screen: cars/)).toBeDefined();
     expect(screen.getByText(/Dialog: add-car/)).toBeDefined();
-    const button = screen.getByRole('button', { name: 'Publish report' }) as HTMLButtonElement;
+    const button = screen.getByRole('button', { name: 'Send report' }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     expect(screen.queryByText('token=secret broken layout')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Remove all diagnostics' }));
     await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(
-      Response.json(
-        { state: 'succeeded', issueUrl: 'https://github.com/ZenZontle/Garage-Guardian/issues/9' },
-        { status: 201 },
-      ),
+      Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
     );
     await user.click(button);
-    await screen.findByRole('link', { name: 'View GitHub issue' });
+    await screen.findByText('Report FB-9 received');
+    expect(screen.getByRole('status').textContent).toBe(
+      'Your report was sent privately to the developer.',
+    );
+    expect(screen.queryByRole('link')).toBeNull();
     const [url, init] = fetchMock.mock.calls.at(-1)!;
     expect(url).toBe('/api/feedback');
     expect(init.headers.Authorization).toBe('Bearer verified-session-token');
@@ -220,7 +218,7 @@ describe('authenticated public feedback reporter', () => {
     await review(user);
     await user.click(screen.getByRole('checkbox'));
     fetchMock.mockRejectedValueOnce(new Error('network error'));
-    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await user.click(screen.getByRole('button', { name: 'Send report' }));
     await screen.findByRole('alert');
     const submission = JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report'));
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
@@ -238,7 +236,7 @@ describe('authenticated public feedback reporter', () => {
       const preview = screen.getByText(/Release:/).textContent;
       const callsBeforePublish = fetchMock.mock.calls.length;
       failSessionLookup(failure);
-      await user.click(screen.getByRole('button', { name: 'Publish report' }));
+      await user.click(screen.getByRole('button', { name: 'Send report' }));
       await screen.findByRole('alert');
       expect(screen.getByRole('alert').textContent).toContain(
         failure === 'rejected' ? 'Account verification is unavailable' : 'Sign in again',
@@ -251,13 +249,10 @@ describe('authenticated public feedback reporter', () => {
       ).toBe(false);
       expect(screen.queryByRole('button', { name: 'Check submission status' })).toBeNull();
       fetchMock.mockResolvedValueOnce(
-        Response.json(
-          { state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` },
-          { status: 201 },
-        ),
+        Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
       );
-      await user.click(screen.getByRole('button', { name: 'Publish report' }));
-      await screen.findByRole('link', { name: 'View GitHub issue' });
+      await user.click(screen.getByRole('button', { name: 'Send report' }));
+      await screen.findByText('Report FB-9 received');
       const [url, init] = fetchMock.mock.calls.at(-1)!;
       expect(url).toBe('/api/feedback');
       expect(init.method).toBe('POST');
@@ -273,7 +268,7 @@ describe('authenticated public feedback reporter', () => {
       await review(user);
       await user.click(screen.getByRole('checkbox'));
       fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
-      await user.click(screen.getByRole('button', { name: 'Publish report' }));
+      await user.click(screen.getByRole('button', { name: 'Send report' }));
       const callsBeforeCheck = fetchMock.mock.calls.length;
       failSessionLookup(failure);
       await user.click(screen.getByRole('button', { name: 'Check submission status' }));
@@ -283,7 +278,7 @@ describe('authenticated public feedback reporter', () => {
       );
       expect(fetchMock).toHaveBeenCalledTimes(callsBeforeCheck);
       expect(screen.queryByRole('button', { name: 'Edit report' })).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Publish report' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Send report' })).toBeNull();
       fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
       await user.click(screen.getByRole('button', { name: 'Check submission status' }));
       expect(fetchMock.mock.calls.at(-1)![1].method).toBeUndefined();
@@ -302,7 +297,7 @@ describe('authenticated public feedback reporter', () => {
     await review(user);
     await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ code }, { status: 503 }));
-    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await user.click(screen.getByRole('button', { name: 'Send report' }));
     await screen.findByRole('alert');
     const submission = JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report'));
     expect(screen.getByRole('button', { name: 'Edit report' })).toBeDefined();
@@ -312,13 +307,10 @@ describe('authenticated public feedback reporter', () => {
     expect(screen.queryByRole('button', { name: 'Check submission status' })).toBeNull();
 
     fetchMock.mockResolvedValueOnce(
-      Response.json(
-        { state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` },
-        { status: 201 },
-      ),
+      Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
     );
-    await user.click(screen.getByRole('button', { name: 'Publish report' }));
-    await screen.findByRole('link', { name: 'View GitHub issue' });
+    await user.click(screen.getByRole('button', { name: 'Send report' }));
+    await screen.findByText('Report FB-9 received');
     const [url, init] = fetchMock.mock.calls.at(-1)!;
     expect(url).toBe('/api/feedback');
     expect(init.method).toBe('POST');
@@ -338,7 +330,7 @@ describe('authenticated public feedback reporter', () => {
       else if (failure === 'disabled')
         fetchMock.mockResolvedValueOnce(Response.json({ enabled: false }));
       else fetchMock.mockResolvedValueOnce(Response.json({ code: 'UNAVAILABLE' }, { status: 503 }));
-      await user.click(screen.getByRole('button', { name: 'Publish report' }));
+      await user.click(screen.getByRole('button', { name: 'Send report' }));
       await screen.findByRole('alert');
       const submission = JSON.parse(
         fetchMock.mock.calls.find((call) => call[1]?.method === 'POST')![1].body.get('report'),
@@ -349,13 +341,10 @@ describe('authenticated public feedback reporter', () => {
       ).toBe(false);
       expect(screen.queryByRole('button', { name: 'Check submission status' })).toBeNull();
       fetchMock.mockResolvedValueOnce(
-        Response.json(
-          { state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` },
-          { status: 201 },
-        ),
+        Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
       );
-      await user.click(screen.getByRole('button', { name: 'Publish report' }));
-      await screen.findByRole('link', { name: 'View GitHub issue' });
+      await user.click(screen.getByRole('button', { name: 'Send report' }));
+      await screen.findByText('Report FB-9 received');
       const [url, init] = fetchMock.mock.calls.at(-1)!;
       expect(url).toBe('/api/feedback');
       expect(init.method).toBe('POST');
@@ -367,11 +356,11 @@ describe('authenticated public feedback reporter', () => {
     await review(user);
     await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
-    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await user.click(screen.getByRole('button', { name: 'Send report' }));
     fetchMock.mockResolvedValueOnce(Response.json({ code: 'NOT_FOUND' }, { status: 404 }));
     await user.click(screen.getByRole('button', { name: 'Check submission status' }));
-    expect(screen.getByRole('alert').textContent).toContain('Check GitHub');
-    expect(screen.queryByRole('button', { name: 'Publish report' })).toBeNull();
+    expect(screen.getByRole('alert').textContent).toContain('delivery cannot be confirmed');
+    expect(screen.queryByRole('button', { name: 'Send report' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Edit report' })).toBeNull();
     expect(fetchMock.mock.calls.filter((call) => call[1]?.method === 'POST')).toHaveLength(1);
   });
@@ -381,12 +370,12 @@ describe('authenticated public feedback reporter', () => {
     await review(user);
     await user.click(screen.getByRole('checkbox'));
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
-    await user.click(screen.getByRole('button', { name: 'Publish report' }));
+    await user.click(screen.getByRole('button', { name: 'Send report' }));
     const submission = JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report'));
     for (const [status, code] of [
       [429, 'RATE_LIMITED'],
       [503, 'LIMITER_UNAVAILABLE'],
-      [502, 'GITHUB_FAILED'],
+      [502, 'DELIVERY_FAILED'],
       [401, 'UNAUTHENTICATED'],
       [409, 'PREVIEW_CHANGED'],
       [503, 'AUTH_UNAVAILABLE'],
@@ -410,7 +399,7 @@ describe('authenticated public feedback reporter', () => {
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'failed' }, { status: 202 }));
     await user.click(screen.getByRole('button', { name: 'Check submission status' }));
     expect(screen.getByRole('button', { name: 'Edit report' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Publish report' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Send report' })).toBeDefined();
     expect(
       screen.getByRole('button', { name: 'Remove all diagnostics' }).matches(':disabled'),
     ).toBe(false);
@@ -440,7 +429,7 @@ describe('authenticated public feedback reporter', () => {
         { status: 429, headers: { 'Retry-After': '60' } },
       ),
     );
-    await user.click(screen.getByRole('button', { name: 'Publicar reporte' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar reporte' }));
     expect(screen.getByRole('alert').textContent).toContain('demasiados reportes');
     expect(screen.getByRole('alert').textContent).toContain('60 segundos');
     expect(screen.getByRole('alert').textContent).not.toContain('English provider text');
@@ -450,7 +439,7 @@ describe('authenticated public feedback reporter', () => {
     expect(screen.getByRole('alert').textContent).toContain('Too many reports');
     switchLocale('es');
     fetchMock.mockResolvedValueOnce(Response.json({ state: 'unknown' }, { status: 202 }));
-    await user.click(screen.getByRole('button', { name: 'Publicar reporte' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar reporte' }));
     expect(screen.getByRole('status').textContent).toContain('estado es desconocido');
     expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report')).submissionId).toBe(
       draft.submissionId,
@@ -459,14 +448,13 @@ describe('authenticated public feedback reporter', () => {
     expect(screen.getByRole('status').textContent).toContain('status is unknown');
     switchLocale('es');
     fetchMock.mockResolvedValueOnce(
-      Response.json(
-        { state: 'succeeded', issueUrl: `https://github.com/${metadata.repository}/issues/9` },
-        { status: 201 },
-      ),
+      Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
     );
     await user.click(screen.getByRole('button', { name: 'Consultar estado del envío' }));
-    expect(screen.getByRole('status').textContent).toBe('Tu reporte se ha publicado.');
-    expect(screen.getByRole('link', { name: 'Ver issue en GitHub' })).toBeDefined();
+    expect(screen.getByRole('status').textContent).toBe(
+      'Tu reporte se envió de forma privada al desarrollador.',
+    );
+    expect(screen.getByText('Reporte FB-9 recibido')).toBeDefined();
   });
   it('traps focus, isolates Escape from existing dialogs, and restores focus', async () => {
     const user = await openReport();

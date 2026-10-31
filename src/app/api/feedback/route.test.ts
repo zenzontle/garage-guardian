@@ -19,14 +19,18 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({ auth: { getUser: runtime.getUser } }),
 }));
 vi.mock('@/lib/feedback/store', () => ({ reportStore: () => runtime.store }));
-vi.mock('@/lib/feedback/github', async (original) => ({
-  ...(await original<typeof import('@/lib/feedback/github')>()),
-  githubAdapter: () => ({
-    create: runtime.create,
-    upload: runtime.upload,
-    reconcile: runtime.reconcile,
-  }),
-}));
+vi.mock('@/lib/feedback/linear', async (original) => {
+  const linear = await original<typeof import('@/lib/feedback/linear')>();
+  return {
+    ...linear,
+    linearAdapter: (config: Parameters<typeof linear.linearAdapter>[0]) => ({
+      issueId: linear.linearAdapter(config).issueId,
+      create: runtime.create,
+      upload: runtime.upload,
+      reconcile: runtime.reconcile,
+    }),
+  };
+});
 vi.mock('sharp', async (original) => {
   const sharpModule = await original<typeof import('sharp')>();
   return { ...sharpModule, default: vi.fn(sharpModule.default) };
@@ -41,7 +45,8 @@ beforeEach(() => {
   for (const [key, value] of Object.entries({
     FEEDBACK_ENABLED: 'true',
     FEEDBACK_HMAC_SECRET: 'x'.repeat(32),
-    FEEDBACK_GITHUB_TOKEN: 'github-test',
+    FEEDBACK_LINEAR_API_KEY: 'lin_api_test',
+    FEEDBACK_LINEAR_TEAM_ID: '6f1c3f5e-1b2a-4c3d-8e9f-0a1b2c3d4e5f',
     FEEDBACK_ENVIRONMENT: 'preview',
     FEEDBACK_RELEASE: '0.1.0+test',
     UPSTASH_REDIS_REST_URL: 'https://test.upstash.io',
@@ -55,10 +60,8 @@ beforeEach(() => {
   runtime.getUser
     .mockReset()
     .mockResolvedValue({ data: { user: { id: 'verified-account' } }, error: null });
-  runtime.create
-    .mockReset()
-    .mockResolvedValue('https://github.com/zenzontle/garage-guardian/issues/7');
-  runtime.upload.mockReset().mockResolvedValue('https://github.com/user-attachments/assets/test');
+  runtime.create.mockReset().mockResolvedValue('FBT-7');
+  runtime.upload.mockReset().mockResolvedValue('https://uploads.linear.app/org/asset/test');
   runtime.reconcile.mockReset().mockResolvedValue(null);
   vi.mocked(sharp).mockClear();
 });
@@ -131,7 +134,7 @@ describe('HTTP reporting boundary', () => {
     await runtime.store.save('verified-account', report().submissionId, {
       ...receipt,
       state: 'unknown',
-      issueUrl: undefined,
+      issueReference: undefined,
     });
     runtime.store.lock = vi.fn().mockRejectedValue(new Error('Redis unavailable'));
     const response = await POST(await postRequest());
@@ -139,7 +142,7 @@ describe('HTTP reporting boundary', () => {
     expect((await response.json()).code).toBe('UNAVAILABLE');
     expect(runtime.create).toHaveBeenCalledTimes(1);
   });
-  it('rejects an oversized public body before processing, decoding or GitHub writes', async () => {
+  it('rejects an oversized body before processing, decoding or Linear writes', async () => {
     const draft = oversizedReport(),
       file = await screenshot();
     const request = await postRequest(
@@ -192,7 +195,7 @@ describe('HTTP reporting boundary', () => {
       await runtime.store.save('verified-account', report().submissionId, {
         ...receipt,
         state,
-        issueUrl: state === 'succeeded' ? receipt.issueUrl : undefined,
+        issueReference: state === 'succeeded' ? receipt.issueReference : undefined,
       });
       runtime.store.processing = vi
         .fn()
@@ -221,10 +224,18 @@ describe('HTTP reporting boundary', () => {
     });
     expect((await POST(new Request('https://app.test', { method: 'POST' }))).status).toBe(404);
     vi.stubEnv('FEEDBACK_ENABLED', 'true');
-    vi.stubEnv('FEEDBACK_GITHUB_TOKEN', '');
-    expect((await POST(new Request('https://app.test', { method: 'POST', headers }))).status).toBe(
-      503,
-    );
+    for (const [key, value] of [
+      ['FEEDBACK_LINEAR_API_KEY', ''],
+      ['FEEDBACK_LINEAR_TEAM_ID', ''],
+      ['FEEDBACK_LINEAR_TEAM_ID', 'FBT'],
+    ]) {
+      vi.stubEnv('FEEDBACK_LINEAR_API_KEY', 'lin_api_test');
+      vi.stubEnv('FEEDBACK_LINEAR_TEAM_ID', '6f1c3f5e-1b2a-4c3d-8e9f-0a1b2c3d4e5f');
+      vi.stubEnv(key, value);
+      const response = await POST(new Request('https://app.test', { method: 'POST', headers }));
+      expect(response.status).toBe(503);
+      expect((await response.json()).code).toBe('NOT_CONFIGURED');
+    }
     expect(runtime.create).not.toHaveBeenCalled();
   });
   it('rejects missing authentication and expired/spoofed tokens before parsing or publishing', async () => {
@@ -241,8 +252,25 @@ describe('HTTP reporting boundary', () => {
     expect(runtime.create).not.toHaveBeenCalled();
     const valid = await POST(await postRequest());
     expect(valid.status).toBe(201);
-    expect((await valid.json()).issueUrl).toContain('/issues/7');
+    expect(await valid.json()).toEqual({ state: 'succeeded', issueReference: 'FBT-7' });
     expect(runtime.create.mock.calls[0][1]).not.toContain('verified-account');
+  });
+  it('looks up an uncertain issue by the ID its creation used', async () => {
+    runtime.create.mockRejectedValueOnce(
+      new (await import('@/lib/feedback/linear')).DeliveryFailure(true),
+    );
+    expect((await POST(await postRequest())).status).toBe(202);
+    const issueId = runtime.create.mock.calls[0][2];
+    expect(issueId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(issueId).not.toBe(report().submissionId);
+    runtime.reconcile.mockResolvedValueOnce('FBT-7');
+    const context = { params: Promise.resolve({ submissionId: report().submissionId }) };
+    const response = await status(new Request('https://app.test', { headers }), context);
+    expect(await response.json()).toEqual({ state: 'succeeded', issueReference: 'FBT-7' });
+    expect(runtime.reconcile).toHaveBeenCalledExactlyOnceWith(issueId);
+    expect(runtime.create).toHaveBeenCalledTimes(1);
   });
   it('keeps status reads scoped to the authenticated owner', async () => {
     await POST(await postRequest());
