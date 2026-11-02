@@ -13,7 +13,7 @@ A private, responsive car maintenance tracker. Record multiple cars and service 
 - **English and Spanish** throughout. See [languages](docs/languages.md).
 - **Protected forms**: forms protect unsaved work, uploads report their current stage, and saves/deletes provide accessible confirmations. See [interaction states](docs/interaction-states.md).
 - **Bookmarkable screens** with keyboard and mobile-friendly navigation. See [navigation](docs/navigation.md).
-- **Public feedback** (optional) to GitHub Issues. See [feedback](docs/feedback.md).
+- **Private feedback** (optional), sent to Linear. See [feedback](docs/feedback.md).
 
 ## Run locally
 

@@ -2,13 +2,12 @@ import { z } from 'zod';
 import {
   authenticate,
   errorResponse,
-  publicMetadata,
   ReportError,
   reportConfig,
   reportingEnabled,
 } from '@/lib/feedback/server-config';
 import { reportStore } from '@/lib/feedback/store';
-import { githubAdapter } from '@/lib/feedback/github';
+import { linearAdapter } from '@/lib/feedback/linear';
 import { receiptResponse, reconcileReceipt } from '@/lib/feedback/submission';
 
 export const runtime = 'nodejs';
@@ -30,14 +29,7 @@ export async function GET(
     const receipt = await store.get(userId, id.data);
     if (!receipt) throw new ReportError(404, 'NOT_FOUND', 'No submission was found.');
     return receiptResponse(
-      await reconcileReceipt(
-        store,
-        githubAdapter(config),
-        userId,
-        id.data,
-        receipt,
-        publicMetadata(request, config, userId).reporterId,
-      ),
+      await reconcileReceipt(store, linearAdapter(config), userId, id.data, receipt),
     );
   } catch (cause) {
     return errorResponse(cause);

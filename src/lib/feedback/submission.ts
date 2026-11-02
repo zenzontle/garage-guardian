@@ -12,7 +12,7 @@ import {
   type PublicMetadata,
 } from './shared';
 import { ReportError } from './server-config';
-import { GitHubFailure, type GitHubAdapter } from './github';
+import { DeliveryFailure, type LinearAdapter } from './linear';
 import type { Receipt, ReportStore } from './store';
 
 export async function readReport(request: Request, metadata: PublicMetadata) {
@@ -84,7 +84,7 @@ export async function readReport(request: Request, metadata: PublicMetadata) {
     throw new ReportError(
       422,
       'ISSUE_TOO_LARGE',
-      'The public report is too long. Remove diagnostics or shorten the description.',
+      'The report is too long. Remove diagnostics or shorten the description.',
     );
   const files = form.getAll('screenshots');
   if (files.length > 2)
@@ -143,7 +143,10 @@ export async function decodeReport(input: Awaited<ReturnType<typeof readReport>>
 
 export function receiptResponse(receipt: Receipt): Response {
   return Response.json(
-    { state: receipt.state, ...(receipt.issueUrl ? { issueUrl: receipt.issueUrl } : {}) },
+    {
+      state: receipt.state,
+      ...(receipt.issueReference ? { issueReference: receipt.issueReference } : {}),
+    },
     { status: receipt.state === 'succeeded' ? 201 : 202, headers: { 'Cache-Control': 'no-store' } },
   );
 }
@@ -155,17 +158,16 @@ async function beforeReceiptWrite<T>(operation: Promise<T>): Promise<T> {
     throw new ReportError(
       503,
       'SUBMISSION_NOT_STARTED',
-      'The report could not be started. Your draft has been kept. Try publishing again.',
+      'The report could not be started. Your draft has been kept. Try sending again.',
     );
   }
 }
 export async function reconcileReceipt(
   store: ReportStore,
-  github: GitHubAdapter,
+  linear: LinearAdapter,
   userId: string,
   submissionId: string,
   receipt: Receipt,
-  reporterId: string,
 ) {
   if (!['uploading', 'creating', 'unknown'].includes(receipt.state)) return receipt;
   const lease = await store.lock(userId, submissionId);
@@ -180,11 +182,11 @@ export async function reconcileReceipt(
       await store.save(userId, submissionId, receipt);
     }
     if (receipt.state !== 'creating' && receipt.state !== 'unknown') return receipt;
-    const issueUrl = await github.reconcile(submissionId, reporterId);
+    const issueReference = await linear.reconcile(linear.issueId(userId, submissionId));
     const updated: Receipt = {
       ...receipt,
-      state: issueUrl ? 'succeeded' : 'unknown',
-      ...(issueUrl ? { issueUrl } : {}),
+      state: issueReference ? 'succeeded' : 'unknown',
+      ...(issueReference ? { issueReference } : {}),
     };
     await store.save(userId, submissionId, updated);
     return updated;
@@ -194,7 +196,7 @@ export async function reconcileReceipt(
 }
 export async function replayReport(
   store: ReportStore,
-  github: GitHubAdapter,
+  linear: LinearAdapter,
   userId: string,
   report: FeedbackReport,
   hash: string,
@@ -210,28 +212,21 @@ export async function replayReport(
     if (receipt.state === 'succeeded') return receiptResponse(receipt);
     if (receipt.state === 'creating' || receipt.state === 'unknown')
       return receiptResponse(
-        await reconcileReceipt(
-          store,
-          github,
-          userId,
-          report.submissionId,
-          receipt,
-          report.metadata.reporterId,
-        ),
+        await reconcileReceipt(store, linear, userId, report.submissionId, receipt),
       );
   }
   return null;
 }
 export async function submitReport(
   store: ReportStore,
-  github: GitHubAdapter,
+  linear: LinearAdapter,
   userId: string,
   ip: string,
   input: Awaited<ReturnType<typeof decodeReport>>,
 ): Promise<Response> {
   const { report, images, hash } = input;
   const id = report.submissionId;
-  const replay = await replayReport(store, github, userId, report, hash);
+  const replay = await replayReport(store, linear, userId, report, hash);
   if (replay) return replay;
   const lease = await beforeReceiptWrite(store.lock(userId, id));
   if (!lease)
@@ -257,7 +252,7 @@ export async function submitReport(
     await store.save(userId, id, receipt);
     try {
       for (let index = receipt.assets.length; index < images.length; index++) {
-        receipt.assets.push(await github.upload(images[index], index));
+        receipt.assets.push(await linear.upload(images[index], index));
         await store.save(userId, id, receipt);
       }
     } catch (cause) {
@@ -265,20 +260,21 @@ export async function submitReport(
       await store.save(userId, id, receipt);
       throw cause;
     }
-    // Persist BEFORE calling GitHub. A process exit leaves an ambiguous receipt,
+    // Persist BEFORE calling Linear. A process exit leaves an ambiguous receipt,
     // never an invitation for a retry to create another issue.
     receipt.state = 'creating';
     await store.save(userId, id, receipt);
     try {
-      const issueUrl = await github.create(
+      const issueReference = await linear.create(
         issueTitle(report.description),
         formatIssue(report, receipt.assets),
+        linear.issueId(userId, id),
       );
-      receipt = { ...receipt, state: 'succeeded', issueUrl };
+      receipt = { ...receipt, state: 'succeeded', issueReference };
       await store.save(userId, id, receipt);
       return receiptResponse(receipt);
     } catch (cause) {
-      receipt.state = cause instanceof GitHubFailure && !cause.ambiguous ? 'failed' : 'unknown';
+      receipt.state = cause instanceof DeliveryFailure && !cause.ambiguous ? 'failed' : 'unknown';
       await store.save(userId, id, receipt);
       if (receipt.state === 'unknown') return receiptResponse(receipt);
       throw cause;

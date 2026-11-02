@@ -5,7 +5,6 @@ import type { Receipt, ReportStore } from './store';
 export const metadata: PublicMetadata = {
   release: '0.1.0+test',
   environment: 'preview',
-  repository: 'zenzontle/garage-guardian',
   reporterId: `reporter-${'a'.repeat(24)}`,
   browserOS: 'Test browser / OS',
 };
@@ -13,7 +12,6 @@ export function report(): FeedbackReport {
   return {
     submissionId: 'b3a37ad0-6f5a-4ca8-96e1-499b169767df',
     description: 'Steps: open dialog. Expected: readable. Actual: clipped.',
-    acknowledged: true,
     metadata,
     context: {
       pathname: '/',
@@ -39,10 +37,10 @@ export function oversizedReport(): FeedbackReport {
   };
 }
 export const config: ReportConfig = {
-  repository: metadata.repository,
+  linearTeamId: '6f1c3f5e-1b2a-4c3d-8e9f-0a1b2c3d4e5f',
   environment: 'preview',
   release: metadata.release,
-  githubToken: 'test-github-token',
+  linearApiKey: 'lin_api_test',
   secret: 'x'.repeat(32),
   redisUrl: 'https://test.upstash.io',
   redisToken: 'test-redis',

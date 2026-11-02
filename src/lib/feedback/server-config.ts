@@ -15,8 +15,8 @@ export class ReportError extends Error {
   }
 }
 export type ReportConfig = {
-  repository: string;
-  githubToken: string;
+  linearApiKey: string;
+  linearTeamId: string;
   secret: string;
   redisUrl: string;
   redisToken: string;
@@ -28,29 +28,30 @@ export type ReportConfig = {
 };
 export const reportingEnabled = () => process.env.FEEDBACK_ENABLED === 'true';
 export function reportConfig(): ReportConfig {
-  const repository = process.env.FEEDBACK_GITHUB_REPOSITORY || 'zenzontle/garage-guardian';
+  const linearTeamId = (process.env.FEEDBACK_LINEAR_TEAM_ID || '').toLowerCase();
   const environment = process.env.FEEDBACK_ENVIRONMENT || process.env.VERCEL_ENV || 'development';
   const commit = process.env.VERCEL_GIT_COMMIT_SHA;
   const release = process.env.FEEDBACK_RELEASE || `${packageInfo.version}+${commit || 'local'}`;
   const config = {
-    repository,
+    linearTeamId,
     environment,
     release,
-    githubToken: process.env.FEEDBACK_GITHUB_TOKEN || '',
+    linearApiKey: process.env.FEEDBACK_LINEAR_API_KEY || '',
     secret: process.env.FEEDBACK_HMAC_SECRET || '',
     redisUrl: process.env.UPSTASH_REDIS_REST_URL || '',
     redisToken: process.env.UPSTASH_REDIS_REST_TOKEN || '',
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || '',
-    prefix: `garage-guardian:feedback:${repository}:${environment}`,
+    prefix: `garage-guardian:feedback:linear:${linearTeamId}:${environment}`,
   };
   if (
-    !/^[\w.-]+\/[\w.-]+$/.test(repository) ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(linearTeamId) ||
     !/^[\w.-]{1,60}$/.test(environment) ||
     release.length > 160 ||
     /[\r\n]/.test(release) ||
     config.secret.length < 32 ||
-    !config.githubToken ||
+    !config.linearApiKey ||
+    /\s/.test(config.linearApiKey) ||
     !config.redisToken ||
     !config.supabaseKey ||
     !validHttps(config.redisUrl) ||
@@ -109,7 +110,6 @@ export function publicMetadata(
   return publicMetadataSchema.parse({
     release: config.release,
     environment: config.environment,
-    repository: config.repository,
     reporterId: `reporter-${identifier(config, 'reporter', userId).slice(0, 24)}`,
     browserOS: redact(request.headers.get('user-agent') || 'Unknown').slice(0, 512),
   });

@@ -24,6 +24,38 @@ describe('configuration and verified identity', () => {
     vi.stubEnv('FEEDBACK_HMAC_SECRET', '');
     expect(reportConfig).toThrow('unavailable');
   });
+  it('requires a Linear API key and team UUID and keeps Redis keys per team', () => {
+    const team = '6F1C3F5E-1B2A-4C3D-8E9F-0A1B2C3D4E5F';
+    for (const [key, value] of Object.entries({
+      FEEDBACK_HMAC_SECRET: 'x'.repeat(32),
+      FEEDBACK_LINEAR_API_KEY: 'lin_api_test',
+      FEEDBACK_LINEAR_TEAM_ID: team,
+      FEEDBACK_ENVIRONMENT: 'preview',
+      FEEDBACK_RELEASE: '0.1.0+test',
+      UPSTASH_REDIS_REST_URL: 'https://test.upstash.io',
+      UPSTASH_REDIS_REST_TOKEN: 'redis-test',
+      NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'test-key',
+    }))
+      vi.stubEnv(key, value);
+    expect(reportConfig()).toMatchObject({
+      linearApiKey: 'lin_api_test',
+      linearTeamId: team.toLowerCase(),
+      prefix: `garage-guardian:feedback:linear:${team.toLowerCase()}:preview`,
+    });
+    for (const [key, value] of [
+      ['FEEDBACK_LINEAR_API_KEY', ''],
+      ['FEEDBACK_LINEAR_API_KEY', 'lin_api_test\nInjected: header'],
+      ['FEEDBACK_LINEAR_TEAM_ID', ''],
+      ['FEEDBACK_LINEAR_TEAM_ID', 'FB'],
+      ['FEEDBACK_LINEAR_TEAM_ID', `${team}:other`],
+    ]) {
+      vi.stubEnv('FEEDBACK_LINEAR_API_KEY', 'lin_api_test');
+      vi.stubEnv('FEEDBACK_LINEAR_TEAM_ID', team);
+      vi.stubEnv(key, value);
+      expect(reportConfig).toThrow(expect.objectContaining({ code: 'NOT_CONFIGURED' }));
+    }
+  });
   it('requires a server-verified nonanonymous Supabase account', async () => {
     const request = new Request('https://app.test', {
       headers: { authorization: 'Bearer actual-token' },

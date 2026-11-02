@@ -7,7 +7,7 @@ import {
   reportingEnabled,
 } from '@/lib/feedback/server-config';
 import { reportStore } from '@/lib/feedback/store';
-import { githubAdapter } from '@/lib/feedback/github';
+import { linearAdapter } from '@/lib/feedback/linear';
 import { decodeReport, readReport, replayReport, submitReport } from '@/lib/feedback/submission';
 
 export const runtime = 'nodejs';
@@ -23,11 +23,11 @@ export async function POST(request: Request) {
     const store = reportStore(config);
     await store.control(userId);
     const input = await readReport(request, publicMetadata(request, config, userId));
-    const github = githubAdapter(config);
-    const replay = await replayReport(store, github, userId, input.report, input.hash);
+    const linear = linearAdapter(config);
+    const replay = await replayReport(store, linear, userId, input.report, input.hash);
     if (replay) return replay;
     await store.processing(userId, ip);
-    return await submitReport(store, github, userId, ip, await decodeReport(input));
+    return await submitReport(store, linear, userId, ip, await decodeReport(input));
   } catch (cause) {
     return errorResponse(cause);
   }
