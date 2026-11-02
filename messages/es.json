@@ -350,7 +350,7 @@
     "reportContents": "El reporte también incluye la versión de la app, tu navegador y sistema operativo, la pantalla actual, el tamaño de la ventana, el idioma, el estado de la conexión y los errores recientes. Puedes revisarlo todo antes de enviarlo.",
     "descriptionExample": "Ejemplo: Cuando guardo una visita desde mi teléfono, la fecha vuelve a ser la de hoy.",
     "screenshots": "Capturas de pantalla (opcional)",
-    "fileHelp": "Hasta dos imágenes de 1,5 MiB cada una. Elimina los detalles privados antes de subirlas. Las capturas se envían solo cuando envías el reporte.",
+    "fileHelp": "Hasta dos imágenes de 1,5 MiB cada una. Elimina los detalles privados antes de subirlas.",
     "completePreview": "Texto completo del reporte",
     "diagnostics": "Errores recientes incluidos",
     "redactionHelp": "La eliminación de datos sensibles puede ser incompleta. Revisa estas entradas y elimina cualquier información privada.",
