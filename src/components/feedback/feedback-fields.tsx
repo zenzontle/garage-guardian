@@ -17,16 +17,14 @@ export function FeedbackFields({
       <label htmlFor="feedback-description">{t('description')}</label>
       <textarea
         id="feedback-description"
-        aria-describedby="feedback-description-example feedback-report-contents"
+        aria-describedby="feedback-report-contents"
+        placeholder={t('descriptionExample')}
         rows={7}
         value={description}
         minLength={10}
         maxLength={5000}
         onChange={(event) => onDescriptionChange(event.target.value)}
       />
-      <p id="feedback-description-example" className="field-help">
-        {t('descriptionExample')}
-      </p>
       <p id="feedback-report-contents" className="feedback-report-contents">
         {t('reportContents')}
       </p>

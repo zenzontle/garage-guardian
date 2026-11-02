@@ -347,7 +347,7 @@
     "reviewTitle": "Review your report",
     "close": "Close feedback",
     "description": "Description",
-    "reportContents": "The report also includes any screenshots you add, the app version, your browser and operating system, the current screen, window size, language, connection status, and recent errors. You can review everything before sending.",
+    "reportContents": "The report also includes the app version, your browser and operating system, the current screen, window size, language, connection status, and recent errors. You can review everything before sending.",
     "descriptionExample": "Example: When I save a visit on my phone, the date changes back to today.",
     "screenshots": "Screenshots (optional)",
     "fileHelp": "Up to two images, 1.5 MiB each. Remove private details before uploading. Screenshots are sent only after you submit.",

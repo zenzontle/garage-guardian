@@ -12,7 +12,6 @@ export function report(): FeedbackReport {
   return {
     submissionId: 'b3a37ad0-6f5a-4ca8-96e1-499b169767df',
     description: 'Steps: open dialog. Expected: readable. Actual: clipped.',
-    acknowledged: true,
     metadata,
     context: {
       pathname: '/',

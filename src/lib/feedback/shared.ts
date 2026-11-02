@@ -72,7 +72,6 @@ export type ReportContext = z.infer<typeof contextSchema>;
 export const reportSchema = z.strictObject({
   submissionId: z.uuid(),
   description: text(5000).trim().min(10),
-  acknowledged: z.literal(true),
   metadata: publicMetadataSchema,
   context: contextSchema,
   diagnostics: z.array(diagnosticSchema).max(20),

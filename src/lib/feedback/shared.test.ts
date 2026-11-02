@@ -298,6 +298,6 @@ describe('public report diagnostics', () => {
     expect(
       reportSchema.safeParse({ ...report(), description: 'invalid\u0000description' }).success,
     ).toBe(false);
-    expect(reportSchema.safeParse({ ...report(), acknowledged: false }).success).toBe(false);
+    expect(reportSchema.safeParse({ ...report(), acknowledged: true }).success).toBe(false);
   });
 });

@@ -109,13 +109,15 @@ describe('authenticated private feedback reporter', () => {
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).queryByRole('combobox')).toBeNull();
     expect(within(dialog).queryByLabelText('Title')).toBeNull();
-    expect(screen.getByLabelText('Description').getAttribute('placeholder')).toBeNull();
-    expect(screen.getByText(/^Example:/)).toBeDefined();
+    expect(screen.getByLabelText('Description').getAttribute('placeholder')).toBe(
+      'Example: When I save a visit on my phone, the date changes back to today.',
+    );
+    expect(screen.queryByText(/^Example:/)).toBeNull();
     expect(
       screen.getByLabelText('Description').getAttribute('aria-describedby')!.split(' '),
     ).toContain('feedback-report-contents');
     expect(document.getElementById('feedback-report-contents')!.textContent).toMatch(
-      /^The report also includes any screenshots you add, the app version/,
+      /^The report also includes the app version, your browser/,
     );
     expect(dialog.textContent).not.toContain('sent privately to the developer.');
     await review(user);
@@ -410,7 +412,7 @@ describe('authenticated private feedback reporter', () => {
     switchLocale('es');
     expect(screen.getByRole('dialog').textContent).toContain('Enviar comentarios');
     expect(screen.getByRole('alert').textContent).toContain('Escribe una descripción');
-    expect(screen.getByText(/^Ejemplo:/)).toBeDefined();
+    expect(screen.getByLabelText('Descripción').getAttribute('placeholder')).toMatch(/^Ejemplo:/);
     expect(screen.getByRole('dialog').textContent).toContain('El reporte también incluye');
     await user.type(
       screen.getByLabelText('Descripción'),

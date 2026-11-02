@@ -196,7 +196,6 @@ export function FeedbackReporter({
     const candidate = reportSchema.safeParse({
       submissionId: crypto.randomUUID(),
       description,
-      acknowledged: true,
       metadata,
       context: {
         pathname: reportPath(window.location.pathname),

@@ -69,12 +69,12 @@ describe('submission validation', () => {
       readReport(request(oversizedReport(), [corrupt]), metadata),
     ).rejects.toHaveProperty('code', 'ISSUE_TOO_LARGE');
   });
-  it('validates strict metadata, lengths, acknowledgment and diagnostics', async () => {
+  it('validates strict metadata, lengths and diagnostics', async () => {
     for (const value of [
       { ...report(), description: 'too short' },
       { ...report(), title: 'Unexpected title' },
       { ...report(), description: 'x'.repeat(5001) },
-      { ...report(), acknowledged: false },
+      { ...report(), acknowledged: true },
       { ...report(), extra: true },
       { ...report(), metadata: { ...metadata, reporterId: `reporter-${'b'.repeat(24)}` } },
       {

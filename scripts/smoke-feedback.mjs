@@ -32,7 +32,6 @@ const report = {
   submissionId: crypto.randomUUID(),
   description:
     'Synthetic test only. Steps: send a generated green screenshot. Expected: exactly one Linear issue with the screenshot and app context. Actual: inspect this issue to verify rendering.',
-  acknowledged: true,
   metadata: configuration.metadata,
   context: {
     pathname: '/',
