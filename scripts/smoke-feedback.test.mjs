@@ -36,42 +36,42 @@ describe('feedback smoke destination guard', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('fails when Preview delivered to a team other than Feedback test', async () => {
+  it('fails when the receipt does not confirm delivery', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(Response.json({ enabled: true, metadata: { environment: 'preview' } }))
-      .mockResolvedValueOnce(Response.json({ state: 'succeeded', issueReference: 'FB-1' }));
+      .mockResolvedValueOnce(Response.json({ state: 'succeeded' }))
+      .mockResolvedValueOnce(Response.json({ state: 'unknown' }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(import('./smoke-feedback.mjs')).rejects.toThrow('not the Feedback test team');
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await expect(import('./smoke-feedback.mjs')).rejects.toThrow('did not confirm delivery');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it('fails when the resent draft returns a different issue', async () => {
+  it('fails when the resent draft does not replay the original delivery', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(Response.json({ enabled: true, metadata: { environment: 'preview' } }))
-      .mockResolvedValueOnce(Response.json({ state: 'succeeded', issueReference: 'FBT-1' }))
-      .mockResolvedValueOnce(Response.json({ state: 'succeeded', issueReference: 'FBT-1' }))
-      .mockResolvedValueOnce(Response.json({ state: 'succeeded', issueReference: 'FBT-2' }));
+      .mockResolvedValueOnce(Response.json({ state: 'succeeded' }))
+      .mockResolvedValueOnce(Response.json({ state: 'succeeded' }))
+      .mockResolvedValueOnce(Response.json({ code: 'DRAFT_CHANGED' }, { status: 409 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(import('./smoke-feedback.mjs')).rejects.toThrow('original issue');
+    await expect(import('./smoke-feedback.mjs')).rejects.toThrow('original delivery');
   });
 
   it.each([undefined, 'synthetic-bypass-token'])(
     'verifies the receipt and a resend of the same draft with bypass token %s',
     async (bypassToken) => {
       vi.stubEnv('FEEDBACK_SMOKE_BYPASS_TOKEN', bypassToken);
-      const issueReference = 'FBT-1';
       const fetchMock = vi
         .fn()
         .mockResolvedValueOnce(
           Response.json({ enabled: true, metadata: { environment: 'preview' } }),
         )
-        .mockResolvedValueOnce(Response.json({ state: 'succeeded', issueReference }))
-        .mockResolvedValueOnce(Response.json({ state: 'succeeded', issueReference }))
-        .mockResolvedValueOnce(Response.json({ state: 'succeeded', issueReference }));
+        .mockResolvedValueOnce(Response.json({ state: 'succeeded' }))
+        .mockResolvedValueOnce(Response.json({ state: 'succeeded' }))
+        .mockResolvedValueOnce(Response.json({ state: 'succeeded' }));
       vi.stubGlobal('fetch', fetchMock);
 
       await import('./smoke-feedback.mjs');
@@ -83,7 +83,7 @@ describe('feedback smoke destination guard', () => {
         expect(requestUrl.search).toBe('');
       }
       if (bypassToken) expect(console.log.mock.calls.flat().join('\n')).not.toContain(bypassToken);
-      expect(console.log.mock.calls.flat().join('\n')).toContain(issueReference);
+      expect(console.log.mock.calls.flat().join('\n')).toContain('Feedback test (FBT) team');
       const [submissionUrl, submissionRequest] = fetchMock.mock.calls[1];
       expect(submissionUrl.pathname).toBe('/api/feedback');
       expect(submissionRequest.method).toBe('POST');

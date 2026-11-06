@@ -57,17 +57,13 @@ if (!response.ok || result.state !== 'succeeded')
   throw new Error(
     `Smoke test did not confirm delivery: ${result.code || result.state || response.status}. Check the submission status before retrying.`,
   );
-if (!/^FBT-\d+$/.test(result.issueReference))
-  throw new Error(
-    `The report went to ${result.issueReference}, not the Feedback test team. Fix the Preview Linear settings and cancel that issue.`,
-  );
 const statusResponse = await fetch(new URL(`/api/feedback/${report.submissionId}`, url), {
   headers,
 });
 const status = await statusResponse.json();
-if (!statusResponse.ok || status.issueReference !== result.issueReference)
-  throw new Error('Submission receipt did not match the created issue.');
-// Resending the same draft must return the same issue instead of creating another.
+if (!statusResponse.ok || status.state !== 'succeeded')
+  throw new Error('The submission receipt did not confirm delivery.');
+// Resending the same draft must replay the receipt instead of creating another issue.
 const resend = new FormData();
 resend.append('report', JSON.stringify(report));
 resend.append('screenshots', new Blob([bytes], { type: 'image/png' }), 'synthetic.png');
@@ -77,9 +73,10 @@ const replayResponse = await fetch(new URL('/api/feedback', url), {
   body: resend,
 });
 const replay = await replayResponse.json();
-if (!replayResponse.ok || replay.issueReference !== result.issueReference)
-  throw new Error('Resending the same draft did not return the original issue.');
-console.log(`Delivered synthetic report: ${result.issueReference}`);
+if (!replayResponse.ok || replay.state !== 'succeeded')
+  throw new Error('Resending the same draft did not replay the original delivery.');
+console.log('Delivered synthetic report.');
+// The API never reveals the issue identifier, so the destination team is checked in Linear.
 console.log(
-  'In Linear, inspect the screenshot and issue text, confirm the screenshot does not open when signed out, then cancel the synthetic issue.',
+  'In Linear, confirm exactly one synthetic issue exists and that it is in the Feedback test (FBT) team; if it is in FB, fix the Preview Linear settings. Inspect the screenshot and issue text, confirm the screenshot does not open when signed out, then cancel the synthetic issue.',
 );

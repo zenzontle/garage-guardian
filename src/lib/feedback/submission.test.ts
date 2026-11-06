@@ -28,10 +28,8 @@ function adapter() {
     upload: vi.fn(
       async (_bytes: Uint8Array, index: number) => `https://uploads.linear.app/org/${index}`,
     ),
-    create: vi.fn<(title: string, body: string, issueId: string) => Promise<string>>(
-      async () => 'FB-1',
-    ),
-    reconcile: vi.fn(async (): Promise<string | null> => null),
+    create: vi.fn<(title: string, body: string, issueId: string) => Promise<void>>(async () => {}),
+    reconcile: vi.fn(async (): Promise<boolean> => false),
   };
 }
 
@@ -223,7 +221,7 @@ describe('Linear delivery and retries', () => {
     linear.create.mockRejectedValueOnce(new DeliveryFailure(true));
     expect((await submitReport(store, linear, 'user', 'ip', value)).status).toBe(202);
     expect((await submitReport(store, linear, 'user', 'ip', value)).status).toBe(202);
-    linear.reconcile.mockResolvedValueOnce('FB-1');
+    linear.reconcile.mockResolvedValueOnce(true);
     expect((await submitReport(store, linear, 'user', 'ip', value)).status).toBe(201);
     expect(linear.create).toHaveBeenCalledTimes(1);
   });
@@ -240,13 +238,13 @@ describe('Linear delivery and retries', () => {
         value = input();
       const receipt = { hash: value.hash, state, assets: [], createdAt: Date.now() };
       await store.claim('user', value.report.submissionId, receipt);
-      let resolveFound!: (reference: string) => void,
-        resolveMissing!: (reference: null) => void,
+      let resolveFound!: (exists: true) => void,
+        resolveMissing!: (exists: false) => void,
         started!: () => void;
-      const found = new Promise<string>((resolve) => {
+      const found = new Promise<boolean>((resolve) => {
         resolveFound = resolve;
       });
-      const missing = new Promise<null>((resolve) => {
+      const missing = new Promise<boolean>((resolve) => {
         resolveMissing = resolve;
       });
       const checking = new Promise<void>((resolve) => {
@@ -266,18 +264,16 @@ describe('Linear delivery and retries', () => {
           : replayReport(store, linear, 'user', value.report, value.hash);
       // Let the concurrent check start before Linear confirms the first result.
       await new Promise((resolve) => setTimeout(resolve, 0));
-      const issueReference = 'FB-1';
-      resolveFound(issueReference);
-      expect(await first).toMatchObject({ state: 'succeeded', issueReference });
-      resolveMissing(null);
+      resolveFound(true);
+      expect(await first).toMatchObject({ state: 'succeeded' });
+      resolveMissing(false);
       await second;
       expect(await store.get('user', value.report.submissionId)).toMatchObject({
         state: 'succeeded',
-        issueReference,
       });
       expect(
         await reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt),
-      ).toMatchObject({ state: 'succeeded', issueReference });
+      ).toMatchObject({ state: 'succeeded' });
       expect(linear.reconcile).toHaveBeenCalledTimes(1);
       expect(linear.create).not.toHaveBeenCalled();
     },
@@ -286,8 +282,8 @@ describe('Linear delivery and retries', () => {
     const store = memoryStore(),
       linear = adapter(),
       value = input();
-    let finish!: (reference: string) => void, started!: () => void;
-    const creating = new Promise<string>((resolve) => {
+    let finish!: () => void, started!: () => void;
+    const creating = new Promise<void>((resolve) => {
       finish = resolve;
     });
     const pending = new Promise<void>((resolve) => {
@@ -304,7 +300,7 @@ describe('Linear delivery and retries', () => {
       await reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt),
     ).toEqual(receipt);
     expect(linear.reconcile).not.toHaveBeenCalled();
-    finish('FB-1');
+    finish();
     expect((await submission).status).toBe(201);
   });
   it('allows reconciliation to retry after a Linear lookup failure', async () => {
@@ -318,7 +314,7 @@ describe('Linear delivery and retries', () => {
       createdAt: Date.now(),
     };
     await store.claim('user', value.report.submissionId, receipt);
-    linear.reconcile.mockRejectedValueOnce(new DeliveryFailure(true)).mockResolvedValueOnce('FB-1');
+    linear.reconcile.mockRejectedValueOnce(new DeliveryFailure(true)).mockResolvedValueOnce(true);
     await expect(
       reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt),
     ).rejects.toBeInstanceOf(DeliveryFailure);
@@ -345,7 +341,7 @@ describe('Linear delivery and retries', () => {
     expect(await response.json()).toEqual({ state: 'unknown' });
     expect(linear.reconcile).not.toHaveBeenCalled();
     expect(linear.create).not.toHaveBeenCalled();
-    linear.reconcile.mockResolvedValueOnce('FB-1');
+    linear.reconcile.mockResolvedValueOnce(true);
     expect(
       await reconcileReceipt(store, linear, 'user', value.report.submissionId, receipt),
     ).toMatchObject({ state: 'succeeded' });

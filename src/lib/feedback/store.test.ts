@@ -94,20 +94,18 @@ beforeEach(() => {
   provider.mode = 'ok';
 });
 describe('shared rate limits', () => {
-  it('reads successful receipts and refuses malformed issue references', async () => {
+  it('reads successful receipts and refuses malformed ones', async () => {
     const store = reportStore(config);
     const receipt = {
       hash: 'hash',
       state: 'succeeded' as const,
       assets: ['https://uploads.linear.app/org/asset/file'],
       createdAt: Date.now(),
-      issueReference: 'FB-12',
     };
     await store.claim('user', 'uuid', receipt);
     expect(await store.get('user', 'uuid')).toEqual(receipt);
     for (const invalid of [
-      { issueReference: 'https://linear.app/team/issue/FB-12' },
-      { issueReference: 'fb-12' },
+      { issueReference: 'FB-12' },
       { assets: ['https://linear.com/user-attachments/assets/abc'] },
       { issueUrl: 'https://linear.com/zenzontle/garage-guardian/issues/12' },
     ]) {
@@ -256,8 +254,8 @@ describe('shared rate limits', () => {
     const linear = {
       issueId: vi.fn(() => 'b3a37ad0-6f5a-4ca8-96e1-499b169767df'),
       upload: vi.fn(async () => 'https://uploads.linear.app/org/second'),
-      create: vi.fn(async () => 'FB-1'),
-      reconcile: vi.fn(async () => null),
+      create: vi.fn(async () => {}),
+      reconcile: vi.fn(async () => false),
     };
     await first.lock('user', value.submissionId);
     await first.claim('user', value.submissionId, receipt);

@@ -17,7 +17,6 @@ import {
   IMAGE_TYPES,
   REPORT_LIMITS,
   fitsIssueBody,
-  isIssueReference,
   publicMetadataSchema,
   reportSchema,
   type FeedbackReport,
@@ -89,7 +88,7 @@ export function FeedbackReporter({
   const [checking, setChecking] = useState(false);
   const [status, setStatus] = useState<keyof typeof en.feedback.statuses | null>(null);
   const [error, setError] = useState<ReporterProblem | null>(null);
-  const [issueReference, setIssueReference] = useState('');
+  const delivered = status === 'sent';
   const [launcherTarget, setLauncherTarget] = useState<Element | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const portalRef = useRef<HTMLDivElement>(null);
@@ -144,7 +143,7 @@ export function FeedbackReporter({
         modified: file.lastModified,
       })),
     },
-    { busy, enabled: !issueReference, onDiscard: reset },
+    { busy, enabled: !delivered, onDiscard: reset },
   );
 
   if (!metadata || !userId) return null;
@@ -158,7 +157,6 @@ export function FeedbackReporter({
     setDescription('');
     setDraft(null);
     setSent(false);
-    setIssueReference('');
     setStatus(null);
     setError(null);
   }
@@ -219,7 +217,6 @@ export function FeedbackReporter({
     setSent(false);
     setError(null);
     setStatus(null);
-    setIssueReference('');
   }
   async function deliver(check = false) {
     if (!draft || busy) return;
@@ -278,8 +275,7 @@ export function FeedbackReporter({
           Number.isInteger(wait) && wait > 0 && wait <= 86400 ? wait : undefined,
         );
       }
-      if (result.state === 'succeeded' && isIssueReference(result.issueReference)) {
-        setIssueReference(result.issueReference);
+      if (result.state === 'succeeded') {
         interaction.accept();
         setStatus('sent');
       } else if (result.state === 'failed') {
@@ -313,7 +309,7 @@ export function FeedbackReporter({
       data-tooltip={t('launch')}
       onKeyDown={(event) => trapFocus(event, launcherTarget)}
       onClick={() => {
-        if (issueReference) reset();
+        if (delivered) reset();
         setOpen(true);
       }}
     >
@@ -395,7 +391,6 @@ export function FeedbackReporter({
                     </p>
                   )}
                   {status && <p role="status">{t(`statuses.${status}`)}</p>}
-                  {issueReference && <p>{t('received', { reference: issueReference })}</p>}
                 </fieldset>
               </div>
               <div className="modal-footer">
@@ -414,7 +409,7 @@ export function FeedbackReporter({
                         {t('edit')}
                       </button>
                     )}
-                    {!issueReference && (
+                    {!delivered && (
                       <button
                         className="button primary"
                         disabled={busy}
@@ -423,7 +418,7 @@ export function FeedbackReporter({
                         {busy ? t('waiting') : sent ? t('checkStatus') : t('send')}
                       </button>
                     )}
-                    {issueReference && (
+                    {delivered && (
                       <button className="button primary" onClick={close}>
                         {t('done')}
                       </button>

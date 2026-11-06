@@ -3,18 +3,12 @@ import { Ratelimit } from '@upstash/ratelimit';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { ReportError, identifier, type ReportConfig } from './server-config';
-import {
-  ISSUE_REFERENCE,
-  LINEAR_ASSET_URL,
-  REPORT_LIMITS,
-  SUBMISSION_RETENTION_MS,
-} from './shared';
+import { LINEAR_ASSET_URL, REPORT_LIMITS, SUBMISSION_RETENTION_MS } from './shared';
 
 const receiptSchema = z.strictObject({
   hash: z.string().min(1).max(128),
   state: z.enum(['uploading', 'creating', 'unknown', 'failed', 'succeeded']),
   assets: z.array(z.string().max(REPORT_LIMITS.assetUrl).regex(LINEAR_ASSET_URL)).max(2),
-  issueReference: z.string().max(32).regex(ISSUE_REFERENCE).optional(),
   createdAt: z.number().int().nonnegative(),
 });
 export type Receipt = z.infer<typeof receiptSchema>;

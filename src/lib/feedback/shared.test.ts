@@ -4,7 +4,6 @@ import {
   cleanDiagnostic,
   fitsIssueBody,
   formatIssue,
-  isIssueReference,
   LINEAR_ASSET_URL,
   feedbackTitle,
   issueTitle,
@@ -152,22 +151,7 @@ describe('public report diagnostics', () => {
     expect(fitsIssueBody(draft)).toBe(true);
     expect(formatIssue(draft).length).toBeLessThan(REPORT_LIMITS.issueBody);
   });
-  it('accepts only Linear issue identifiers and private Linear asset URLs', () => {
-    for (const value of ['FB-12', 'FBT-1', 'A-0', 'ABC1234-99'])
-      expect(isIssueReference(value)).toBe(true);
-    for (const value of [
-      'fb-12',
-      'FB12',
-      'FB-',
-      '1FB-2',
-      'ABCDEFGH-1',
-      'FB-12 ',
-      'https://linear.app/team/issue/FB-12',
-      'https://github.com/zenzontle/garage-guardian/issues/12',
-      12,
-      null,
-    ])
-      expect(isIssueReference(value)).toBe(false);
+  it('accepts only private Linear asset URLs', () => {
     expect(LINEAR_ASSET_URL.test('https://uploads.linear.app/org-id/file-id/asset-id')).toBe(true);
     for (const url of [
       'https://github.com/user-attachments/assets/abc',

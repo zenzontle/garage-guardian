@@ -359,7 +359,6 @@
     "screenshotAlt": "Captura de pantalla {count} que se incluirá en el reporte",
     "screenshotCaption": "Captura de pantalla {count}",
     "removeScreenshot": "Eliminar captura de pantalla {count}",
-    "received": "Reporte {reference} recibido",
     "review": "Revisar reporte",
     "edit": "Editar reporte",
     "waiting": "Espera un momento…",
