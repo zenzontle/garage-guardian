@@ -2,6 +2,9 @@
 # "Require Code Owners approval" ruleset on main.
 /.github/               @zenzontle
 /REVIEW.md              @zenzontle
+/.claude/commands/pr-review.* @zenzontle
+/.claude/settings.json  @zenzontle
+/.claude/hooks/         @zenzontle
 /supabase/              @zenzontle
 /src/app/api/           @zenzontle
 /vercel.json            @zenzontle
