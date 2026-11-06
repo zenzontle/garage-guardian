@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { linearAdapter } from './linear';
 import { config } from './fixtures.test-helper';
 import { REPORT_LIMITS } from './shared';
@@ -25,6 +25,9 @@ function body(call: unknown[]) {
 }
 
 describe('isolated Linear adapter', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
   it('uploads through a signed URL without forwarding the API key', async () => {
     const fetch = vi
       .fn()
@@ -89,6 +92,108 @@ describe('isolated Linear adapter', () => {
       'ambiguous',
       false,
     );
+  });
+  it('logs why Linear failed without the API key, signed URL, or report content', async () => {
+    const fetch = vi.fn();
+    vi.stubGlobal('fetch', fetch);
+    const logs = () => vi.mocked(console.error).mock.calls.map((call) => String(call[0]));
+    fetch.mockResolvedValueOnce(
+      Response.json(
+        {
+          errors: [
+            { message: 'Forbidden', extensions: { code: 'FORBIDDEN', type: 'forbidden' } },
+            { message: 'x'.repeat(500) },
+          ],
+        },
+        { status: 400 },
+      ),
+    );
+    await expect(linearAdapter(config).upload(new Uint8Array([1]), 0)).rejects.toMatchObject({
+      code: 'DELIVERY_FAILED',
+    });
+    expect(logs().at(-1)).toBe(
+      `[feedback] Linear fileUpload failed: HTTP 400: Forbidden (FORBIDDEN) | ${'x'.repeat(200)}`,
+    );
+    fetch.mockResolvedValueOnce(
+      Response.json({ data: null, errors: [{ message: 'Entity not found: Team' }] }),
+    );
+    fetch.mockResolvedValueOnce(Response.json({ data: { issues: { nodes: [] } } }));
+    await expect(
+      linearAdapter(config).create('secret title', 'secret body', crypto.randomUUID()),
+    ).rejects.toMatchObject({ code: 'DELIVERY_FAILED' });
+    expect(logs().at(-1)).toBe('[feedback] Linear issueCreate failed: Entity not found: Team');
+    fetch
+      .mockResolvedValueOnce(uploadResponse())
+      .mockResolvedValueOnce(new Response('<Error>denied</Error>', { status: 403 }));
+    await expect(linearAdapter(config).upload(new Uint8Array([1]), 0)).rejects.toMatchObject({
+      code: 'DELIVERY_FAILED',
+    });
+    expect(logs().at(-1)).toBe('[feedback] Linear screenshot PUT failed: HTTP 403');
+    fetch.mockRejectedValueOnce(new DOMException('timed out', 'TimeoutError'));
+    await expect(
+      linearAdapter(config).create('title', 'body', crypto.randomUUID()),
+    ).rejects.toMatchObject({ code: 'DELIVERY_UNKNOWN' });
+    expect(logs().at(-1)).toBe('[feedback] Linear issueCreate failed: TimeoutError: timed out');
+    fetch.mockResolvedValueOnce(
+      Response.json({
+        errors: [
+          {
+            message:
+              'Variable "$input" got invalid value { title: "secret title", description: "secret body" }; Field "priority" of required type "Int!" was not provided.',
+          },
+          {
+            message:
+              'Variable "$input" got invalid value { titel: "secret title" }; Field "titel" is not defined by type "IssueCreateInput". Did you mean "title"?',
+          },
+          { message: 'Variable "$input" got invalid value "secret title"; Expected type' },
+        ],
+      }),
+    );
+    fetch.mockResolvedValueOnce(Response.json({ data: { issues: { nodes: [] } } }));
+    await expect(
+      linearAdapter(config).create('secret title', 'secret body', crypto.randomUUID()),
+    ).rejects.toMatchObject({ code: 'DELIVERY_FAILED' });
+    expect(logs().at(-1)).toBe(
+      '[feedback] Linear issueCreate failed: Variable "$input" got an invalid value; Field "priority" of required type "Int!" was not provided. | Variable "$input" got an invalid value; Field "titel" is not defined by type "IssueCreateInput". | Variable "$input" got an invalid value',
+    );
+    fetch.mockResolvedValueOnce(
+      Response.json({
+        errors: [
+          {
+            message: 'Argument Validation Error: title "a long secret" is not allowed in "Team"',
+            extensions: { type: 'invalid input' },
+          },
+          { message: 'Description secret body is too long' },
+        ],
+      }),
+    );
+    fetch.mockResolvedValueOnce(Response.json({ data: { issues: { nodes: [] } } }));
+    await expect(
+      linearAdapter(config).create('secret title', 'secret body', crypto.randomUUID()),
+    ).rejects.toMatchObject({ code: 'DELIVERY_FAILED' });
+    expect(logs().at(-1)).toBe(
+      '[feedback] Linear issueCreate failed: Argument Validation Error: title "<redacted>" is not allowed in "Team" (invalid input) | Description <redacted> is too long',
+    );
+    fetch
+      .mockResolvedValueOnce(uploadResponse())
+      .mockRejectedValueOnce(
+        new TypeError('Request cannot be constructed from https://u:p@storage.test/signed-upload'),
+      );
+    await expect(linearAdapter(config).upload(new Uint8Array([1]), 0)).rejects.toMatchObject({
+      code: 'DELIVERY_FAILED',
+    });
+    expect(logs().at(-1)).toBe(
+      '[feedback] Linear screenshot PUT failed: TypeError: Request cannot be constructed from <url>',
+    );
+    const all = logs().join(' ');
+    for (const secret of [
+      config.linearApiKey,
+      'signed-upload',
+      'secret title',
+      'secret body',
+      'a long secret',
+    ])
+      expect(all).not.toContain(secret);
   });
   it('creates the issue with the chosen ID and team and returns its identifier', async () => {
     const fetch = vi

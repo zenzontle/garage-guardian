@@ -159,6 +159,8 @@ async function beforeReceiptWrite<T>(operation: Promise<T>): Promise<T> {
       503,
       'SUBMISSION_NOT_STARTED',
       'The report could not be started. Your draft has been kept. Try sending again.',
+      undefined,
+      cause,
     );
   }
 }

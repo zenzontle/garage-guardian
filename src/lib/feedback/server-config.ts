@@ -10,9 +10,16 @@ export class ReportError extends Error {
     public code: string,
     message: string,
     public retryAfter?: number,
+    // Kept for the server log only; never sent to the client.
+    cause?: unknown,
   ) {
-    super(message);
+    super(message, cause === undefined ? undefined : { cause });
   }
+}
+// Error name and message for server logs, with URLs (which may be signed) masked.
+export function describeCause(cause: unknown): string {
+  const text = cause instanceof Error ? `${cause.name}: ${cause.message}` : typeof cause;
+  return text.replace(/https?:\/\/\S*/g, '<url>').slice(0, 200);
 }
 export type ReportConfig = {
   linearApiKey: string;
@@ -129,7 +136,16 @@ export function errorResponse(cause: unknown): Response {
   const error =
     cause instanceof ReportError
       ? cause
-      : new ReportError(503, 'UNAVAILABLE', 'Feedback is unavailable. Your draft has been kept.');
+      : new ReportError(
+          503,
+          'UNAVAILABLE',
+          'Feedback is unavailable. Your draft has been kept.',
+          undefined,
+          cause,
+        );
+  // Client errors are expected; anything else is logged so Vercel shows why.
+  if (error.cause !== undefined)
+    console.error(`[feedback] ${error.code}: ${describeCause(error.cause)}`);
   return Response.json(
     { error: error.message, code: error.code },
     {
