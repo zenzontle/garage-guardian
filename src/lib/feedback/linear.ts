@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { ReportError, describeCause, identifier, type ReportConfig } from './server-config';
-import { LINEAR_ASSET_URL, REPORT_LIMITS, isIssueReference } from './shared';
+import { LINEAR_ASSET_URL, REPORT_LIMITS } from './shared';
 
 const LINEAR_API = 'https://api.linear.app/graphql';
 const uploadSchema = z.object({
@@ -14,13 +14,10 @@ const uploadSchema = z.object({
   }),
 });
 const createSchema = z.object({
-  issueCreate: z.object({
-    success: z.literal(true),
-    issue: z.object({ identifier: z.string() }),
-  }),
+  issueCreate: z.object({ success: z.literal(true) }),
 });
 const lookupSchema = z.object({
-  issues: z.object({ nodes: z.array(z.object({ identifier: z.string() })).max(1) }),
+  issues: z.object({ nodes: z.array(z.object({ id: z.string() })).max(1) }),
 });
 export class DeliveryFailure extends ReportError {
   constructor(
@@ -152,10 +149,6 @@ export function linearAdapter(config: ReportConfig) {
     if (!data.success) throw failure(operation, 'response data has an unexpected shape', creating);
     return data.data;
   }
-  function reference(operation: string, value: string) {
-    if (!isIssueReference(value)) throw failure(operation, 'unexpected issue identifier', true);
-    return value;
-  }
   return {
     // Reporters cannot predict the ID, and every retry of one draft reuses it.
     issueId(userId: string, submissionId: string): string {
@@ -214,18 +207,14 @@ export function linearAdapter(config: ReportConfig) {
       );
       return uploadFile.assetUrl;
     },
-    async create(title: string, description: string, issueId: string): Promise<string> {
-      let result;
+    async create(title: string, description: string, issueId: string): Promise<void> {
       try {
-        result = await graphql(
+        await graphql(
           'issueCreate',
           `
             mutation FeedbackCreate($input: IssueCreateInput!) {
               issueCreate(input: $input) {
                 success
-                issue {
-                  identifier
-                }
               }
             }
           `,
@@ -237,15 +226,13 @@ export function linearAdapter(config: ReportConfig) {
       } catch (cause) {
         if (!(cause instanceof DeliveryFailure) || cause.ambiguous) throw cause;
         // A rejected retry may mean an earlier attempt already created this ID.
-        const existing = await lookup(issueId).catch(() => null);
-        if (existing) return existing;
+        if (await lookup(issueId).catch(() => false)) return;
         throw cause;
       }
-      return reference('issueCreate', result.issueCreate.issue.identifier);
     },
     reconcile: lookup,
   };
-  async function lookup(issueId: string): Promise<string | null> {
+  async function lookup(issueId: string): Promise<boolean> {
     // A filter returns an empty list for a missing issue; issue(id) reports it as an error.
     const result = await graphql(
       'issue lookup',
@@ -257,7 +244,7 @@ export function linearAdapter(config: ReportConfig) {
             includeArchived: true
           ) {
             nodes {
-              identifier
+              id
             }
           }
         }
@@ -265,8 +252,7 @@ export function linearAdapter(config: ReportConfig) {
       { id: issueId, teamId: config.linearTeamId },
       lookupSchema,
     );
-    const found = result.issues.nodes[0];
-    return found ? reference('issue lookup', found.identifier) : null;
+    return result.issues.nodes.length > 0;
   }
 }
 export type LinearAdapter = ReturnType<typeof linearAdapter>;

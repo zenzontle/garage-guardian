@@ -359,7 +359,6 @@
     "screenshotAlt": "Screenshot {count} to include in the report",
     "screenshotCaption": "Screenshot {count}",
     "removeScreenshot": "Remove screenshot {count}",
-    "received": "Report {reference} received",
     "review": "Review report",
     "edit": "Edit report",
     "waiting": "Please wait…",

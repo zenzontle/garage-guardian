@@ -157,11 +157,9 @@ describe('authenticated private feedback reporter', () => {
     expect(screen.getByRole('alert').textContent).toContain('Elimina algunos diagnósticos');
     switchLocale('en');
     await user.click(screen.getByRole('button', { name: 'Remove all diagnostics' }));
-    fetchMock.mockResolvedValueOnce(
-      Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
-    );
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded' }, { status: 201 }));
     await user.click(screen.getByRole('button', { name: 'Send report' }));
-    await screen.findByText('Report FB-9 received');
+    await screen.findByText('Your report was sent privately to the developer.');
     expect(JSON.parse(fetchMock.mock.calls.at(-1)![1].body.get('report')).diagnostics).toEqual([]);
   });
   it('does not fetch or display for guests and hides disabled deployments', async () => {
@@ -185,11 +183,9 @@ describe('authenticated private feedback reporter', () => {
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByText('token=secret broken layout')).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Remove all diagnostics' }));
-    fetchMock.mockResolvedValueOnce(
-      Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
-    );
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded' }, { status: 201 }));
     await user.click(button);
-    await screen.findByText('Report FB-9 received');
+    await screen.findByText('Your report was sent privately to the developer.');
     expect(screen.getByRole('status').textContent).toBe(
       'Your report was sent privately to the developer.',
     );
@@ -253,11 +249,9 @@ describe('authenticated private feedback reporter', () => {
         screen.getByRole('button', { name: 'Remove all diagnostics' }).matches(':disabled'),
       ).toBe(false);
       expect(screen.queryByRole('button', { name: 'Check submission status' })).toBeNull();
-      fetchMock.mockResolvedValueOnce(
-        Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
-      );
+      fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded' }, { status: 201 }));
       await user.click(screen.getByRole('button', { name: 'Send report' }));
-      await screen.findByText('Report FB-9 received');
+      await screen.findByText('Your report was sent privately to the developer.');
       const [url, init] = fetchMock.mock.calls.at(-1)!;
       expect(url).toBe('/api/feedback');
       expect(init.method).toBe('POST');
@@ -311,11 +305,9 @@ describe('authenticated private feedback reporter', () => {
     ).toBe(false);
     expect(screen.queryByRole('button', { name: 'Check submission status' })).toBeNull();
 
-    fetchMock.mockResolvedValueOnce(
-      Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
-    );
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded' }, { status: 201 }));
     await user.click(screen.getByRole('button', { name: 'Send report' }));
-    await screen.findByText('Report FB-9 received');
+    await screen.findByText('Your report was sent privately to the developer.');
     const [url, init] = fetchMock.mock.calls.at(-1)!;
     expect(url).toBe('/api/feedback');
     expect(init.method).toBe('POST');
@@ -344,11 +336,9 @@ describe('authenticated private feedback reporter', () => {
         screen.getByRole('button', { name: 'Remove all diagnostics' }).matches(':disabled'),
       ).toBe(false);
       expect(screen.queryByRole('button', { name: 'Check submission status' })).toBeNull();
-      fetchMock.mockResolvedValueOnce(
-        Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
-      );
+      fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded' }, { status: 201 }));
       await user.click(screen.getByRole('button', { name: 'Send report' }));
-      await screen.findByText('Report FB-9 received');
+      await screen.findByText('Your report was sent privately to the developer.');
       const [url, init] = fetchMock.mock.calls.at(-1)!;
       expect(url).toBe('/api/feedback');
       expect(init.method).toBe('POST');
@@ -448,14 +438,11 @@ describe('authenticated private feedback reporter', () => {
     switchLocale('en');
     expect(screen.getByRole('status').textContent).toContain('status is unknown');
     switchLocale('es');
-    fetchMock.mockResolvedValueOnce(
-      Response.json({ state: 'succeeded', issueReference: 'FB-9' }, { status: 201 }),
-    );
+    fetchMock.mockResolvedValueOnce(Response.json({ state: 'succeeded' }, { status: 201 }));
     await user.click(screen.getByRole('button', { name: 'Consultar estado del envío' }));
     expect(screen.getByRole('status').textContent).toBe(
       'Tu reporte se envió de forma privada al desarrollador.',
     );
-    expect(screen.getByText('Reporte FB-9 recibido')).toBeDefined();
   });
   it('traps focus, isolates Escape from existing dialogs, and restores focus', async () => {
     const user = await openReport();

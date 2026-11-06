@@ -13,11 +13,6 @@ export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 // Linear serves uploads privately to workspace members.
 export const LINEAR_ASSET_URL =
   /^https:\/\/uploads\.linear\.app(?:\/[A-Za-z0-9_-][A-Za-z0-9._-]*){1,4}$/;
-// A Linear issue identifier: team key and number, for example FB-12.
-export const ISSUE_REFERENCE = /^[A-Z][A-Z0-9]{0,6}-\d+$/;
-export function isIssueReference(value: unknown): value is string {
-  return typeof value === 'string' && value.length <= 32 && ISSUE_REFERENCE.test(value);
-}
 const text = (max: number) =>
   z
     .string()

@@ -60,9 +60,9 @@ beforeEach(() => {
   runtime.getUser
     .mockReset()
     .mockResolvedValue({ data: { user: { id: 'verified-account' } }, error: null });
-  runtime.create.mockReset().mockResolvedValue('FBT-7');
+  runtime.create.mockReset().mockResolvedValue(undefined);
   runtime.upload.mockReset().mockResolvedValue('https://uploads.linear.app/org/asset/test');
-  runtime.reconcile.mockReset().mockResolvedValue(null);
+  runtime.reconcile.mockReset().mockResolvedValue(false);
   vi.mocked(sharp).mockClear();
 });
 async function postRequest(extra: Record<string, unknown> = {}, files: File[] = []) {
@@ -134,7 +134,6 @@ describe('HTTP reporting boundary', () => {
     await runtime.store.save('verified-account', report().submissionId, {
       ...receipt,
       state: 'unknown',
-      issueReference: undefined,
     });
     runtime.store.lock = vi.fn().mockRejectedValue(new Error('Redis unavailable'));
     const response = await POST(await postRequest());
@@ -195,7 +194,6 @@ describe('HTTP reporting boundary', () => {
       await runtime.store.save('verified-account', report().submissionId, {
         ...receipt,
         state,
-        issueReference: state === 'succeeded' ? receipt.issueReference : undefined,
       });
       runtime.store.processing = vi
         .fn()
@@ -252,7 +250,7 @@ describe('HTTP reporting boundary', () => {
     expect(runtime.create).not.toHaveBeenCalled();
     const valid = await POST(await postRequest());
     expect(valid.status).toBe(201);
-    expect(await valid.json()).toEqual({ state: 'succeeded', issueReference: 'FBT-7' });
+    expect(await valid.json()).toEqual({ state: 'succeeded' });
     expect(runtime.create.mock.calls[0][1]).not.toContain('verified-account');
   });
   it('looks up an uncertain issue by the ID its creation used', async () => {
@@ -265,10 +263,10 @@ describe('HTTP reporting boundary', () => {
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
     );
     expect(issueId).not.toBe(report().submissionId);
-    runtime.reconcile.mockResolvedValueOnce('FBT-7');
+    runtime.reconcile.mockResolvedValueOnce(true);
     const context = { params: Promise.resolve({ submissionId: report().submissionId }) };
     const response = await status(new Request('https://app.test', { headers }), context);
-    expect(await response.json()).toEqual({ state: 'succeeded', issueReference: 'FBT-7' });
+    expect(await response.json()).toEqual({ state: 'succeeded' });
     expect(runtime.reconcile).toHaveBeenCalledExactlyOnceWith(issueId);
     expect(runtime.create).toHaveBeenCalledTimes(1);
   });

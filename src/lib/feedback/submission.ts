@@ -143,10 +143,7 @@ export async function decodeReport(input: Awaited<ReturnType<typeof readReport>>
 
 export function receiptResponse(receipt: Receipt): Response {
   return Response.json(
-    {
-      state: receipt.state,
-      ...(receipt.issueReference ? { issueReference: receipt.issueReference } : {}),
-    },
+    { state: receipt.state },
     { status: receipt.state === 'succeeded' ? 201 : 202, headers: { 'Cache-Control': 'no-store' } },
   );
 }
@@ -184,12 +181,8 @@ export async function reconcileReceipt(
       await store.save(userId, submissionId, receipt);
     }
     if (receipt.state !== 'creating' && receipt.state !== 'unknown') return receipt;
-    const issueReference = await linear.reconcile(linear.issueId(userId, submissionId));
-    const updated: Receipt = {
-      ...receipt,
-      state: issueReference ? 'succeeded' : 'unknown',
-      ...(issueReference ? { issueReference } : {}),
-    };
+    const created = await linear.reconcile(linear.issueId(userId, submissionId));
+    const updated: Receipt = { ...receipt, state: created ? 'succeeded' : 'unknown' };
     await store.save(userId, submissionId, updated);
     return updated;
   } finally {
@@ -267,12 +260,12 @@ export async function submitReport(
     receipt.state = 'creating';
     await store.save(userId, id, receipt);
     try {
-      const issueReference = await linear.create(
+      await linear.create(
         issueTitle(report.description),
         formatIssue(report, receipt.assets),
         linear.issueId(userId, id),
       );
-      receipt = { ...receipt, state: 'succeeded', issueReference };
+      receipt = { ...receipt, state: 'succeeded' };
       await store.save(userId, id, receipt);
       return receiptResponse(receipt);
     } catch (cause) {

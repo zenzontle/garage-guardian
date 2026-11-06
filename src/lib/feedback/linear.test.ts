@@ -195,17 +195,16 @@ describe('isolated Linear adapter', () => {
     ])
       expect(all).not.toContain(secret);
   });
-  it('creates the issue with the chosen ID and team and returns its identifier', async () => {
+  it('creates the issue with the chosen ID and team without fetching its identifier', async () => {
     const fetch = vi
       .fn()
-      .mockResolvedValueOnce(
-        Response.json({ data: { issueCreate: { success: true, issue: { identifier: 'FB-12' } } } }),
-      );
+      .mockResolvedValueOnce(Response.json({ data: { issueCreate: { success: true } } }));
     vi.stubGlobal('fetch', fetch);
     const issueId = linearAdapter(config).issueId('user', 'submission');
-    expect(await linearAdapter(config).create('[Feedback] title', 'description', issueId)).toBe(
-      'FB-12',
-    );
+    await expect(
+      linearAdapter(config).create('[Feedback] title', 'description', issueId),
+    ).resolves.toBeUndefined();
+    expect(body(fetch.mock.calls[0]).query).not.toContain('identifier');
     expect(body(fetch.mock.calls[0]).variables).toEqual({
       input: {
         id: issueId,
@@ -215,18 +214,16 @@ describe('isolated Linear adapter', () => {
       },
     });
   });
-  it('returns the existing issue when a retry is rejected because its ID already exists', async () => {
+  it('succeeds when a retry is rejected because its ID already exists', async () => {
     const fetch = vi
       .fn()
       .mockResolvedValueOnce(Response.json({ data: null, errors: [{ message: 'already exists' }] }))
-      .mockResolvedValueOnce(
-        Response.json({ data: { issues: { nodes: [{ identifier: 'FB-12' }] } } }),
-      )
+      .mockResolvedValueOnce(Response.json({ data: { issues: { nodes: [{ id: 'existing' }] } } }))
       .mockResolvedValueOnce(Response.json({ data: null, errors: [{ message: 'invalid' }] }))
       .mockResolvedValueOnce(Response.json({ data: { issues: { nodes: [] } } }));
     vi.stubGlobal('fetch', fetch);
     const issueId = crypto.randomUUID();
-    expect(await linearAdapter(config).create('title', 'body', issueId)).toBe('FB-12');
+    await expect(linearAdapter(config).create('title', 'body', issueId)).resolves.toBeUndefined();
     expect(body(fetch.mock.calls[1]).variables.id).toBe(issueId);
     await expect(linearAdapter(config).create('title', 'body', issueId)).rejects.toMatchObject({
       ambiguous: false,
@@ -244,32 +241,27 @@ describe('isolated Linear adapter', () => {
     await expect(create()).rejects.toHaveProperty('ambiguous', true);
     fetch.mockResolvedValueOnce(new Response('not json', { status: 200 }));
     await expect(create()).rejects.toHaveProperty('ambiguous', true);
-    fetch.mockResolvedValueOnce(
-      Response.json({
-        data: { issueCreate: { success: true, issue: { identifier: 'https://linear.app/x' } } },
-      }),
-    );
+    fetch.mockResolvedValueOnce(Response.json({ data: { issueCreate: { success: false } } }));
     await expect(create()).rejects.toHaveProperty('ambiguous', true);
     fetch.mockResolvedValueOnce(
       new Response('', { status: 429, headers: { 'Retry-After': '60' } }),
     );
     await expect(create()).rejects.toMatchObject({ ambiguous: false, retryAfter: 60 });
   });
-  it('looks an issue up by ID within the team and reports a missing one as null', async () => {
+  it('looks an issue up by ID within the team and reports whether it exists', async () => {
     const fetch = vi
       .fn()
-      .mockResolvedValueOnce(
-        Response.json({ data: { issues: { nodes: [{ identifier: 'FB-3' }] } } }),
-      )
+      .mockResolvedValueOnce(Response.json({ data: { issues: { nodes: [{ id: 'existing' }] } } }))
       .mockResolvedValueOnce(Response.json({ data: { issues: { nodes: [] } } }));
     vi.stubGlobal('fetch', fetch);
     const issueId = crypto.randomUUID();
-    expect(await linearAdapter(config).reconcile(issueId)).toBe('FB-3');
+    expect(await linearAdapter(config).reconcile(issueId)).toBe(true);
+    expect(body(fetch.mock.calls[0]).query).not.toContain('identifier');
     expect(body(fetch.mock.calls[0]).variables).toEqual({
       id: issueId,
       teamId: config.linearTeamId,
     });
-    expect(await linearAdapter(config).reconcile(issueId)).toBeNull();
+    expect(await linearAdapter(config).reconcile(issueId)).toBe(false);
   });
   it('derives a stable, unpredictable UUID v4 issue ID per account and submission', () => {
     const linear = linearAdapter(config);
