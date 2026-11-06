@@ -8,7 +8,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     environment: 'jsdom',
     restoreMocks: true,
-    // Playwright specs in e2e/ run with `pnpm test:e2e`.
+    // Playwright specs in e2e/ run with `pnpm e2e`.
     exclude: [...configDefaults.exclude, 'e2e/**'],
   },
 });

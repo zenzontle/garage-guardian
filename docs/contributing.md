@@ -33,12 +33,12 @@ pnpm format:check
 pnpm typecheck
 pnpm test
 pnpm build
-pnpm test:e2e
+pnpm e2e
 ```
 
-CI runs `pnpm exec prettier --check .` and `pnpm exec eslint . --max-warnings 0` (warnings fail), then typecheck, test, and build. A separate browser-test job builds the app and runs `pnpm test:e2e`, uploading the Playwright report and traces when a test fails.
+CI runs `pnpm exec prettier --check .` and `pnpm exec eslint . --max-warnings 0` (warnings fail), then typecheck, test, and build. A separate browser-test job builds the app and runs `pnpm e2e`, uploading the Playwright report and traces when a test fails.
 
-Browser tests in `e2e` run the production build in local prototype mode, in Chromium at a desktop size and a phone size (Pixel 7). They cover vehicles, maintenance reminders, service visits with photos, history filters and CSV export, fuel economy, reports, unsaved-change prompts, language switching, and navigation. Run `pnpm exec playwright install chromium` once, then `pnpm build` before `pnpm test:e2e`; the tests start the built app on port 3210, which must be free. They run without retries, so a flaky test fails. Build without Supabase variables (move `.env.local` aside), or the app will not run in prototype mode. Each test opens a fresh browser context, so IndexedDB starts empty.
+Browser tests in `e2e` run the production build in local prototype mode, in Chromium at a desktop size and a phone size (Pixel 7). They cover vehicles, maintenance reminders, service visits with photos, history filters and CSV export, fuel economy, reports, unsaved-change prompts, language switching, and navigation. Run `pnpm exec playwright install chromium` once, then `pnpm build` before `pnpm e2e`; the tests start the built app on port 3210, which must be free. They run without retries, so a flaky test fails. Build without Supabase variables (move `.env.local` aside), or the app will not run in prototype mode. Each test opens a fresh browser context, so IndexedDB starts empty.
 
 ESLint checks JavaScript, TypeScript, and TSX files with the recommended Next.js Core Web Vitals and TypeScript rules. Run `pnpm lint` to check the project or `pnpm lint:fix` to apply automatic fixes. Configuration lives in `eslint.config.mjs`; generated Next.js types, build output, and coverage are excluded. Prettier handles formatting separately, with `eslint-config-prettier` preventing conflicting lint rules.
 

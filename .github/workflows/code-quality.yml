@@ -64,6 +64,7 @@ jobs:
 
   browser-tests:
     name: Browser tests
+    # Independent of verify: it installs and builds on its own, so both run at once.
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
@@ -81,7 +82,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - name: Install Chromium
+      # Install scripts are disabled, so Playwright's browser download is an explicit step.
+      - name: Install Playwright Chromium
         run: pnpm exec playwright install --with-deps chromium
 
       # No Supabase variables are set, so the build runs in local prototype mode.
@@ -91,10 +93,10 @@ jobs:
           NEXT_TELEMETRY_DISABLED: 1
 
       - name: Run browser tests
-        run: pnpm test:e2e
+        run: pnpm e2e
 
       # Also after a job timeout, which GitHub reports as cancelled rather than failed.
-      - name: Upload test report
+      - name: Upload Playwright report and traces
         if: failure() || cancelled()
         uses: actions/upload-artifact@v7
         with:
@@ -103,4 +105,4 @@ jobs:
             playwright-report/
             test-results/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 14
