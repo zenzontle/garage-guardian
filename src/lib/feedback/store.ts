@@ -53,11 +53,14 @@ export function reportStore(config: ReportConfig) {
         await result.pending;
         return result;
       }),
-    ).catch(() => {
+    ).catch((cause) => {
+      if (cause instanceof ReportError) throw cause;
       throw new ReportError(
         503,
         'LIMITER_UNAVAILABLE',
         'Feedback is temporarily unavailable. Try again later.',
+        undefined,
+        cause,
       );
     });
     const denied = results.filter((result) => !result.success);

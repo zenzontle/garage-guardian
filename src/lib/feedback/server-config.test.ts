@@ -1,8 +1,10 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  ReportError,
   authenticate,
   clientIp,
+  errorResponse,
   identifier,
   publicMetadata,
   reportConfig,
@@ -116,5 +118,24 @@ describe('configuration and verified identity', () => {
         }),
       ),
     ).toThrow();
+  });
+  it('logs unexpected failures and wrapped causes, but not client errors', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const response = errorResponse(new Error('connect ECONNREFUSED https://redis.test/?token=x'));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: 'Feedback is unavailable. Your draft has been kept.',
+      code: 'UNAVAILABLE',
+    });
+    expect(log).toHaveBeenLastCalledWith(
+      '[feedback] UNAVAILABLE: Error: connect ECONNREFUSED <url>',
+    );
+    errorResponse(
+      new ReportError(503, 'LIMITER_UNAVAILABLE', 'x', undefined, new TypeError('down')),
+    );
+    expect(log).toHaveBeenLastCalledWith('[feedback] LIMITER_UNAVAILABLE: TypeError: down');
+    log.mockClear();
+    errorResponse(new ReportError(401, 'UNAUTHENTICATED', 'Sign in again.'));
+    expect(log).not.toHaveBeenCalled();
   });
 });
