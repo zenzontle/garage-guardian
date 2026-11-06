@@ -10,3 +10,6 @@ coverage/
 /.interaction-*.log
 dark-theme-preview.jpg
 service-form-updated.jpg
+/test-results/
+/playwright-report/
+/blob-report/
