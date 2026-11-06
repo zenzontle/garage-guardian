@@ -37,6 +37,8 @@ For bug fixes, check that the change addresses the root cause, and that other in
 These changes always need a human reviewer, even if AI review passes. `.github/CODEOWNERS` enforces this.
 
 - `.github/` (CI and merge gates) and `REVIEW.md`
+- `.claude/commands/pr-review.md` (the CI review command the merge gate depends on)
+- `.claude/settings.json`, `.claude/hooks/` (hooks also run inside the CI review job)
 - `supabase/` (schema, policies, and seeds)
 - `src/app/api/` and `vercel.json` (server endpoints and the reminder cron)
 - `src/lib/account/` and `src/app/(garage)/auth/` (authentication and account changes)
