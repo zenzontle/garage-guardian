@@ -467,7 +467,8 @@ it('stores cloud photos under the extension of their real type', async () => {
   });
   await expect(
     repository.uploadPhoto(visit.id, new File(['png'], 'receipt.png', { type: 'image/png' })),
-  ).rejects.toThrow('Photo type not allowed by bucket');
+  ).rejects.toMatchObject({ code: 'photoUnsupported' });
+  expect(cloud.bucket.upload).toHaveBeenCalledTimes(2);
 });
 
 it('does not lose simultaneous local writes', async () => {
