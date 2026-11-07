@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { useId, useState } from 'react';
 import { Modal } from '../ui/modal';
 import { useInteractions } from '../interaction/interaction-provider';
+import { AccountDeletionForm } from './account-deletion-form';
 import { AccountSettingsForm } from './account-settings-form';
 import { useGarage } from '../garage/garage-provider';
 import { NotificationPreferencesForm } from '../notifications/notification-preferences-form';
@@ -61,6 +62,12 @@ export function AccountSettingsDialog({ section }: { section?: 'security' }) {
               headingLevel={4}
             />
           ))}
+          <AccountDeletionForm
+            disabled={
+              garage.accountBusy || notificationBusy || garage.transferring || garage.loading
+            }
+            headingLevel={4}
+          />
         </section>
       </div>
     </Modal>

@@ -421,6 +421,67 @@ describe.each([
     expect(cloud.auth.signOut).not.toHaveBeenCalled();
     expect(testRouter.url).toBe('/auth/recovery');
   });
+  it.each([
+    ['accountDeleted', 200],
+    ['deletionScheduled', 202],
+  ] as const)(
+    'deletes the account after confirmation and reauthentication (%s)',
+    async (status, code) => {
+      localStorage.setItem('garage-guardian:locale', locale);
+      testRouter.reset('/settings/security');
+      cloud.emit(account());
+      const requests = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async (url) =>
+        url === '/api/account'
+          ? Response.json({ status }, { status: code })
+          : Response.json({ enabled: false }),
+      );
+      vi.stubGlobal('fetch', requests);
+      const App = await loadGarageTestApp();
+      const user = userEvent.setup();
+      render(<App />);
+      const form = within(await screen.findByRole('form', { name: copy.account.deleteAccount }));
+      const submit = form.getByRole('button', { name: copy.account.deleteAccount });
+      await user.type(form.getByLabelText(copy.account.currentPassword), 'current-password');
+      // Nothing can be submitted until the permanent loss is acknowledged.
+      expect(submit).toHaveProperty('disabled', true);
+      await user.click(form.getByRole('checkbox', { name: copy.account.deleteAccountConfirm }));
+      await user.click(submit);
+      expect(await screen.findByText(copy.account[status])).toBeDefined();
+      const call = requests.mock.calls.find(([url]) => url === '/api/account');
+      expect(call?.[1]).toMatchObject({
+        method: 'DELETE',
+        body: JSON.stringify({ currentPassword: 'current-password' }),
+      });
+      expect(cloud.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+      expect(testRouter.url).toBe('/');
+    },
+  );
+  it('keeps the account and the password draft when deletion is refused', async () => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    testRouter.reset('/settings/security');
+    cloud.emit(account());
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url === '/api/account'
+          ? Response.json({ error: { code: 'currentPasswordIncorrect' } }, { status: 403 })
+          : Response.json({ enabled: false }),
+      ),
+    );
+    const App = await loadGarageTestApp();
+    const user = userEvent.setup();
+    render(<App />);
+    const form = within(await screen.findByRole('form', { name: copy.account.deleteAccount }));
+    await user.type(form.getByLabelText(copy.account.currentPassword), 'wrong-password');
+    await user.click(form.getByRole('checkbox', { name: copy.account.deleteAccountConfirm }));
+    await user.click(form.getByRole('button', { name: copy.account.deleteAccount }));
+    expect((await form.findByRole('alert')).textContent).toBe(copy.errors.currentPasswordIncorrect);
+    expect(cloud.auth.signOut).not.toHaveBeenCalled();
+    expect(testRouter.url).toBe('/settings/security');
+    expect((form.getByLabelText(copy.account.currentPassword) as HTMLInputElement).value).toBe(
+      'wrong-password',
+    );
+  });
 });
 
 it('disables all account forms during an in-flight request and retains drafts on network failure', async () => {

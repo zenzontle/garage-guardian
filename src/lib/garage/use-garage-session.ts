@@ -20,7 +20,12 @@ import {
   sameRecoverySession,
   storedRecovery,
 } from '../account/account-recovery';
-import type { AccountPatch } from '../account/account-contract';
+import type {
+  AccountDelete,
+  AccountDeletionStatus,
+  AccountPatch,
+} from '../account/account-contract';
+import { OfflineReceipts } from '../currency/offline-receipts';
 import {
   assertPasswordSignOutSupport,
   signOutPasswordSession,
@@ -47,7 +52,9 @@ export function useGarageSession() {
   const [accountBusy, setAccountBusy] = useState(false);
   const accountLock = useRef(false);
   const transferBlocked = useRef(false);
-  const [accountNotice, setAccountNotice] = useState<'passwordChanged' | null>(null);
+  const [accountNotice, setAccountNotice] = useState<
+    'passwordChanged' | AccountDeletionStatus | null
+  >(null);
   const [resendUntil, setResendUntil] = useState(0);
   const resendDeadline = useRef(0);
   const generation = useRef(0);
@@ -408,13 +415,16 @@ export function useGarageSession() {
     }
   }
 
-  async function requestAccount(input: AccountPatch) {
-    const version = generation.current;
+  async function callAccount(
+    method: 'PATCH' | 'DELETE',
+    input: AccountPatch | AccountDelete,
+    version?: number,
+  ) {
     const { data, error } = await supabase!.auth.getSession();
     if (error || !data.session || data.session.user.id !== currentUser.current?.id)
       throw new AppError('sessionExpired');
     const response = await fetch('/api/account', {
-      method: 'PATCH',
+      method,
       cache: 'no-store',
       headers: {
         Authorization: `Bearer ${data.session.access_token}`,
@@ -422,17 +432,23 @@ export function useGarageSession() {
       },
       body: JSON.stringify(input),
     });
-    if (generation.current !== version) throw new AppError('sessionChanged');
+    if (version !== undefined && generation.current !== version)
+      throw new AppError('sessionChanged');
+    const body = (await response.json().catch(() => null)) as {
+      status?: unknown;
+      error?: { code?: string };
+    } | null;
     if (!response.ok) {
-      const body = (await response.json().catch(() => null)) as {
-        error?: { code?: string };
-      } | null;
       const code = body?.error?.code;
       throw new AppError(
         code && Object.hasOwn(en.errors, code) ? (code as keyof typeof en.errors) : 'auth',
       );
     }
-    return data.session;
+    return { session: data.session, status: body?.status };
+  }
+
+  async function requestAccount(input: AccountPatch) {
+    return (await callAccount('PATCH', input, generation.current)).session;
   }
 
   async function finishPasswordChange(session: Session, global: boolean) {
@@ -517,6 +533,28 @@ export function useGarageSession() {
     });
   }
 
+  async function deleteAccount(currentPassword: string) {
+    await accountOperation(async () => {
+      // Let in-flight saves settle so none reaches the cloud after the deletion order.
+      await Promise.allSettled([...operations.current]);
+      const { session, status } = await callAccount('DELETE', { currentPassword });
+      // The account is deleted, or queued and banned with every refresh session revoked.
+      // Either way it must not stay open here, even if a later local step fails.
+      const notice: AccountDeletionStatus =
+        status === 'accountDeleted' ? 'accountDeleted' : 'deletionScheduled';
+      await new OfflineReceipts(project, session.user.id).clear().catch(recordDiagnostic);
+      try {
+        // Bound to the deleted account's session: never sign out a replacement login.
+        await signOutPasswordSession(supabase!, session, 'local');
+      } catch (cause) {
+        recordDiagnostic(cause);
+      }
+      if (currentUser.current && currentUser.current.id !== session.user.id) return;
+      transition.current(null, true);
+      setAccountNotice(notice);
+    });
+  }
+
   return {
     repository,
     setCarArchived: (id: string, archived: boolean) =>
@@ -555,6 +593,7 @@ export function useGarageSession() {
     cancelRecovery,
     changeEmail,
     changePassword,
+    deleteAccount,
     retry: () => retry.current(),
   };
 }

@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import { account } from '@/test/fake-supabase';
-import { PATCH } from './route';
+import { DELETE, PATCH } from './route';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 const owner = account();
@@ -157,4 +157,115 @@ it('reports temporary-session cleanup failure and password revocation failure wi
   await expectError(await PATCH(request('PATCH', email)), 'accountSessionCleanup', 502);
   verification.auth.signOut.mockResolvedValueOnce({ error: new Error('Offline') });
   await expectError(await PATCH(request('PATCH', password)), 'sessionRevocation', 502);
+});
+
+describe('account deletion', () => {
+  const admin = {
+    rpc: vi.fn(),
+    from: vi.fn(),
+    storage: { from: vi.fn() },
+    auth: { admin: { updateUserById: vi.fn(), deleteUser: vi.fn() } },
+  };
+  const remove = vi.fn();
+  const deletion = { currentPassword: 'current-secret' };
+  const invoke = (body: unknown = deletion, token?: string) =>
+    DELETE(request('DELETE', body, token));
+  beforeEach(() => {
+    vi.stubEnv('SUPABASE_SECRET_KEY', 'secret-key');
+    admin.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => {
+      if (name === 'claim_account_deletions')
+        return { data: [{ user_id: args.p_user_id }], error: null };
+      return { data: name === 'account_photo_paths' ? [] : '2026-11-07T00:00:00Z', error: null };
+    });
+    admin.from.mockReturnValue({ update: () => ({ eq: async () => ({ error: null }) }) });
+    admin.storage.from.mockReturnValue({ remove });
+    remove.mockResolvedValue({ data: [], error: null });
+    admin.auth.admin.updateUserById.mockResolvedValue({ data: {}, error: null });
+    admin.auth.admin.deleteUser.mockResolvedValue({ data: {}, error: null });
+    vi.mocked(createClient).mockImplementation(
+      (_url, key) =>
+        (key === 'secret-key'
+          ? admin
+          : { auth: { ...identity.auth, ...verification.auth } }) as unknown as ReturnType<
+          typeof createClient
+        >,
+    );
+  });
+
+  it('reauthenticates, queues the order, revokes sessions, and deletes the caller only', async () => {
+    const result = await invoke();
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ status: 'accountDeleted' });
+    expect(result.headers.get('cache-control')).toBe('no-store');
+    expect(identity.auth.getUser).toHaveBeenCalledWith('caller-token');
+    expect(verification.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: owner.email,
+      password: deletion.currentPassword,
+    });
+    expect(admin.rpc.mock.calls.map(([name]) => name)).toEqual([
+      'request_account_deletion',
+      'claim_account_deletions',
+      'account_photo_paths',
+    ]);
+    expect(admin.rpc).toHaveBeenCalledWith('request_account_deletion', { p_user_id: owner.id });
+    expect(admin.auth.admin.updateUserById).toHaveBeenCalledWith(owner.id, {
+      ban_duration: '876000h',
+    });
+    expect(verification.auth.signOut.mock.calls).toEqual([[{ scope: 'global' }]]);
+    expect(admin.auth.admin.deleteUser).toHaveBeenCalledWith(owner.id);
+  });
+  it('checks the server key before asking for the password', async () => {
+    vi.stubEnv('SUPABASE_SECRET_KEY', '');
+    await expectError(await invoke(), 'accountDeletionUnavailable', 503);
+    expect(verification.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+  it('rejects missing sessions, wrong passwords, and target IDs without queuing anything', async () => {
+    await expectError(await invoke(deletion, ''), 'sessionExpired', 401);
+    await expectError(await invoke({ ...deletion, userId: 'victim' }), 'accountInput', 400);
+    verification.auth.signInWithPassword.mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: { code: 'invalid_credentials' },
+    });
+    await expectError(await invoke(), 'currentPasswordIncorrect', 403);
+    verification.auth.signInWithPassword.mockResolvedValueOnce({
+      data: { user: account('different-user'), session: {} },
+      error: null,
+    });
+    await expectError(await invoke(), 'sessionExpired', 403);
+    expect(admin.rpc).not.toHaveBeenCalled();
+    expect(admin.auth.admin.deleteUser).not.toHaveBeenCalled();
+  });
+  it('reports a failed order without revoking sessions', async () => {
+    admin.rpc.mockResolvedValueOnce({ data: null, error: { code: '57014' } });
+    await expectError(await invoke(), 'accountDeletion', 502);
+    expect(admin.auth.admin.deleteUser).not.toHaveBeenCalled();
+    expect(verification.auth.signOut.mock.calls).toEqual([[{ scope: 'local' }]]);
+  });
+  it('accepts a queued order when inline deletion cannot finish', async () => {
+    remove.mockResolvedValueOnce({ data: null, error: { message: 'storage offline' } });
+    admin.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => {
+      if (name === 'claim_account_deletions')
+        return { data: [{ user_id: args.p_user_id }], error: null };
+      if (name === 'account_photo_paths')
+        return { data: [{ name: `${owner.id}/visit/photo.webp` }], error: null };
+      return { data: '2026-11-07T00:00:00Z', error: null };
+    });
+    const result = await invoke();
+    expect(result.status).toBe(202);
+    expect(await result.json()).toEqual({ status: 'deletionScheduled' });
+    expect(admin.auth.admin.deleteUser).not.toHaveBeenCalled();
+  });
+  it('still succeeds when session revocation fails after the order is durable', async () => {
+    verification.auth.signOut.mockResolvedValue({ error: new Error('Offline') });
+    const result = await invoke();
+    expect(result.status).toBe(200);
+    expect(await result.json()).toEqual({ status: 'accountDeleted' });
+  });
+  it('explains that a banned account is already being deleted', async () => {
+    verification.auth.signInWithPassword.mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: { code: 'user_banned' },
+    });
+    await expectError(await invoke(), 'accountDeletionPending', 400);
+  });
 });
