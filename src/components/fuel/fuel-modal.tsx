@@ -76,7 +76,10 @@ export function FuelModal({
 }) {
   const t = useTranslations();
   cars = [...cars].sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
-  const initialCar = cars.find((car) => car.id === (item?.carId ?? carId ?? cars[0]?.id));
+  // A new fill-up defaults to an active car; an archived one is only used when asked for by id.
+  const initialCar = cars.find(
+    (car) => car.id === (item?.carId ?? carId ?? cars.find((car) => !car.isArchived)?.id),
+  );
   const defaults = carDefaults(initialCar, fuelEntries, homeCurrency);
   const [selectedCarId, setSelectedCarId] = useState(initialCar?.id ?? '');
   const [date, setDate] = useState(item?.date ?? todayISO());
@@ -268,6 +271,11 @@ export function FuelModal({
                   required
                   disabled={Boolean(item)}
                 >
+                  {!selectedCarId && (
+                    <option value="" disabled>
+                      {t('car.choose')}
+                    </option>
+                  )}
                   {cars.map((car) => (
                     <option key={car.id} value={car.id}>
                       {car.name}

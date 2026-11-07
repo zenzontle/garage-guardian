@@ -60,8 +60,10 @@ export function VisitModal({
 }) {
   const t = useTranslations();
   cars = [...cars].sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
-  const initialCar = cars.find((car) => car.id === (item?.carId ?? carId ?? cars[0]?.id));
-  const [selectedCarId, setSelectedCarId] = useState(item?.carId ?? carId ?? cars[0]?.id ?? '');
+  // A new visit defaults to an active car; an archived one is only used when asked for by id.
+  const initialCarId = item?.carId ?? carId ?? cars.find((car) => !car.isArchived)?.id ?? '';
+  const initialCar = cars.find((car) => car.id === initialCarId);
+  const [selectedCarId, setSelectedCarId] = useState(initialCarId);
   const [date, setDate] = useState(item?.date ?? todayISO());
   const [odometer, setOdometer] = useState(
     item
@@ -238,6 +240,11 @@ export function VisitModal({
                   required
                   disabled={Boolean(item)}
                 >
+                  {!selectedCarId && (
+                    <option value="" disabled>
+                      {t('car.choose')}
+                    </option>
+                  )}
                   {cars.map((car) => (
                     <option key={car.id} value={car.id}>
                       {car.name}

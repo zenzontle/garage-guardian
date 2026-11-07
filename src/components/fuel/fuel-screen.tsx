@@ -26,6 +26,7 @@ export function FuelScreen() {
       carId={carId}
       onCarChange={(id) => router.replace(fuelPath(id))}
       onAdd={() => setModal({ kind: 'fuel', carId: carId || undefined })}
+      onAddCar={() => setModal({ kind: 'car' })}
       onEdit={(item) => setModal({ kind: 'fuel', item })}
       onDelete={(entry) =>
         interactions?.confirmDelete({

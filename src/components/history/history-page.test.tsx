@@ -34,7 +34,15 @@ function setup(visits = [{ ...visit, odometer: 1000 }, later]) {
   const repository = new LocalRepository();
   const onEdit = vi.fn(),
     onDelete = vi.fn();
-  const props = { cars: [car, metric], visits, repository, onAdd: vi.fn(), onEdit, onDelete };
+  const props = {
+    cars: [car, metric],
+    visits,
+    repository,
+    onAdd: vi.fn(),
+    onAddCar: vi.fn(),
+    onEdit,
+    onDelete,
+  };
   const view = render(
     <NextIntlClientProvider locale="en" messages={en}>
       <FilteredHistoryPage {...props} />
@@ -184,6 +192,24 @@ it('handles an empty history and records whose vehicle is unavailable', () => {
   );
   const cards = within(screen.getByRole('list', { name: 'Service history' }));
   expect(cards.getByText('Unknown')).toBeDefined();
+});
+
+it('offers Add a car instead of Log service when every car is archived', async () => {
+  const { rerender, props, user } = setup();
+  await user.click(screen.getByRole('button', { name: 'Log service' }));
+  expect(props.onAdd).toHaveBeenCalledOnce();
+  rerender(
+    <NextIntlClientProvider locale="en" messages={en}>
+      <FilteredHistoryPage
+        {...props}
+        cars={props.cars.map((entry) => ({ ...entry, isArchived: true }))}
+      />
+    </NextIntlClientProvider>,
+  );
+  expect(screen.queryByRole('button', { name: 'Log service' })).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Add a car' }));
+  expect(props.onAddCar).toHaveBeenCalledOnce();
+  expect(props.onAdd).toHaveBeenCalledOnce();
 });
 
 it('orders same-day visits by creation time when sorting oldest first', async () => {
