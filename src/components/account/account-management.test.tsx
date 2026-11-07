@@ -238,9 +238,11 @@ describe.each([
       ['H1', copy.account.security],
       ['H2', copy.account.changeEmail],
       ['H2', copy.account.changePassword],
+      ['H2', copy.account.deleteAccount],
     ]);
     const email = within(main).getByRole('form', { name: copy.account.changeEmail });
     const password = within(main).getByRole('form', { name: copy.account.changePassword });
+    const deletion = within(main).getByRole('form', { name: copy.account.deleteAccount });
     within(email).getByLabelText(copy.account.currentPassword).focus();
     for (const control of [
       within(email).getByLabelText(copy.account.newEmail),
@@ -249,6 +251,8 @@ describe.each([
       within(password).getByLabelText(copy.account.newPassword),
       within(password).getByLabelText(copy.account.confirmPassword),
       within(password).getByRole('button', { name: copy.account.changePassword }),
+      within(deletion).getByLabelText(copy.account.currentPassword),
+      within(deletion).getByRole('checkbox', { name: copy.account.deleteAccountConfirm }),
     ]) {
       await user.tab();
       expect(document.activeElement).toBe(control);
@@ -258,7 +262,7 @@ describe.each([
     expect(screen.queryByRole('form')).toBeNull();
     act(() => testRouter.forward());
     await screen.findByRole('heading', { name: copy.account.security });
-    expect(screen.getAllByRole('form')).toHaveLength(2);
+    expect(screen.getAllByRole('form')).toHaveLength(3);
   });
   it('preserves entered email through recovery/resend, announces generic copy, and enforces cooldown', async () => {
     localStorage.setItem('garage-guardian:locale', locale);
@@ -353,7 +357,10 @@ describe.each([
     await user.type(within(form).getByLabelText(copy.account.confirmPassword), 'mismatch');
     await user.click(within(form).getByRole('button', { name: copy.account.changePassword }));
     expect((await within(form).findByRole('alert')).textContent).toBe(copy.errors.passwordMismatch);
-    const last = within(dialog).getByRole('button', { name: copy.account.changePassword });
+    // Account deletion comes last, and its submit button stays disabled until confirmed.
+    const last = within(dialog).getByRole('checkbox', {
+      name: copy.account.deleteAccountConfirm,
+    });
     last.focus();
     await user.tab();
     expect(document.activeElement).toBe(
