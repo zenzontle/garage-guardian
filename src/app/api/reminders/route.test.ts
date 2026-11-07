@@ -32,6 +32,24 @@ it('rejects unauthenticated cron calls before creating a client', async () => {
   expect((await GET(request('wrong'))).status).toBe(401);
   expect(createClient).not.toHaveBeenCalled();
 });
+it.each([
+  ['a wrong secret of the same length', 'Bearer secreT'],
+  ['a missing scheme', 'secret'],
+  ['a longer value', 'Bearer secret2'],
+])('rejects %s', async (_, authorization) => {
+  expect((await GET(request(authorization))).status).toBe(401);
+  expect(createClient).not.toHaveBeenCalled();
+});
+it('rejects a missing authorization header', async () => {
+  const bare = new NextRequest('https://garage.example/api/reminders');
+  expect((await GET(bare)).status).toBe(401);
+  expect(createClient).not.toHaveBeenCalled();
+});
+it('rejects every request when CRON_SECRET is unset', async () => {
+  vi.stubEnv('CRON_SECRET', '');
+  expect((await GET(request('Bearer '))).status).toBe(401);
+  expect(createClient).not.toHaveBeenCalled();
+});
 it('defaults to disabled and does no work', async () => {
   vi.stubEnv('REMINDERS_ENABLED', '');
   expect(await (await GET(request())).json()).toEqual({ status: 'email_disabled' });
