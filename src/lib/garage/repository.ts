@@ -2,6 +2,7 @@
 
 import { del, get, set, update } from 'idb-keyval';
 import { AppError } from '../utils/app-error';
+import { photoExtension } from '../utils/photo-type';
 import { accountAuthOptions, serializeAccountSignIns } from '../account/account-session';
 import { bootstrapRecovery } from '../account/account-recovery';
 import { recordDiagnostic } from '../feedback/diagnostics';
@@ -692,7 +693,7 @@ export class SupabaseRepository implements Repository {
   }
   async uploadPhoto(recordId: string, file: File): Promise<Photo> {
     const id = crypto.randomUUID();
-    const path = `${this.userId}/${recordId}/${id}.webp`;
+    const path = `${this.userId}/${recordId}/${id}.${photoExtension(file.type)}`;
     const { error } = await this.client.storage
       .from('visit-photos')
       .upload(path, file, { contentType: file.type, upsert: false });

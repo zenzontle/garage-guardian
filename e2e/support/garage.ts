@@ -129,7 +129,7 @@ export async function logService(
 
 async function attachPhoto(page: Page, dialog: Locator, file: string) {
   await dialog.getByLabel(/^Photos/).setInputFiles(file);
-  // Photos are resized to WebP in the browser before they are attached.
+  // Chromium resizes photos to WebP in the browser before they are attached.
   const name = `${path.basename(file, path.extname(file))}.webp`;
   await expect(dialog.getByRole('button', { name: `Remove ${name}` })).toBeVisible();
   await expect(page.getByText('Preparing photos…')).toBeHidden();
