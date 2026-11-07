@@ -664,6 +664,28 @@ describe('signup transfer of fill-ups', () => {
     expect(await pendingTransfer(project)).toBeUndefined();
   });
 
+  it('transfers JPEG photos under a .jpg path with their JPEG type', async () => {
+    const local = new LocalRepository();
+    await local.saveCar(car);
+    const jpeg = await local.uploadPhoto(
+      fuelEntry.id,
+      new File(['safari receipt'], 'pump.jpg', { type: 'image/jpeg' }),
+    );
+    await local.saveFuelEntry({ ...fuelEntry, photos: [jpeg] });
+    const cloud = fakeSupabase();
+    cloud.emit(account());
+    await registerSignup(project, account(), true);
+    await transferSignupData(cloud.client, project, account().id);
+    const cloudPath = `${account().id}/${fuelEntry.id}/${jpeg.id}.jpg`;
+    const saved = await new SupabaseRepository(cloud.client, account().id).load();
+    expect(saved.fuelEntries[0].photos).toEqual([{ ...jpeg, path: cloudPath }]);
+    expect(cloud.bucket.upload).toHaveBeenCalledWith(cloudPath, expect.any(Blob), {
+      contentType: 'image/jpeg',
+      upsert: true,
+    });
+    expect(await cloud.photos.get(cloudPath)!.text()).toBe('safari receipt');
+  });
+
   it('keeps local fill-ups and photos when the uploaded copy cannot be verified', async () => {
     const { local, fuelPhoto } = await seedFuel();
     const before = await local.load();
