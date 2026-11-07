@@ -41,6 +41,9 @@ export function failureOf(cause: unknown, fallback: ErrorCode = 'generic'): AppF
     case 'over_request_rate_limit':
     case 'over_email_send_rate_limit':
       return { code: 'rateLimited' };
+    case 'user_banned':
+      // The only bans the app issues hold an account while its deletion completes.
+      return { code: 'accountDeletionPending' };
     case 'session_not_found':
     case 'refresh_token_not_found':
     case 'refresh_token_already_used':

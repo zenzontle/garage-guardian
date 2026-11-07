@@ -40,6 +40,9 @@
     "resendCooldown": "Espera 60 segundos antes de solicitar otro correo de confirmación.",
     "sessionRevocation": "Tu contraseña se actualizó, pero no se pudieron revocar las sesiones. Reintenta para terminar o inicia sesión con la nueva contraseña.",
     "accountSessionCleanup": "Es posible que la solicitud se haya completado, pero no se pudo cerrar la sesión temporal de verificación. Comprueba tu cuenta antes de reintentar.",
+    "accountDeletionUnavailable": "La eliminación de cuentas no está disponible en esta implementación.",
+    "accountDeletion": "No se pudo solicitar la eliminación de la cuenta. No se eliminó nada. Inténtalo de nuevo.",
+    "accountDeletionPending": "Esta cuenta se está eliminando y ya no puede iniciar sesión.",
     "notificationInput": "Revisa tus preferencias de recordatorios e inténtalo de nuevo.",
     "notificationSave": "No se pudieron cargar o guardar las preferencias de recordatorios. Inténtalo de nuevo.",
     "archive": "No se pudo cambiar el estado del vehículo. Inténtalo de nuevo; los cambios en la nube requieren conexión.",
@@ -148,7 +151,13 @@
     "cooldown": "Puedes reenviar en {seconds} segundos.",
     "passwordChanged": "Tu contraseña cambió. Inicia sesión con la nueva contraseña. Las sesiones de renovación se revocaron; los tokens de acceso existentes pueden seguir siendo válidos hasta que caduquen.",
     "transferBlocked": "Termina la transferencia de registro antes de cambiar tu cuenta.",
-    "requestAnother": "Solicitar otro correo de recuperación"
+    "requestAnother": "Solicitar otro correo de recuperación",
+    "deleteAccount": "Eliminar cuenta",
+    "deleteAccountDescription": "Elimina permanentemente tu cuenta y todo lo que contiene: vehículos, programas de mantenimiento, visitas de servicio, cargas de combustible, recibos, fotos y la configuración de notificaciones y moneda. Se cerrará la sesión en todos los dispositivos. Esta acción no se puede deshacer.",
+    "deleteAccountKeep": "Para conservar una copia, exporta primero tu historial de servicio a CSV. Los registros de invitado guardados en este navegador sin una cuenta no se verán afectados.",
+    "deleteAccountConfirm": "Entiendo que mi cuenta y todos sus datos se eliminarán permanentemente.",
+    "accountDeleted": "Tu cuenta y todos sus datos se eliminaron.",
+    "deletionScheduled": "Tu cuenta está programada para eliminarse. Ya no puede iniciar sesión y sus datos restantes se eliminarán en un plazo de 24 horas."
   },
   "dashboard": {
     "overview": "RESUMEN",

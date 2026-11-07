@@ -12,3 +12,9 @@ export const accountPatchSchema = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 export type AccountPatch = z.infer<typeof accountPatchSchema>;
+
+// Deletion reauthenticates like other account changes; the target is always the caller.
+export const accountDeleteSchema = z.object({ currentPassword }).strict();
+export type AccountDelete = z.infer<typeof accountDeleteSchema>;
+// Successful DELETE /api/account statuses.
+export type AccountDeletionStatus = 'accountDeleted' | 'deletionScheduled';
