@@ -157,12 +157,16 @@ it('supports archived direct links, view switching, refresh/back, late receipts,
   act(() => testRouter.push('/reports'));
   await screen.findByRole('option', { name: `${car.name} (${en.archive.archived})` });
   expect(screen.getAllByText('USD 150.00').length).toBeGreaterThan(0);
+  // With no active car, History offers Add a car; late receipts start from the archived car's page.
   act(() => testRouter.push('/history'));
-  await user.click(await screen.findByRole('button', { name: en.shared.logService }));
+  await screen.findByRole('button', { name: en.shared.addCar });
+  expect(screen.queryByRole('button', { name: en.shared.logService })).toBeNull();
+  act(() => testRouter.push(`/cars/${car.id}`));
+  await user.click((await screen.findAllByRole('button', { name: en.shared.logService }))[0]);
   const dialog = within(screen.getByRole('dialog'));
   expect(
-    dialog.getByRole('option', { name: `${car.name} (${en.archive.archived})` }),
-  ).toBeDefined();
+    (dialog.getByRole('combobox', { name: en.shared.vehicle }) as HTMLSelectElement).value,
+  ).toBe(car.id);
   fireEvent.change(dialog.getByRole('textbox', { name: en.visit.itemName }), {
     target: { value: 'Late receipt' },
   });
