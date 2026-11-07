@@ -441,6 +441,35 @@ it('normalizes legacy cloud records and preserves zero kilometer reminder window
   expect((await repository.load()).cars[0].reminderMiles).toBe(1000);
 });
 
+it('stores cloud photos under the extension of their real type', async () => {
+  const { SupabaseRepository } = await import('./repository');
+  const cloud = fakeSupabase();
+  cloud.emit(account());
+  const repository = new SupabaseRepository(cloud.client, account().id);
+  const jpeg = await repository.uploadPhoto(
+    visit.id,
+    new File(['jpeg'], 'receipt.jpg', { type: 'image/jpeg' }),
+  );
+  const webp = await repository.uploadPhoto(
+    visit.id,
+    new File(['webp'], 'receipt.webp', { type: 'image/webp' }),
+  );
+  expect(jpeg).toEqual({
+    id: jpeg.id,
+    path: `${account().id}/${visit.id}/${jpeg.id}.jpg`,
+    name: 'receipt.jpg',
+    contentType: 'image/jpeg',
+  });
+  expect(webp.path).toBe(`${account().id}/${visit.id}/${webp.id}.webp`);
+  expect(cloud.bucket.upload).toHaveBeenCalledWith(jpeg.path, expect.any(File), {
+    contentType: 'image/jpeg',
+    upsert: false,
+  });
+  await expect(
+    repository.uploadPhoto(visit.id, new File(['png'], 'receipt.png', { type: 'image/png' })),
+  ).rejects.toThrow('Photo type not allowed by bucket');
+});
+
 it('does not lose simultaneous local writes', async () => {
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', '');

@@ -151,9 +151,12 @@ export function fakeSupabase() {
     return builder;
   });
   const bucket = {
-    upload: vi.fn(async (path: string, blob: Blob) => {
+    upload: vi.fn(async (path: string, blob: Blob, options?: { contentType?: string }) => {
       if (!user || !path.startsWith(`${user.id}/`))
         return { error: new Error('Photo owner policy denied write') };
+      // Mirrors the bucket's allowed_mime_types (migration 0013).
+      if (!['image/webp', 'image/jpeg'].includes(options?.contentType ?? ''))
+        return { error: new Error('Photo type not allowed by bucket') };
       photos.set(path, blob);
       return { error: null };
     }),

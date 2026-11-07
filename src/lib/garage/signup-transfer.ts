@@ -2,6 +2,7 @@
 
 import { del, get, set, update } from 'idb-keyval';
 import { AppError } from '../utils/app-error';
+import { photoExtension } from '../utils/photo-type';
 import { withNamedLock } from '../utils/named-lock';
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { LocalRepository, SupabaseRepository, sameRecord } from './repository';
@@ -108,7 +109,7 @@ async function runTransfer(
       for (const photo of record.photos) {
         assertActive();
         const file = await local.readPhoto(photo);
-        const path = `${userId}/${record.id}/${photo.id}.webp`;
+        const path = `${userId}/${record.id}/${photo.id}.${photoExtension(photo.contentType)}`;
         assertActive();
         onProgress?.({ phase: 'uploading', current: completed + 1, total });
         const { error } = await client.storage
