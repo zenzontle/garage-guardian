@@ -172,6 +172,7 @@ describe('account deletion', () => {
     DELETE(request('DELETE', body, token));
   beforeEach(() => {
     vi.stubEnv('SUPABASE_SECRET_KEY', 'secret-key');
+    vi.stubEnv('CRON_SECRET', 'cron-secret');
     admin.rpc.mockImplementation(async (name: string, args: Record<string, unknown>) => {
       if (name === 'claim_account_deletions')
         return { data: [{ user_id: args.p_user_id }], error: null };
@@ -214,11 +215,14 @@ describe('account deletion', () => {
     expect(verification.auth.signOut.mock.calls).toEqual([[{ scope: 'global' }]]);
     expect(admin.auth.admin.deleteUser).toHaveBeenCalledWith(owner.id);
   });
-  it('checks the server key before asking for the password', async () => {
-    vi.stubEnv('SUPABASE_SECRET_KEY', '');
-    await expectError(await invoke(), 'accountDeletionUnavailable', 503);
-    expect(verification.auth.signInWithPassword).not.toHaveBeenCalled();
-  });
+  it.each(['SUPABASE_SECRET_KEY', 'CRON_SECRET'])(
+    'requires %s before asking for the password',
+    async (name) => {
+      vi.stubEnv(name, '');
+      await expectError(await invoke(), 'accountDeletionUnavailable', 503);
+      expect(verification.auth.signInWithPassword).not.toHaveBeenCalled();
+    },
+  );
   it('rejects missing sessions, wrong passwords, and target IDs without queuing anything', async () => {
     await expectError(await invoke(deletion, ''), 'sessionExpired', 401);
     await expectError(await invoke({ ...deletion, userId: 'victim' }), 'accountInput', 400);

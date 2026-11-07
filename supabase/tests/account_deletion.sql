@@ -102,7 +102,27 @@ do $$ begin
       values ('visit-photos', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/visit-1/d.webp');
     raise exception 'Upload succeeded after deletion was requested';
   exception when insufficient_privilege then null; end;
+  begin
+    update storage.objects set metadata = '{}'::jsonb
+      where name = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1/visit-1/a.webp';
+    raise exception 'Photo replaced after deletion was requested';
+  exception when insufficient_privilege then null; end;
 end $$;
+-- Re-enabling reminders with that token must not lead to another digest.
+update public.notification_preferences set enabled = true;
+reset role;
+update public.notification_preferences set next_scheduled_at = now() - interval '1 day'
+  where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+set local role service_role;
+do $$ begin
+  if public.claim_reminder('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') is not null
+    or exists (select 1 from public.reminder_deliveries
+      where user_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1') then
+    raise exception 'A queued account was claimed for a reminder';
+  end if;
+end $$;
+reset role;
+set local role authenticated;
 select set_config('request.jwt.claim.sub', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2', true);
 insert into storage.objects (bucket_id, name)
   values ('visit-photos', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2/visit-2/b.webp');

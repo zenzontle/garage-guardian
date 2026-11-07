@@ -52,7 +52,7 @@ Out of scope: transactional email already accepted by Brevo, and feedback report
 
 ### Deletion release setup
 
-Apply `supabase/migrations/0013_account_deletion.sql` before deploying, then run `supabase/tests/account_deletion.sql` as an administrator. Configure server-only `SUPABASE_SECRET_KEY` and `CRON_SECRET` (shared with [account reminders](account-reminders.md#deployment)). Without the secret key, the endpoint returns `accountDeletionUnavailable` (503) before asking for a password.
+Apply `supabase/migrations/0013_account_deletion.sql` before deploying, then run `supabase/tests/account_deletion.sql` as an administrator. Configure server-only `SUPABASE_SECRET_KEY` and `CRON_SECRET` (shared with [account reminders](account-reminders.md#deployment)). Without either secret, the endpoint returns `accountDeletionUnavailable` (503) before asking for a password, because an order that cannot finish inline would never be retried. While an order is queued, `claim_reminder` never claims the account, even if an older access token re-enables reminders.
 
 Smoke-test with a disposable account that has vehicles, visits and fill-ups with photos, and reminders enabled: delete it and confirm that its rows, its `visit-photos` folder, and its Auth user are gone, and that another account's data is untouched. Then make the worker fail (for example, temporarily revoke the Storage API key), confirm a 202 response and that sign-in is refused, restore the key, call the cron route, and confirm the order completes.
 

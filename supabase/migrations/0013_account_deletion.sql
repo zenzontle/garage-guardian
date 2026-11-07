@@ -93,3 +93,33 @@ create policy "Accounts being deleted cannot upload photos" on storage.objects
 create policy "Accounts being deleted cannot replace photos" on storage.objects
   as restrictive for update to authenticated
   with check (bucket_id <> 'visit-photos' or public.account_accepts_uploads());
+
+-- Same as 0007, but an account with a queued deletion order is never claimed. Its reminders
+-- are disabled when the order is recorded; an access token issued before the request could
+-- still re-enable them until the order completes.
+create or replace function public.claim_reminder(p_user_id uuid)
+returns date language plpgsql security definer set search_path = '' as $$
+declare
+  preferences public.notification_preferences;
+  week date := date_trunc('week', now() at time zone 'UTC')::date;
+  claimed date;
+begin
+  if exists (select 1 from public.account_deletion_requests where user_id = p_user_id) then
+    return null;
+  end if;
+  select * into preferences from public.notification_preferences
+    where user_id = p_user_id for update;
+  if not found or not preferences.enabled or preferences.next_scheduled_at > now() then
+    return null;
+  end if;
+  insert into public.reminder_deliveries (user_id, week_start, status)
+    values (p_user_id, week, 'processing')
+    on conflict do nothing returning week_start into claimed;
+  update public.notification_preferences
+    set next_scheduled_at = public.next_reminder_date(weekday, now())
+    where user_id = p_user_id;
+  return claimed;
+end;
+$$;
+revoke all on function public.claim_reminder(uuid) from public, anon, authenticated;
+grant execute on function public.claim_reminder(uuid) to service_role;

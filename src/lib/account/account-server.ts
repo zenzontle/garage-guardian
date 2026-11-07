@@ -165,8 +165,10 @@ export async function accountDeletionRequest(request: Request) {
     try {
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
       const secret = process.env.SUPABASE_SECRET_KEY;
-      // Check before asking for the password: without the secret key nothing can be deleted.
-      if (!url || !secret) throw new AccountError('accountDeletionUnavailable', 503);
+      // Check before asking for the password: without the secret key nothing can be deleted,
+      // and without the cron secret an order that does not finish inline is never retried.
+      if (!url || !secret || !process.env.CRON_SECRET)
+        throw new AccountError('accountDeletionUnavailable', 503);
       const { user, client } = await verifyCaller(request, accountDeleteSchema, verification);
       const deadline = Date.now() + INLINE_DELETION_MS;
       const db = serverClient(url, secret, AbortSignal.timeout(INLINE_DELETION_MS + 5_000));

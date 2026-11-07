@@ -535,6 +535,8 @@ export function useGarageSession() {
 
   async function deleteAccount(currentPassword: string) {
     await accountOperation(async () => {
+      // Fail before the server deletes anything if safe local sign-out is unavailable.
+      assertPasswordSignOutSupport(supabase!);
       // Let in-flight saves settle so none reaches the cloud after the deletion order.
       await Promise.allSettled([...operations.current]);
       const { session, status } = await callAccount('DELETE', { currentPassword });
