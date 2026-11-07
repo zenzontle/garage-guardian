@@ -40,6 +40,31 @@ it('lists active vehicles first and accepts archived vehicles for late receipts'
   );
 });
 
+it('makes a new visit choose a vehicle when every vehicle is archived', async () => {
+  const onSave = vi.fn(async () => {});
+  render(
+    <NextIntlClientProvider locale="en" messages={en}>
+      <VisitModal
+        cars={[{ ...car, isArchived: true }]}
+        visits={[]}
+        schedules={[]}
+        repository={new LocalRepository()}
+        onClose={vi.fn()}
+        onSave={onSave}
+      />
+    </NextIntlClientProvider>,
+  );
+  const selector = screen.getByRole('combobox', { name: 'Vehicle' }) as HTMLSelectElement;
+  expect(selector.value).toBe('');
+  expect(selector.selectedOptions[0].text).toBe('Choose vehicle');
+  expect(screen.getByLabelText('Odometer (miles)')).toHaveProperty('value', '');
+  await userEvent.selectOptions(selector, car.id);
+  expect(selector.value).toBe(car.id);
+  expect(Array.from(selector.options).map((option) => option.text)).toEqual([
+    `${car.name} (Archived)`,
+  ]);
+});
+
 it.each(['', '0'])('saves an unknown odometer and a zero total from %j', async (cost) => {
   const repository = new LocalRepository();
   const onSave = vi.fn(async (saved) => repository.saveVisit(saved));

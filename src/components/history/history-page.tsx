@@ -20,6 +20,7 @@ export function HistoryPage({
   carId,
   onCarChange,
   onAdd,
+  onAddCar,
   onEdit,
   onDelete,
   homeCurrency = 'USD',
@@ -30,11 +31,13 @@ export function HistoryPage({
   carId: string;
   onCarChange: (carId: string) => void;
   onAdd: () => void;
+  onAddCar: () => void;
   onEdit: (visit: Visit) => void;
   onDelete: (visit: Visit) => void;
   homeCurrency?: Currency;
 }) {
   const t = useTranslations();
+  const activeCars = cars.filter((car) => !car.isArchived);
   const [query, setQuery] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -92,10 +95,17 @@ export function HistoryPage({
         title={t('navigation.history')}
         description={t('history.description')}
         action={
-          <button className="button primary" onClick={onAdd} disabled={!cars.length}>
-            <Plus size={18} />
-            {t('shared.logService')}
-          </button>
+          activeCars.length ? (
+            <button className="button primary" onClick={onAdd}>
+              <Plus size={18} />
+              {t('shared.logService')}
+            </button>
+          ) : (
+            <button className="button primary" onClick={onAddCar}>
+              <Plus size={18} />
+              {t('shared.addCar')}
+            </button>
+          )
         }
       />
       <div className="panel table-panel">

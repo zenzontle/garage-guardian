@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NextIntlClientProvider } from 'next-intl';
 import { expect, it, vi } from 'vitest';
@@ -28,6 +28,18 @@ function renderModal(props: Partial<Parameters<typeof FuelModal>[0]> = {}) {
   return { onSave };
 }
 const field = (label: string) => screen.getByLabelText(label) as HTMLInputElement;
+
+it('defaults a new fill-up to an active car and never to an archived one', () => {
+  const archived = { ...car, id: 'archived', name: 'Archived car', isArchived: true };
+  renderModal({ cars: [archived, { ...car, id: 'active', name: 'Active car' }] });
+  const selector = screen.getByRole('combobox', { name: 'Vehicle' }) as HTMLSelectElement;
+  expect(selector.value).toBe('active');
+  cleanup();
+  renderModal({ cars: [archived] });
+  const unchosen = screen.getByRole('combobox', { name: 'Vehicle' }) as HTMLSelectElement;
+  expect(unchosen.value).toBe('');
+  expect(unchosen.selectedOptions[0].text).toBe('Choose vehicle');
+});
 
 it('calculates the total from volume and price, and lets a typed total stand', () => {
   renderModal();

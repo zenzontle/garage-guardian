@@ -20,6 +20,7 @@ export function FuelPage({
   carId,
   onCarChange,
   onAdd,
+  onAddCar,
   onEdit,
   onDelete,
 }: {
@@ -29,11 +30,13 @@ export function FuelPage({
   carId: string;
   onCarChange: (carId: string) => void;
   onAdd: () => void;
+  onAddCar: () => void;
   onEdit: (entry: FuelEntry) => void;
   onDelete: (entry: FuelEntry) => void;
 }) {
   const t = useTranslations();
   const fuel = useFuelDisplay();
+  const activeCars = cars.filter((car) => !car.isArchived);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   function toggle(id: string) {
     setExpanded((previous) => {
@@ -68,10 +71,17 @@ export function FuelPage({
         title={t('navigation.fuel')}
         description={t('fuel.description')}
         action={
-          <button className="button primary tone-fuel" onClick={onAdd} disabled={!cars.length}>
-            <Plus size={18} />
-            {t('fuel.log')}
-          </button>
+          activeCars.length ? (
+            <button className="button primary tone-fuel" onClick={onAdd}>
+              <Plus size={18} />
+              {t('fuel.log')}
+            </button>
+          ) : (
+            <button className="button primary" onClick={onAddCar}>
+              <Plus size={18} />
+              {t('shared.addCar')}
+            </button>
+          )
         }
       />
       {averageCars.length > 0 && (
