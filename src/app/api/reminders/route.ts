@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { reminderOrigin } from '@/lib/reminders/email';
 import { runReminders } from '@/lib/reminders/worker';
+import { cronAuthorized } from '@/lib/utils/cron-secret';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,8 +11,7 @@ export const maxDuration = 60;
 export async function GET(request: NextRequest) {
   const reply = (body: object, status = 200) =>
     NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`)
+  if (!cronAuthorized(request.headers.get('authorization'), process.env.CRON_SECRET))
     return reply({ error: { code: 'unauthorized' } }, 401);
   if (process.env.REMINDERS_ENABLED !== 'true') return reply({ status: 'email_disabled' });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

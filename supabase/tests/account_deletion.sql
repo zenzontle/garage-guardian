@@ -1,4 +1,4 @@
--- Run as postgres/admin after migration 0013. All fixtures roll back.
+-- Run as postgres/admin after migration 0014. All fixtures roll back.
 begin;
 insert into auth.users (id) values
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1'),

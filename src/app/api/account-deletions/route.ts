@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { runAccountDeletions } from '@/lib/account/account-deletion';
+import { cronAuthorized } from '@/lib/utils/cron-secret';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,8 +12,7 @@ export const maxDuration = 60;
 export async function GET(request: NextRequest) {
   const reply = (body: object, status = 200) =>
     NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
-  const secret = process.env.CRON_SECRET;
-  if (!secret || request.headers.get('authorization') !== `Bearer ${secret}`)
+  if (!cronAuthorized(request.headers.get('authorization'), process.env.CRON_SECRET))
     return reply({ error: { code: 'unauthorized' } }, 401);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SECRET_KEY;

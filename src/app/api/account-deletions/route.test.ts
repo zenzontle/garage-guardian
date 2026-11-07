@@ -21,6 +21,8 @@ const request = (authorization = 'Bearer secret') =>
 
 it('rejects unauthenticated cron calls before creating a client', async () => {
   expect((await GET(request('wrong'))).status).toBe(401);
+  // Same length as the real header, so only the constant-time comparison rejects it.
+  expect((await GET(request('Bearer secreT'))).status).toBe(401);
   vi.stubEnv('CRON_SECRET', '');
   expect((await GET(request('Bearer '))).status).toBe(401);
   expect(createClient).not.toHaveBeenCalled();

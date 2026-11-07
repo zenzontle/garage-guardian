@@ -34,7 +34,8 @@ Apply migrations in numeric order, each **before** deploying the application cod
 | `0010_multi_currency.sql`          | Garage settings, receipt currencies and conversions, and the conditional background-save function                      | `supabase/tests/multi_currency.sql`        | [Multi-currency](multi-currency.md#reporting-and-rollout)  |
 | `0011_archive_vehicles.sql`        | Vehicle archive state and a `save_car` function that cannot undo a concurrent archive/restore                          | `supabase/tests/archive_vehicles.sql`      | [Vehicles](vehicles.md#archiving)                          |
 | `0012_fuel_entries.sql`            | Owner-scoped fill-ups, and first due baselines that also count fill-up odometers                                       | `supabase/tests/fuel_entries.sql`          | [Fuel log](fuel.md#deployment)                             |
-| `0013_account_deletion.sql`        | Server-only account deletion queue, its claim and photo-listing functions, and upload blocks for deleted accounts      | `supabase/tests/account_deletion.sql`      | [Account deletion](account-management.md#account-deletion) |
+| `0013_jpeg_photos.sql`             | JPEG photos in the photo bucket, for browsers such as Safari that cannot encode WebP                                   | `supabase/tests/jpeg_photos.sql`           |                                                            |
+| `0014_account_deletion.sql`        | Server-only account deletion queue, its claim and photo-listing functions, and upload blocks for deleted accounts      | `supabase/tests/account_deletion.sql`      | [Account deletion](account-management.md#account-deletion) |
 
 Shipped migrations are never edited; schema changes go in a new numbered file.
 
@@ -67,4 +68,4 @@ Vercel Speed Insights is also included in the root layout to measure performance
 
 ## Free-tier limits
 
-No paid plan or automatic upgrade is required. Free service quotas and Supabase inactivity pausing can delay an email or make the prototype temporarily unavailable. Check provider usage and export records regularly. The free photo bucket is limited to 1 GB; each visit accepts up to three resized photos of at most 2 MB each.
+No paid plan or automatic upgrade is required. Free service quotas and Supabase inactivity pausing can delay an email or make the prototype temporarily unavailable. Check provider usage and export records regularly. The free photo bucket is limited to 1 GB; each visit accepts up to three resized photos of at most 2 MB each. Photos are resized to at most 1,800 pixels on the long edge and saved as WebP, or as JPEG in browsers such as Safari that cannot encode WebP.
