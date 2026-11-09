@@ -128,7 +128,8 @@ it.each(['account', 'security'] as const)(
     const currentEmail = en.account.currentEmail.replace('{email}', account().email!);
     await screen.findByText(currentEmail);
     expect(testRouter.url).toBe(`/settings/${section}`);
-    expect(screen.queryAllByRole('form')).toHaveLength(section === 'account' ? 0 : 2);
+    // Security has the email, password, and account deletion forms.
+    expect(screen.queryAllByRole('form')).toHaveLength(section === 'account' ? 0 : 3);
     await user.click(screen.getByRole('button', { name: en.account.openMenu }));
     await user.click(screen.getByRole('button', { name: en.account.signOut }));
     await waitFor(() => expect(screen.queryByText(currentEmail)).toBeNull());

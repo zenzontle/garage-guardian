@@ -31,6 +31,10 @@ export class OfflineReceipts {
   withLock<T>(action: () => Promise<T>): Promise<T> {
     return withNamedLock(this.key, action);
   }
+  // Removes this browser's cached copy and unsynced receipts, e.g. after account deletion.
+  async clear() {
+    await this.withLock(() => del(this.key));
+  }
   async rememberVisit(visit: Visit) {
     await update<CachedGarage | undefined>(this.key, (current) => {
       if (!current) return current;

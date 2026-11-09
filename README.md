@@ -8,7 +8,7 @@ A private, responsive car maintenance tracker. Record multiple cars and service 
 - **Maintenance schedules** driven by repeat intervals, with persisted first due points. See [maintenance schedules](docs/maintenance-schedules.md).
 - **Fuel log** with per-fill-up gallons or liters, fuel economy (MPG or L/100 km), and fill-up odometers that keep distance reminders current. See [fuel log](docs/fuel.md).
 - **Receipts** in USD, MXN, or CAD, with home-currency reports and offline receipt retry. See [multi-currency](docs/multi-currency.md).
-- **Guest mode and accounts**: use everything without signing in, then transfer to a private cloud account on signup. See [deployment](docs/deployment.md#guest-data-and-signup) and [account management](docs/account-management.md).
+- **Guest mode and accounts**: use everything without signing in, then transfer to a private cloud account on signup. Accounts can be permanently deleted with all of their data. See [deployment](docs/deployment.md#guest-data-and-signup) and [account management](docs/account-management.md).
 - **Weekly email reminders** (opt-in) alongside in-app due reminders. See [account reminders](docs/account-reminders.md).
 - **English and Spanish** throughout. See [languages](docs/languages.md).
 - **Protected forms**: forms protect unsaved work, uploads report their current stage, and saves/deletes provide accessible confirmations. See [interaction states](docs/interaction-states.md).
