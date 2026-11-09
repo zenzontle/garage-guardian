@@ -40,6 +40,7 @@
     "resendCooldown": "Wait 60 seconds before requesting another confirmation email.",
     "sessionRevocation": "Your password was updated, but sessions could not be revoked. Retry to finish, or sign in with your new password.",
     "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying.",
+    "accountLimiterUnavailable": "Account changes are temporarily unavailable. Try again later.",
     "notificationInput": "Check your reminder preferences and try again.",
     "notificationSave": "Could not load or save reminder preferences. Try again.",
     "archive": "Could not change vehicle archive status. Try again; cloud changes require an online save.",
@@ -108,6 +109,9 @@
   },
   "account": {
     "signOut": "Sign out",
+    "signOutUnsyncedTitle": "Sign out and delete unsynced receipts?",
+    "signOutUnsyncedDescription": "{count, plural, one {# receipt saved on this device has not synced to your account yet.} other {# receipts saved on this device have not synced to your account yet.}} Signing out removes your garage from this device, including {count, plural, one {that receipt} other {those receipts}}. Stay signed in and reconnect to sync {count, plural, one {it} other {them}} first.",
+    "signOutDiscard": "Sign out and delete",
     "signIn": "Sign in",
     "create": "Create account",
     "createTitle": "Create your account",

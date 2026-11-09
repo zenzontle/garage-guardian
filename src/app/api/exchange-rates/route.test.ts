@@ -25,7 +25,7 @@ it.each(CURRENCIES.flatMap((base) => CURRENCIES.map((target) => [base, target] a
       );
       expect(fetcher.mock.calls[0][1]).toMatchObject({
         redirect: 'error',
-        next: { revalidate: 86400 },
+        next: { revalidate: 2592000 },
       });
     }
   },
@@ -34,6 +34,8 @@ it.each([
   'base=EUR&target=USD&date=2024-06-08',
   'base=USD&target=CAD&date=2024-02-30',
   'base=USD&target=CAD&date=2999-01-01',
+  'base=USD&target=CAD&date=1999-01-03',
+  'base=MXN&target=USD&date=1900-01-01',
   'base=USD&target=CAD&date=2024-06-08&amount=20',
   'base=USD&base=MXN&target=CAD&date=2024-06-08',
 ])('rejects invalid or extra inputs: %s', async (query) => {
@@ -67,7 +69,7 @@ it.each(['missing', 'offline', 'timeout'])(
     if (failure === 'missing') fetcher.mockResolvedValue(new Response(null, { status: 404 }));
     else fetcher.mockRejectedValue(new Error(failure));
     vi.stubGlobal('fetch', fetcher);
-    const response = await GET(request('base=MXN&target=USD&date=1900-01-01'));
+    const response = await GET(request('base=MXN&target=USD&date=1999-01-04'));
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: { code: 'rateUnavailable' } });
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -92,4 +94,32 @@ it('accepts a local today that is already tomorrow in UTC', async () => {
   } finally {
     vi.useRealTimers();
   }
+});
+it.each([
+  { date: '2024-06-12', revalidate: 3600 },
+  { date: '2024-06-11', revalidate: 86400 },
+  { date: '2024-06-05', revalidate: 86400 },
+  { date: '2024-06-04', revalidate: 2592000 },
+  { date: '1999-01-04', revalidate: 2592000 },
+])('caches the $date rate for $revalidate seconds', async ({ date, revalidate }) => {
+  vi.useFakeTimers({ now: new Date('2024-06-12T12:00:00Z') });
+  const fetcher = vi
+    .fn()
+    .mockResolvedValue(Response.json({ base: 'USD', quote: 'CAD', date, rate: 1.25 }));
+  vi.stubGlobal('fetch', fetcher);
+  try {
+    const response = await GET(request(`base=USD&target=CAD&date=${date}`));
+    expect(response.status).toBe(200);
+    expect(fetcher.mock.calls[0][1]).toMatchObject({ next: { revalidate } });
+    expect(response.headers.get('Cache-Control')).toBe(`public, max-age=${revalidate}`);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it('keeps same-currency receipts before ECB data at a rate of 1', async () => {
+  const fetcher = vi.fn();
+  vi.stubGlobal('fetch', fetcher);
+  const response = await GET(request('base=USD&target=USD&date=1995-03-01'));
+  expect(await response.json()).toEqual({ rate: 1, rateDate: '1995-03-01' });
+  expect(fetcher).not.toHaveBeenCalled();
 });

@@ -21,6 +21,7 @@ import { GarageTopbar } from './garage-topbar';
 import { GarageMobileNavigation } from './garage-mobile-navigation';
 import { AccountSettingsDialog } from '../account/account-settings-dialog';
 import { AccountRecoveryScreen } from '../account/account-recovery-screen';
+import { SignOutDialog } from '../account/sign-out-dialog';
 import { useInteractions } from '../interaction/interaction-provider';
 
 export function GarageContent({ children }: { children: ReactNode }) {
@@ -114,11 +115,19 @@ export function GarageContent({ children }: { children: ReactNode }) {
     modal?.kind === 'account' && user ? (
       <AccountSettingsDialog key={`account:${user.id}`} section={modal.section} />
     ) : null;
+  const signOutDialog = garage.signOutPrompt && (
+    <SignOutDialog
+      count={garage.signOutPrompt.length}
+      onCancel={garage.cancelSignOut}
+      onConfirm={garage.confirmSignOut}
+    />
+  );
   if (loading || !repository)
     return (
       <>
         {reporter}
         {settings}
+        {signOutDialog}
         <div className="auth-page">
           <div className="auth-card">
             {!loading && <LocaleSelector />}
@@ -282,6 +291,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
 
         <GarageMobileNavigation page={page} />
         {settings}
+        {signOutDialog}
 
         {modal?.kind === 'car' && (
           <CarModal

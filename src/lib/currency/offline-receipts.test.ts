@@ -4,6 +4,7 @@ import { SupabaseRepository } from '../garage/repository';
 import { account, fakeSupabase } from '@/test/fake-supabase';
 import { car, visit } from '@/test/fixtures';
 import { receiptInputs, type Currency } from './currency';
+import { OfflineReceipts } from './offline-receipts';
 
 beforeEach(async () => clear());
 it('loads fresh cloud data despite a deleted-vehicle conflict, syncs other receipts, and allows discard', async () => {
@@ -179,4 +180,27 @@ it('serializes a delayed outbox flush with deletes across repository instances',
   release();
   await Promise.all([flushing, deleting]);
   expect((await repository.load()).visits).toEqual([]);
+});
+it('forgets the account garage on request, but only with approval for unsynced receipts', async () => {
+  const cloud = fakeSupabase();
+  cloud.emit(account());
+  const repository = new SupabaseRepository(cloud.client, account().id, true);
+  const offline = new OfflineReceipts(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '', account().id);
+  await repository.saveCar(car);
+  await repository.load();
+  expect(await offline.read()).toBeDefined();
+  cloud.execute.mockRejectedValue(new TypeError('Failed to fetch'));
+  await repository.saveVisit(visit);
+  const second = { ...visit, id: 'second-visit' };
+  await repository.saveVisit(second);
+  expect(await offline.pendingIds()).toEqual([visit.id, second.id]);
+  // Unapproved, or only partly approved, receipts keep the whole cache.
+  expect(await offline.discard([])).toBe(false);
+  expect(await offline.discard([visit.id])).toBe(false);
+  expect(await offline.pendingIds()).toEqual([visit.id, second.id]);
+  expect(await offline.discard([visit.id, second.id])).toBe(true);
+  expect(await offline.read()).toBeUndefined();
+  // Nothing pending: no approval is needed.
+  const other = new OfflineReceipts(process.env.NEXT_PUBLIC_SUPABASE_URL ?? '', 'other-account');
+  expect(await other.discard([])).toBe(true);
 });

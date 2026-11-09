@@ -54,9 +54,12 @@ function useGarageState() {
   const [notice, setNotice] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountEmail, setAccountEmail] = useState('');
+  // Unsynced receipt IDs awaiting the owner's decision before sign-out.
+  const [signOutPrompt, setSignOutPrompt] = useState<string[] | null>(null);
   const identity = garage.user?.id;
   useEffect(() => {
     interactions?.clear();
+    setSignOutPrompt(null);
   }, [identity, garage.recovering, interactions]);
 
   useEffect(() => {
@@ -120,10 +123,21 @@ function useGarageState() {
     signOut: (onStarted?: () => void) => {
       const action = () => {
         onStarted?.();
-        void garage.signOut();
+        void garage.unsyncedReceipts().then((unsynced) => {
+          // Sign-out deletes the device copy, so unsynced receipts need explicit consent.
+          if (unsynced.length) setSignOutPrompt(unsynced);
+          else void garage.signOut();
+        });
       };
       if (interactions) interactions.request(action);
       else action();
+    },
+    signOutPrompt,
+    cancelSignOut: () => setSignOutPrompt(null),
+    confirmSignOut: () => {
+      if (!signOutPrompt) return;
+      setSignOutPrompt(null);
+      void garage.signOut('global', signOutPrompt);
     },
   };
 }

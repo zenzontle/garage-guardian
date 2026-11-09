@@ -910,3 +910,58 @@ it('ignores an in-flight refresh from an account that has signed out', async () 
   expect(hook.result.current.snapshot.cars).toEqual([car]);
   expect(hook.result.current.refreshError).toBeNull();
 });
+
+describe('signing out of a shared device', () => {
+  const cacheKey = () => `garage-guardian:account-receipts:v1:${project}:${account().id}`;
+  async function signedInWithReceipt(online: boolean) {
+    cloud.emit(account());
+    const hook = await openGarage();
+    await act(async () => {
+      await hook.result.current.run(() => hook.result.current.repository!.saveCar(car));
+    });
+    expect(await get(cacheKey())).toBeDefined();
+    const execute = cloud.execute.getMockImplementation()!;
+    if (!online) cloud.execute.mockRejectedValue(new TypeError('Failed to fetch'));
+    await act(async () => {
+      await hook.result.current.repository!.saveVisit(visit);
+    });
+    cloud.execute.mockImplementation(execute);
+    return hook;
+  }
+
+  it('removes the cached account garage', async () => {
+    const hook = await signedInWithReceipt(true);
+    expect(await hook.result.current.unsyncedReceipts()).toEqual([]);
+    await act(async () => {
+      expect(await hook.result.current.signOut()).toBe(true);
+    });
+    expect(hook.result.current.user).toBeNull();
+    expect(await get(cacheKey())).toBeUndefined();
+  });
+
+  it('keeps unsynced receipts unless the owner approved removing them', async () => {
+    const hook = await signedInWithReceipt(false);
+    expect(await hook.result.current.unsyncedReceipts()).toEqual([visit.id]);
+    await act(async () => {
+      expect(await hook.result.current.signOut()).toBe(true);
+    });
+    expect((await get<{ pending: unknown[] }>(cacheKey()))?.pending).toHaveLength(1);
+  });
+
+  it('removes unsynced receipts the owner approved', async () => {
+    const hook = await signedInWithReceipt(false);
+    await act(async () => {
+      expect(await hook.result.current.signOut('global', [visit.id])).toBe(true);
+    });
+    expect(await get(cacheKey())).toBeUndefined();
+  });
+
+  it('keeps the cache when sign-out fails', async () => {
+    const hook = await signedInWithReceipt(true);
+    cloud.auth.signOut.mockResolvedValueOnce({ error: new Error('Sign-out failed') });
+    await act(async () => {
+      expect(await hook.result.current.signOut()).toBe(false);
+    });
+    expect(await get(cacheKey())).toBeDefined();
+  });
+});

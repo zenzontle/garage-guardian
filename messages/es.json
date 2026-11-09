@@ -40,6 +40,7 @@
     "resendCooldown": "Espera 60 segundos antes de solicitar otro correo de confirmación.",
     "sessionRevocation": "Tu contraseña se actualizó, pero no se pudieron revocar las sesiones. Reintenta para terminar o inicia sesión con la nueva contraseña.",
     "accountSessionCleanup": "Es posible que la solicitud se haya completado, pero no se pudo cerrar la sesión temporal de verificación. Comprueba tu cuenta antes de reintentar.",
+    "accountLimiterUnavailable": "Los cambios de cuenta no están disponibles temporalmente. Inténtalo más tarde.",
     "notificationInput": "Revisa tus preferencias de recordatorios e inténtalo de nuevo.",
     "notificationSave": "No se pudieron cargar o guardar las preferencias de recordatorios. Inténtalo de nuevo.",
     "archive": "No se pudo cambiar el estado del vehículo. Inténtalo de nuevo; los cambios en la nube requieren conexión.",
@@ -108,6 +109,9 @@
   },
   "account": {
     "signOut": "Cerrar sesión",
+    "signOutUnsyncedTitle": "¿Cerrar sesión y eliminar los recibos sin sincronizar?",
+    "signOutUnsyncedDescription": "{count, plural, one {# recibo guardado en este dispositivo aún no se ha sincronizado con tu cuenta.} other {# recibos guardados en este dispositivo aún no se han sincronizado con tu cuenta.}} Al cerrar sesión se elimina tu garaje de este dispositivo, {count, plural, one {incluido ese recibo} other {incluidos esos recibos}}. Mantén la sesión abierta y vuelve a conectarte para {count, plural, one {sincronizarlo} other {sincronizarlos}} primero.",
+    "signOutDiscard": "Cerrar sesión y eliminar",
     "signIn": "Iniciar sesión",
     "create": "Crear cuenta",
     "createTitle": "Crea tu cuenta",

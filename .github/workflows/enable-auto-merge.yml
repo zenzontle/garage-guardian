@@ -31,7 +31,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          sensitive=$(gh pr diff "$PR_URL" --name-only | grep -E '^(\.github/|REVIEW\.md$|supabase/|src/app/api/|vercel\.json$|src/lib/account/|src/app/\(garage\)/auth/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)' || true)
+          sensitive=$(gh pr diff "$PR_URL" --name-only | grep -E '^(\.github/|REVIEW\.md$|\.claude/commands/pr-review\.|\.claude/settings\.json$|\.claude/hooks/|supabase/|src/app/api/|vercel\.json$|src/lib/account/|src/app/\(garage\)/auth/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)' || true)
           if [ -n "$sensitive" ]; then
             echo "Sensitive paths changed; a human must merge this PR:"
             echo "$sensitive"

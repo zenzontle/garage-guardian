@@ -27,6 +27,7 @@ import {
   updateRecoveryPassword,
   withAccountLock,
 } from '../account/account-session';
+import { OfflineReceipts } from '../currency/offline-receipts';
 import en from '../../../messages/en.json';
 
 export type MutationResult = { refreshed: boolean };
@@ -354,9 +355,24 @@ export function useGarageSession() {
     transition.current(data.user, wasRecovering);
   }
 
-  async function signOut(scope: 'global' | 'local' = 'global') {
+  // Receipts saved on this device that the signed-in account does not have yet.
+  async function unsyncedReceipts(): Promise<string[]> {
+    const userId = currentUser.current?.id;
+    if (!supabase || !userId) return [];
+    try {
+      return await new OfflineReceipts(project, userId).pendingIds();
+    } catch (cause) {
+      // Sign-out still keeps any receipts it cannot confirm were approved for removal.
+      recordDiagnostic(cause);
+      return [];
+    }
+  }
+
+  // discardUnsynced lists the unsynced receipt IDs the owner agreed to remove.
+  async function signOut(scope: 'global' | 'local' = 'global', discardUnsynced: string[] = []) {
     if (!supabase) return true;
     if (accountLock.current) return false;
+    const userId = currentUser.current?.id;
     try {
       const { error } = await withAccountLock(supabase, () => supabase!.auth.signOut({ scope }));
       if (error) {
@@ -364,6 +380,11 @@ export function useGarageSession() {
         return false;
       }
       transition.current(null);
+      // Do not leave the account's garage readable on a shared device.
+      if (userId)
+        await new OfflineReceipts(project, userId)
+          .discard(discardUnsynced)
+          .catch((cause: unknown) => recordDiagnostic(cause));
       return true;
     } catch {
       setError({ code: 'auth' });
@@ -544,6 +565,7 @@ export function useGarageSession() {
     signUp,
     signIn,
     signOut,
+    unsyncedReceipts,
     recovering,
     accountBusy,
     accountNotice,

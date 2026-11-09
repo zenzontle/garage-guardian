@@ -45,13 +45,31 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Third-party plugin code runs in this job (skills, and any hooks it declares) next to
+      # the OAuth token and the merge gate, so install a reviewed commit, never a branch.
+      # The upstream marketplace points its plugin at the default branch, so it is
+      # redirected to this checkout. Review the diff before changing AGENT_SKILLS_SHA.
+      - name: Fetch pinned review skills
+        env:
+          AGENT_SKILLS_SHA: 301b02b12bff98e4688e6984af6556802322bbde
+          SKILLS_DIR: ${{ runner.temp }}/agent-skills
+        run: |
+          git init -q "$SKILLS_DIR"
+          git -C "$SKILLS_DIR" fetch -q --depth 1 https://github.com/addyosmani/agent-skills.git "$AGENT_SKILLS_SHA"
+          git -C "$SKILLS_DIR" checkout -q --detach FETCH_HEAD
+          test "$(git -C "$SKILLS_DIR" rev-parse HEAD)" = "$AGENT_SKILLS_SHA"
+          manifest="$SKILLS_DIR/.claude-plugin/marketplace.json"
+          jq -e '.name == "addy-agent-skills" and any(.plugins[]; .name == "agent-skills")' "$manifest" > /dev/null
+          jq '.plugins |= map(select(.name == "agent-skills") | .source = "./")' "$manifest" > "$manifest.pinned"
+          mv "$manifest.pinned" "$manifest"
+
       - name: Run Claude Code Review
         id: claude-review
         uses: anthropics/claude-code-action@8041f1d17e0e7d2f2cfe35002962e9f26237c0bb
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           plugin_marketplaces: |
-            https://github.com/addyosmani/agent-skills.git
+            ${{ runner.temp }}/agent-skills
           plugins: |
             agent-skills@addy-agent-skills
           # /pr-review is the repo's copy of the code-review plugin's command
