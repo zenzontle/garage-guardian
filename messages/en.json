@@ -111,7 +111,7 @@
   "account": {
     "signOut": "Sign out",
     "signOutUnsyncedTitle": "Sign out and delete unsynced receipts?",
-    "signOutUnsyncedDescription": "{count, plural, one {# receipt saved on this device has not synced to your account yet.} other {# receipts saved on this device have not synced to your account yet.}} Signing out removes your garage from this device, including {count, plural, one {that receipt} other {those receipts}}. Cancel to keep {count, plural, one {it} other {them}} on this device.",
+    "signOutUnsyncedDescription": "{count, plural, one {# receipt saved on this device has not synced to your account yet.} other {# receipts saved on this device have not synced to your account yet.}} Signing out removes your garage from this device, including {count, plural, one {that receipt} other {those receipts}}. Cancel to keep {count, plural, one {that receipt} other {those receipts}} on this device.",
     "signOutDiscard": "Sign out and delete",
     "signIn": "Sign in",
     "create": "Create account",

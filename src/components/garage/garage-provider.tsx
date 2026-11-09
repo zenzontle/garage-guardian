@@ -127,13 +127,20 @@ function useGarageState() {
     setAccountEmail,
     perform,
     signOut: (onStarted?: () => void) => {
-      onStarted?.();
       // Sign-out deletes the device copy, so unsynced receipts need explicit consent.
-      // Ask before the unsaved-changes guard, so cancelling here keeps any open draft.
-      void garage.unsyncedReceipts().then((unsynced) => {
-        if (unsynced.length) setSignOutPrompt(unsynced);
-        else guardedSignOut([]);
-      });
+      const askAboutReceipts = () => {
+        onStarted?.();
+        void garage.unsyncedReceipts().then((unsynced) => {
+          if (unsynced.length) setSignOutPrompt(unsynced);
+          else void garage.signOut();
+        });
+      };
+      // Receipts already known to be waiting are asked about before the unsaved-changes
+      // guard, so cancelling keeps an open draft. Otherwise the guard opens at once and
+      // "Keep editing" returns focus to the sign-out button.
+      if ((garage.snapshot.pendingSyncCount ?? 0) > 0) askAboutReceipts();
+      else if (interactions) interactions.request(askAboutReceipts);
+      else askAboutReceipts();
     },
     signOutPrompt,
     cancelSignOut: () => setSignOutPrompt(null),

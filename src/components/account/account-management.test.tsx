@@ -147,7 +147,8 @@ describe.each([
     await user.click(screen.getByRole('button', { name: copy.account.signOut }));
     await waitFor(() => expect(cloud.auth.signOut).toHaveBeenCalled());
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(screen.getByRole('button', { name: copy.account.openMenu })).toBeDefined();
+    // Sign-out first checks this device for unsynced receipts, then reopens as a guest.
+    expect(await screen.findByRole('button', { name: copy.account.openMenu })).toBeDefined();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
