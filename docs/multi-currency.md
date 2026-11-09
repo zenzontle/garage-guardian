@@ -22,6 +22,8 @@ After an authenticated garage has loaded online, receipts can be saved on that d
 
 Receipt flushes, edits, deletes, and background conversions share an account-scoped operation lock, using Web Locks across tabs where available. Queued manual intent is merged into subsequent unrelated edits. Signup transfer uses an online-only repository so a cached record cannot falsely satisfy cloud verification. IndexedDB storage must remain available for device-only work; clearing site data removes unsynced receipts.
 
+Signing out from the account menu deletes this account's cached garage from the device, so it is not left readable on a shared computer. When receipts have not synced, including ones that cannot sync because their vehicle was deleted, sign-out first asks for confirmation; cancelling keeps them and any open draft. Only the receipts the owner approved are removed: one queued afterwards, in this or another tab, keeps the whole cache. A failed sign-out keeps the cache. Another tab that is still loading can write a fresh copy back after sign-out; signing out there as well removes it.
+
 If an outbox receipt's vehicle was deleted on another device, its foreign-key conflict does not block loading fresh garage data or syncing other receipts. The receipt and its saved conversions remain on the device. A conflict notice links to service history, where receipts for deleted vehicles appear under “Unknown car” and can be discarded using the existing delete action. Connectivity failures still use the cached garage, and authorization failures remain errors.
 
 ## Reporting and rollout

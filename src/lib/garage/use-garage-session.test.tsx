@@ -965,3 +965,29 @@ describe('signing out of a shared device', () => {
     expect(await get(cacheKey())).toBeDefined();
   });
 });
+
+it.each([
+  { retryAfter: '86000', error: { code: 'accountRateLimited', values: { minutes: 1434 } } },
+  { retryAfter: null, error: { code: 'rateLimited' } },
+])('reports how long an account change is limited (Retry-After $retryAfter)', async (limit) => {
+  cloud.emit(account());
+  const hook = await openGarage();
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify({ error: { code: 'rateLimited' } }), {
+          status: 429,
+          headers: limit.retryAfter ? { 'Retry-After': limit.retryAfter } : {},
+        }),
+    ),
+  );
+  let failure: unknown;
+  await act(async () => {
+    failure = await hook.result.current
+      .changePassword('password', 'new-password', 'new-password')
+      .catch((cause: unknown) => cause);
+  });
+  expect(failure).toMatchObject(limit.error);
+  vi.unstubAllGlobals();
+});

@@ -97,6 +97,12 @@ function useGarageState() {
     [garage.snapshot.fuelEntries],
   );
 
+  function guardedSignOut(approvedUnsynced: string[]) {
+    const action = () => void garage.signOut('global', approvedUnsynced);
+    if (interactions) interactions.request(action);
+    else action();
+  }
+
   async function perform(action: () => Promise<void>) {
     const result = await garage.run(action);
     setModal(null);
@@ -121,23 +127,20 @@ function useGarageState() {
     setAccountEmail,
     perform,
     signOut: (onStarted?: () => void) => {
-      const action = () => {
-        onStarted?.();
-        void garage.unsyncedReceipts().then((unsynced) => {
-          // Sign-out deletes the device copy, so unsynced receipts need explicit consent.
-          if (unsynced.length) setSignOutPrompt(unsynced);
-          else void garage.signOut();
-        });
-      };
-      if (interactions) interactions.request(action);
-      else action();
+      onStarted?.();
+      // Sign-out deletes the device copy, so unsynced receipts need explicit consent.
+      // Ask before the unsaved-changes guard, so cancelling here keeps any open draft.
+      void garage.unsyncedReceipts().then((unsynced) => {
+        if (unsynced.length) setSignOutPrompt(unsynced);
+        else guardedSignOut([]);
+      });
     },
     signOutPrompt,
     cancelSignOut: () => setSignOutPrompt(null),
     confirmSignOut: () => {
       if (!signOutPrompt) return;
       setSignOutPrompt(null);
-      void garage.signOut('global', signOutPrompt);
+      guardedSignOut(signOutPrompt);
     },
   };
 }

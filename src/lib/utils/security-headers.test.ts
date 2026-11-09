@@ -45,6 +45,11 @@ describe('security headers', () => {
     ).toThrow();
     expect(
       directives(
+        contentSecurityPolicy({ supabaseUrl: 'http://127.0.0.1:54321', development: false }),
+      )['connect-src'],
+    ).toContain('http://127.0.0.1:54321');
+    expect(
+      directives(
         contentSecurityPolicy({ supabaseUrl: 'http://127.0.0.1:54321', development: true }),
       )['connect-src'],
     ).toContain('http://127.0.0.1:54321');

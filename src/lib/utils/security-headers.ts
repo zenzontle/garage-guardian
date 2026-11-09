@@ -12,7 +12,9 @@ export function contentSecurityPolicy({
   let supabase: string[] = [];
   if (supabaseUrl) {
     const url = new URL(supabaseUrl);
-    if (url.protocol !== 'https:' && !development)
+    const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    // A local Supabase stack runs over HTTP; any other cloud project must use HTTPS.
+    if (url.protocol !== 'https:' && !development && !loopback)
       throw new Error('NEXT_PUBLIC_SUPABASE_URL must use HTTPS');
     supabase = [url.origin];
   }
