@@ -40,6 +40,9 @@
     "resendCooldown": "Wait 60 seconds before requesting another confirmation email.",
     "sessionRevocation": "Your password was updated, but sessions could not be revoked. Retry to finish, or sign in with your new password.",
     "accountSessionCleanup": "The request may have completed, but the temporary verification session could not be closed. Check your account before retrying.",
+    "accountDeletionUnavailable": "Account deletion is not available on this deployment.",
+    "accountDeletion": "Could not request account deletion. Nothing was deleted. Try again.",
+    "accountDeletionPending": "This account is being deleted and can no longer sign in.",
     "notificationInput": "Check your reminder preferences and try again.",
     "notificationSave": "Could not load or save reminder preferences. Try again.",
     "archive": "Could not change vehicle archive status. Try again; cloud changes require an online save.",
@@ -148,7 +151,13 @@
     "cooldown": "You can resend in {seconds} seconds.",
     "passwordChanged": "Your password was changed. Sign in with your new password. Refresh sessions have been revoked; existing access tokens may remain valid until they expire.",
     "transferBlocked": "Finish your signup transfer before changing your account.",
-    "requestAnother": "Request another recovery email"
+    "requestAnother": "Request another recovery email",
+    "deleteAccount": "Delete account",
+    "deleteAccountDescription": "Permanently delete your account and everything stored in it: vehicles, maintenance schedules, service visits, fill-ups, receipts, photos, and notification and currency settings. Every device is signed out. This cannot be undone.",
+    "deleteAccountKeep": "To keep a copy, export your service history to CSV first. Guest records kept in this browser without an account are not affected.",
+    "deleteAccountConfirm": "I understand that my account and all of its data will be permanently deleted.",
+    "accountDeleted": "Your account and all of its data were deleted.",
+    "deletionScheduled": "Your account is scheduled for deletion. It can no longer sign in, and its remaining data will be removed within 24 hours."
   },
   "dashboard": {
     "overview": "OVERVIEW",

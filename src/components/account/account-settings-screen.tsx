@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { accountPath } from '@/lib/navigation/garage-routes';
 import { isCloudConfigured } from '@/lib/garage/repository';
 import { useGarage } from '../garage/garage-provider';
+import { AccountDeletionForm } from './account-deletion-form';
 import { AccountSettingsForm } from './account-settings-form';
 import { HomeCurrencyForm } from './home-currency-form';
 
@@ -29,6 +30,10 @@ export function AccountSettingsScreen({ section }: { section: 'account' | 'secur
                   headingLevel={2}
                 />
               ))}
+              <AccountDeletionForm
+                disabled={garage.accountBusy || garage.transferring || garage.loading}
+                headingLevel={2}
+              />
             </>
           )}
         </div>

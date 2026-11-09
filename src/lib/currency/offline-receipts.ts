@@ -1,6 +1,6 @@
 'use client';
 
-import { get, update } from 'idb-keyval';
+import { del, get, update } from 'idb-keyval';
 import { withNamedLock } from '../utils/named-lock';
 import { normalizeSnapshot, type FuelEntry, type Snapshot, type Visit } from '../garage/model';
 import { mergeConversions, receiptInputs, sameInputs, type Currency } from './currency';
@@ -30,6 +30,10 @@ export class OfflineReceipts {
   }
   withLock<T>(action: () => Promise<T>): Promise<T> {
     return withNamedLock(this.key, action);
+  }
+  // Removes this browser's cached copy and unsynced receipts, e.g. after account deletion.
+  async clear() {
+    await this.withLock(() => del(this.key));
   }
   async rememberVisit(visit: Visit) {
     await update<CachedGarage | undefined>(this.key, (current) => {

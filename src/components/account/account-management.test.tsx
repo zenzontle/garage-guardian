@@ -238,9 +238,11 @@ describe.each([
       ['H1', copy.account.security],
       ['H2', copy.account.changeEmail],
       ['H2', copy.account.changePassword],
+      ['H2', copy.account.deleteAccount],
     ]);
     const email = within(main).getByRole('form', { name: copy.account.changeEmail });
     const password = within(main).getByRole('form', { name: copy.account.changePassword });
+    const deletion = within(main).getByRole('form', { name: copy.account.deleteAccount });
     within(email).getByLabelText(copy.account.currentPassword).focus();
     for (const control of [
       within(email).getByLabelText(copy.account.newEmail),
@@ -249,6 +251,8 @@ describe.each([
       within(password).getByLabelText(copy.account.newPassword),
       within(password).getByLabelText(copy.account.confirmPassword),
       within(password).getByRole('button', { name: copy.account.changePassword }),
+      within(deletion).getByLabelText(copy.account.currentPassword),
+      within(deletion).getByRole('checkbox', { name: copy.account.deleteAccountConfirm }),
     ]) {
       await user.tab();
       expect(document.activeElement).toBe(control);
@@ -258,7 +262,7 @@ describe.each([
     expect(screen.queryByRole('form')).toBeNull();
     act(() => testRouter.forward());
     await screen.findByRole('heading', { name: copy.account.security });
-    expect(screen.getAllByRole('form')).toHaveLength(2);
+    expect(screen.getAllByRole('form')).toHaveLength(3);
   });
   it('preserves entered email through recovery/resend, announces generic copy, and enforces cooldown', async () => {
     localStorage.setItem('garage-guardian:locale', locale);
@@ -353,7 +357,10 @@ describe.each([
     await user.type(within(form).getByLabelText(copy.account.confirmPassword), 'mismatch');
     await user.click(within(form).getByRole('button', { name: copy.account.changePassword }));
     expect((await within(form).findByRole('alert')).textContent).toBe(copy.errors.passwordMismatch);
-    const last = within(dialog).getByRole('button', { name: copy.account.changePassword });
+    // Account deletion comes last, and its submit button stays disabled until confirmed.
+    const last = within(dialog).getByRole('checkbox', {
+      name: copy.account.deleteAccountConfirm,
+    });
     last.focus();
     await user.tab();
     expect(document.activeElement).toBe(
@@ -420,6 +427,67 @@ describe.each([
     expect((await cloud.auth.getSession()).data.session?.user.id).toBe('replacement');
     expect(cloud.auth.signOut).not.toHaveBeenCalled();
     expect(testRouter.url).toBe('/auth/recovery');
+  });
+  it.each([
+    ['accountDeleted', 200],
+    ['deletionScheduled', 202],
+  ] as const)(
+    'deletes the account after confirmation and reauthentication (%s)',
+    async (status, code) => {
+      localStorage.setItem('garage-guardian:locale', locale);
+      testRouter.reset('/settings/security');
+      cloud.emit(account());
+      const requests = vi.fn<(url: string, init?: RequestInit) => Promise<Response>>(async (url) =>
+        url === '/api/account'
+          ? Response.json({ status }, { status: code })
+          : Response.json({ enabled: false }),
+      );
+      vi.stubGlobal('fetch', requests);
+      const App = await loadGarageTestApp();
+      const user = userEvent.setup();
+      render(<App />);
+      const form = within(await screen.findByRole('form', { name: copy.account.deleteAccount }));
+      const submit = form.getByRole('button', { name: copy.account.deleteAccount });
+      await user.type(form.getByLabelText(copy.account.currentPassword), 'current-password');
+      // Nothing can be submitted until the permanent loss is acknowledged.
+      expect(submit).toHaveProperty('disabled', true);
+      await user.click(form.getByRole('checkbox', { name: copy.account.deleteAccountConfirm }));
+      await user.click(submit);
+      expect(await screen.findByText(copy.account[status])).toBeDefined();
+      const call = requests.mock.calls.find(([url]) => url === '/api/account');
+      expect(call?.[1]).toMatchObject({
+        method: 'DELETE',
+        body: JSON.stringify({ currentPassword: 'current-password' }),
+      });
+      expect(cloud.auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+      expect(testRouter.url).toBe('/');
+    },
+  );
+  it('keeps the account and the password draft when deletion is refused', async () => {
+    localStorage.setItem('garage-guardian:locale', locale);
+    testRouter.reset('/settings/security');
+    cloud.emit(account());
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) =>
+        url === '/api/account'
+          ? Response.json({ error: { code: 'currentPasswordIncorrect' } }, { status: 403 })
+          : Response.json({ enabled: false }),
+      ),
+    );
+    const App = await loadGarageTestApp();
+    const user = userEvent.setup();
+    render(<App />);
+    const form = within(await screen.findByRole('form', { name: copy.account.deleteAccount }));
+    await user.type(form.getByLabelText(copy.account.currentPassword), 'wrong-password');
+    await user.click(form.getByRole('checkbox', { name: copy.account.deleteAccountConfirm }));
+    await user.click(form.getByRole('button', { name: copy.account.deleteAccount }));
+    expect((await form.findByRole('alert')).textContent).toBe(copy.errors.currentPasswordIncorrect);
+    expect(cloud.auth.signOut).not.toHaveBeenCalled();
+    expect(testRouter.url).toBe('/settings/security');
+    expect((form.getByLabelText(copy.account.currentPassword) as HTMLInputElement).value).toBe(
+      'wrong-password',
+    );
   });
 });
 
