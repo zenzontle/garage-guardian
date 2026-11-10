@@ -7,6 +7,7 @@ import {
   type AccountDeletionStatus,
 } from '@/lib/account/account-contract';
 import { processAccountDeletion, requestAccountDeletion } from '@/lib/account/account-deletion';
+import { checkAccountLimit } from '@/lib/account/account-rate-limit';
 import type { ErrorCode } from '@/lib/utils/app-error';
 
 const authOptions = {
@@ -16,6 +17,7 @@ class AccountError extends Error {
   constructor(
     readonly code: ErrorCode,
     readonly status = 400,
+    readonly retryAfter?: number,
   ) {
     super(code);
   }
@@ -32,11 +34,17 @@ function providerError(error: { code?: string } | null): never {
   };
   throw new AccountError(codes[error?.code ?? ''] ?? 'auth', 400);
 }
-const response = (body: object, status = 200) =>
-  NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
+const response = (body: object, status = 200, retryAfter?: number) =>
+  NextResponse.json(body, {
+    status,
+    headers: {
+      'Cache-Control': 'no-store',
+      ...(retryAfter ? { 'Retry-After': String(retryAfter) } : {}),
+    },
+  });
 const failure = (cause: unknown) => {
   const error = cause instanceof AccountError ? cause : new AccountError('auth', 502);
-  return response({ error: { code: error.code } }, error.status);
+  return response({ error: { code: error.code } }, error.status, error.retryAfter);
 };
 
 async function bodyOf(request: Request) {
@@ -81,6 +89,11 @@ async function verifyCaller<Schema extends z.ZodType<{ currentPassword: string }
   const parsed = schema.safeParse(await bodyOf(request));
   if (!parsed.success) throw new AccountError('accountInput');
   const input = parsed.data as z.infer<Schema>;
+  // Every account change and deletion verifies the password from this server, where
+  // Supabase's per-IP sign-in limit sees Vercel's shared addresses, not the caller's.
+  const limit = await checkAccountLimit(request, caller.user.id);
+  if (limit.status === 'limited') throw new AccountError('rateLimited', 429, limit.retryAfter);
+  if (limit.status === 'unavailable') throw new AccountError('accountLimiterUnavailable', 503);
   const client = createClient(url, key, authOptions);
   verification.client = client;
   const { data, error } = await client.auth.signInWithPassword({

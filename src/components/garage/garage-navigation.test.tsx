@@ -3,9 +3,9 @@ import * as React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, expect, it, vi } from 'vitest';
-import { clear } from 'idb-keyval';
+import { clear, get, set } from 'idb-keyval';
 import { createClient } from '@supabase/supabase-js';
-import { car } from '../../test/fixtures';
+import { car, visit } from '../../test/fixtures';
 import { account, fakeSupabase } from '../../test/fake-supabase';
 import { accountPath, carPath } from '../../lib/navigation/garage-routes';
 import en from '../../../messages/en.json';
@@ -649,4 +649,55 @@ it('keeps the requested vehicle and does not restart a signup transfer on naviga
   const completed = new Event('beforeunload', { cancelable: true });
   window.dispatchEvent(completed);
   expect(completed.defaultPrevented).toBe(false);
+});
+
+it('asks before sign-out deletes receipts that have not synced from this device', async () => {
+  configureCloud();
+  cloud.emit(account());
+  const key = `garage-guardian:account-receipts:v1:https://garage.supabase.co:${account().id}`;
+  const receipt = { ...visit, carId: car.id };
+  await set(key, {
+    snapshot: {
+      homeCurrency: 'USD',
+      cars: [car],
+      schedules: [],
+      visits: [receipt],
+      fuelEntries: [],
+      pendingSyncCount: 1,
+    },
+    pending: [{ visit: receipt, manualTargets: [] }],
+  });
+  // The device is offline for receipt sync, so the receipt stays queued.
+  const execute = cloud.execute.getMockImplementation()!;
+  cloud.execute.mockImplementation(async (...args) => {
+    if (args[0] === 'visits' && args[1] === 'upsert') throw new TypeError('Failed to fetch');
+    return execute(...args);
+  });
+  const App = await loadGarageTestApp();
+  render(<App />);
+  const user = userEvent.setup();
+  await screen.findByText(/1 receipts waiting to sync/);
+  const signOut = async () => {
+    await user.click(screen.getByRole('button', { name: 'Open account menu' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    return screen.findByRole('alertdialog', { name: 'Sign out and delete unsynced receipts?' });
+  };
+
+  let dialog = await signOut();
+  expect(
+    within(dialog).getByText(/1 receipt saved on this device has not synced to your account yet/),
+  ).toBeDefined();
+  await waitFor(() =>
+    expect(document.activeElement).toBe(within(dialog).getByRole('button', { name: 'Cancel' })),
+  );
+  await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+  expect(screen.queryByRole('alertdialog')).toBeNull();
+  expect(cloud.auth.signOut).not.toHaveBeenCalled();
+  expect((await get<{ pending: unknown[] }>(key))?.pending).toHaveLength(1);
+
+  dialog = await signOut();
+  await user.click(within(dialog).getByRole('button', { name: 'Sign out and delete' }));
+  await waitFor(() => expect(cloud.auth.signOut).toHaveBeenCalledWith({ scope: 'global' }));
+  await waitFor(async () => expect(await get(key)).toBeUndefined());
+  expect(screen.queryByRole('alertdialog')).toBeNull();
 });

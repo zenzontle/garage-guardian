@@ -145,6 +145,21 @@ export class OfflineReceipts {
       };
     });
   }
+  // Receipts saved on this device that the account does not have yet.
+  async pendingIds() {
+    return ((await this.read())?.pending ?? []).map(({ visit }) => visit.id);
+  }
+  // Explicit sign-out removes this account's garage from the device. Receipts that are
+  // still unsynced are only removed when the owner approved discarding exactly them;
+  // one queued by another tab after the approval keeps the whole cache.
+  async discard(approved: string[]): Promise<boolean> {
+    return this.withLock(async () => {
+      const pending = await this.pendingIds();
+      if (pending.some((id) => !approved.includes(id))) return false;
+      await del(this.key);
+      return true;
+    });
+  }
   async cachedSnapshot() {
     const saved = await this.read();
     return saved ? normalizeSnapshot(saved.snapshot) : null;

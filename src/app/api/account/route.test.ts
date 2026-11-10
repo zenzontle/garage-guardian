@@ -2,9 +2,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import { account } from '@/test/fake-supabase';
+import { checkAccountLimit } from '@/lib/account/account-rate-limit';
 import { DELETE, PATCH } from './route';
 
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
+vi.mock('@/lib/account/account-rate-limit', () => ({ checkAccountLimit: vi.fn() }));
 const owner = account();
 const identity = { auth: { getUser: vi.fn() } };
 const verification = {
@@ -22,6 +24,7 @@ beforeEach(() => {
   });
   verification.auth.updateUser.mockResolvedValue({ data: { user: owner }, error: null });
   verification.auth.signOut.mockResolvedValue({ error: null });
+  vi.mocked(checkAccountLimit).mockResolvedValue({ status: 'allowed' });
   vi.mocked(createClient).mockImplementation(
     () =>
       ({ auth: { ...identity.auth, ...verification.auth } }) as unknown as ReturnType<
@@ -158,6 +161,38 @@ it('reports temporary-session cleanup failure and password revocation failure wi
   verification.auth.signOut.mockResolvedValueOnce({ error: new Error('Offline') });
   await expectError(await PATCH(request('PATCH', password)), 'sessionRevocation', 502);
 });
+describe.each([
+  { name: 'email', input: email },
+  { name: 'password', input: password },
+])('$name rate limiting', ({ input }) => {
+  it('checks the verified caller before verifying the password', async () => {
+    await PATCH(request('PATCH', input));
+    expect(checkAccountLimit).toHaveBeenCalledWith(expect.any(Request), owner.id);
+    expect(vi.mocked(checkAccountLimit).mock.invocationCallOrder[0]).toBeLessThan(
+      verification.auth.signInWithPassword.mock.invocationCallOrder[0],
+    );
+  });
+  it('rejects limited callers with Retry-After and no password verification', async () => {
+    vi.mocked(checkAccountLimit).mockResolvedValueOnce({ status: 'limited', retryAfter: 120 });
+    const result = await PATCH(request('PATCH', input));
+    expect(result.headers.get('retry-after')).toBe('120');
+    await expectError(result, 'rateLimited', 429);
+    expect(verification.auth.signInWithPassword).not.toHaveBeenCalled();
+    expect(verification.auth.updateUser).not.toHaveBeenCalled();
+  });
+  it('fails closed when the limiter is unavailable', async () => {
+    vi.mocked(checkAccountLimit).mockResolvedValueOnce({ status: 'unavailable' });
+    const result = await PATCH(request('PATCH', input));
+    expect(result.headers.get('retry-after')).toBeNull();
+    await expectError(result, 'accountLimiterUnavailable', 503);
+    expect(verification.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+});
+it('does not spend rate-limit attempts on unauthenticated or malformed requests', async () => {
+  await PATCH(request('PATCH', password, ''));
+  await PATCH(request('PATCH', { ...password, userId: 'victim' }));
+  expect(checkAccountLimit).not.toHaveBeenCalled();
+});
 
 describe('account deletion', () => {
   const admin = {
@@ -264,6 +299,16 @@ describe('account deletion', () => {
     const result = await invoke();
     expect(result.status).toBe(200);
     expect(await result.json()).toEqual({ status: 'accountDeleted' });
+  });
+  it('rate limits deletion before verifying the password', async () => {
+    vi.mocked(checkAccountLimit).mockResolvedValueOnce({ status: 'limited', retryAfter: 60 });
+    const limited = await invoke();
+    expect(limited.headers.get('retry-after')).toBe('60');
+    await expectError(limited, 'rateLimited', 429);
+    vi.mocked(checkAccountLimit).mockResolvedValueOnce({ status: 'unavailable' });
+    await expectError(await invoke(), 'accountLimiterUnavailable', 503);
+    expect(verification.auth.signInWithPassword).not.toHaveBeenCalled();
+    expect(admin.rpc).not.toHaveBeenCalled();
   });
   it('explains that a banned account is already being deleted', async () => {
     verification.auth.signInWithPassword.mockResolvedValueOnce({

@@ -43,12 +43,13 @@ Shipped migrations are never edited; schema changes go in a new numbered file.
 
 `.env.example` lists every deployment variable; Vercel supplies its system variables (`VERCEL_ENV`, `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_GIT_COMMIT_SHA`) automatically, and the feedback smoke test reads its own private tokens (see [feedback](feedback.md#preview-smoke-test-and-rollout)). All deployment variables except the two `NEXT_PUBLIC_SUPABASE_*` values are server-only.
 
-| Variables                                                                                   | Used by                                                    |
-| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                          | Accounts and cloud sync                                    |
-| `SUPABASE_SECRET_KEY`, `REMINDERS_ENABLED`, `BREVO_*`, `CRON_SECRET`, `REMINDER_APP_ORIGIN` | [Account reminders](account-reminders.md#deployment)       |
-| `SUPABASE_SECRET_KEY`, `CRON_SECRET`                                                        | [Account deletion](account-management.md#account-deletion) |
-| `FEEDBACK_ENABLED`, `FEEDBACK_LINEAR_*`, `FEEDBACK_*`, `UPSTASH_REDIS_REST_*`               | [Private feedback](feedback.md#deployment-setup)           |
+| Variables                                                                                   | Used by                                                                                                                                           |
+| ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`                          | Accounts and cloud sync                                                                                                                           |
+| `SUPABASE_SECRET_KEY`, `REMINDERS_ENABLED`, `BREVO_*`, `CRON_SECRET`, `REMINDER_APP_ORIGIN` | [Account reminders](account-reminders.md#deployment)                                                                                              |
+| `SUPABASE_SECRET_KEY`, `CRON_SECRET`                                                        | [Account deletion](account-management.md#account-deletion)                                                                                        |
+| `UPSTASH_REDIS_REST_*`                                                                      | [Account change and deletion limits](account-management.md#rate-limits) (required on Vercel) and [private feedback](feedback.md#deployment-setup) |
+| `FEEDBACK_ENABLED`, `FEEDBACK_LINEAR_*`, `FEEDBACK_*`                                       | [Private feedback](feedback.md#deployment-setup)                                                                                                  |
 
 ## Guest data and signup
 

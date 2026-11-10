@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
-import { isIP } from 'node:net';
 import { createClient } from '@supabase/supabase-js';
+import { vercelClientIp } from '../utils/client-ip';
 import packageInfo from '../../../package.json';
 import { publicMetadataSchema, redact, type PublicMetadata } from './shared';
 
@@ -126,11 +126,9 @@ export function clientIp(request: Request): string {
   if (!process.env.VERCEL && process.env.NODE_ENV !== 'production') return '127.0.0.1';
   if (!process.env.VERCEL)
     throw new ReportError(503, 'IP_UNAVAILABLE', 'Feedback requires a trusted deployment proxy.');
-  let ip = (request.headers.get('x-vercel-forwarded-for') || '').trim().toLowerCase();
-  if (ip.startsWith('::ffff:') && isIP(ip.slice(7)) === 4) ip = ip.slice(7);
-  const kind = isIP(ip);
-  if (!kind) throw new ReportError(503, 'IP_UNAVAILABLE', 'Could not verify the request address.');
-  return kind === 6 ? new URL(`http://[${ip}]/`).hostname.slice(1, -1) : ip;
+  const ip = vercelClientIp(request);
+  if (!ip) throw new ReportError(503, 'IP_UNAVAILABLE', 'Could not verify the request address.');
+  return ip;
 }
 export function errorResponse(cause: unknown): Response {
   const error =

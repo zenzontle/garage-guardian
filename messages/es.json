@@ -40,6 +40,8 @@
     "resendCooldown": "Espera 60 segundos antes de solicitar otro correo de confirmación.",
     "sessionRevocation": "Tu contraseña se actualizó, pero no se pudieron revocar las sesiones. Reintenta para terminar o inicia sesión con la nueva contraseña.",
     "accountSessionCleanup": "Es posible que la solicitud se haya completado, pero no se pudo cerrar la sesión temporal de verificación. Comprueba tu cuenta antes de reintentar.",
+    "accountLimiterUnavailable": "Los cambios de cuenta no están disponibles temporalmente. Inténtalo más tarde.",
+    "accountRateLimited": "Demasiados intentos de cambiar la cuenta. Vuelve a intentarlo en {minutes, plural, one {# minuto} other {# minutos}}.",
     "accountDeletionUnavailable": "La eliminación de cuentas no está disponible en esta implementación.",
     "accountDeletion": "No se pudo solicitar la eliminación de la cuenta. No se eliminó nada. Inténtalo de nuevo.",
     "accountDeletionPending": "Esta cuenta se está eliminando y ya no puede iniciar sesión.",
@@ -111,6 +113,9 @@
   },
   "account": {
     "signOut": "Cerrar sesión",
+    "signOutUnsyncedTitle": "¿Cerrar sesión y eliminar los recibos sin sincronizar?",
+    "signOutUnsyncedDescription": "{count, plural, one {# recibo guardado en este dispositivo aún no se ha sincronizado con tu cuenta.} other {# recibos guardados en este dispositivo aún no se han sincronizado con tu cuenta.}} Al cerrar sesión se elimina tu garaje de este dispositivo, {count, plural, one {incluido ese recibo} other {incluidos esos recibos}}. Cancela para conservar {count, plural, one {ese recibo} other {esos recibos}} en este dispositivo.",
+    "signOutDiscard": "Cerrar sesión y eliminar",
     "signIn": "Iniciar sesión",
     "create": "Crear cuenta",
     "createTitle": "Crea tu cuenta",

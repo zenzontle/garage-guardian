@@ -54,9 +54,12 @@ function useGarageState() {
   const [notice, setNotice] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountEmail, setAccountEmail] = useState('');
+  // Unsynced receipt IDs awaiting the owner's decision before sign-out.
+  const [signOutPrompt, setSignOutPrompt] = useState<string[] | null>(null);
   const identity = garage.user?.id;
   useEffect(() => {
     interactions?.clear();
+    setSignOutPrompt(null);
   }, [identity, garage.recovering, interactions]);
 
   useEffect(() => {
@@ -94,6 +97,12 @@ function useGarageState() {
     [garage.snapshot.fuelEntries],
   );
 
+  function guardedSignOut(approvedUnsynced: string[]) {
+    const action = () => void garage.signOut('global', approvedUnsynced);
+    if (interactions) interactions.request(action);
+    else action();
+  }
+
   async function perform(action: () => Promise<void>) {
     const result = await garage.run(action);
     setModal(null);
@@ -118,12 +127,27 @@ function useGarageState() {
     setAccountEmail,
     perform,
     signOut: (onStarted?: () => void) => {
-      const action = () => {
+      // Sign-out deletes the device copy, so unsynced receipts need explicit consent.
+      const askAboutReceipts = () => {
         onStarted?.();
-        void garage.signOut();
+        void garage.unsyncedReceipts().then((unsynced) => {
+          if (unsynced.length) setSignOutPrompt(unsynced);
+          else void garage.signOut();
+        });
       };
-      if (interactions) interactions.request(action);
-      else action();
+      // Receipts already known to be waiting are asked about before the unsaved-changes
+      // guard, so cancelling keeps an open draft. Otherwise the guard opens at once and
+      // "Keep editing" returns focus to the sign-out button.
+      if ((garage.snapshot.pendingSyncCount ?? 0) > 0) askAboutReceipts();
+      else if (interactions) interactions.request(askAboutReceipts);
+      else askAboutReceipts();
+    },
+    signOutPrompt,
+    cancelSignOut: () => setSignOutPrompt(null),
+    confirmSignOut: () => {
+      if (!signOutPrompt) return;
+      setSignOutPrompt(null);
+      guardedSignOut(signOutPrompt);
     },
   };
 }
