@@ -5,10 +5,9 @@ minimumReleaseAgeIgnoreMissingTime: false
 blockExoticSubdeps: true
 trustPolicy: no-downgrade
 # Existing releases without provenance; registry integrity matches the committed lockfile.
-# Reviewed 2026-10-21. Revisit on dependency updates; do not broaden these selectors.
+# Reviewed 2026-11-13. Revisit on dependency updates; do not broaden these selectors.
 trustPolicyExclude:
   - eslint-import-resolver-typescript@3.10.1 # Published 2025-04-21.
-  - semver@6.3.1 # Published 2023-07-10.
   - undici-types@6.21.0 # Published 2024-11-13.
 trustLockfile: false
 
@@ -17,5 +16,3 @@ strictDepBuilds: true
 allowBuilds:
   '@parcel/watcher': false
   '@swc/core': false
-  esbuild@0.28.2: true
-  unrs-resolver@1.12.2: true
