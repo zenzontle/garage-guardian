@@ -17,7 +17,7 @@ async function processAccount(
   if (claim.error) throw new Error('claim_failed');
   if (!claim.data) return 'skipped';
   const week = claim.data as string;
-  let status: Outcome = 'failed';
+  let status: Outcome;
   let code: string | null = null;
   let messageId: string | null = null;
   let count = 0;
