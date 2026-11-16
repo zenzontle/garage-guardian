@@ -1,12 +1,13 @@
 :root {
   color-scheme: dark;
-  --bg: #0c131e;
-  --surface: #131e2d;
-  --surface-raised: #1c2a3d;
-  --surface-navigation: #101a28;
+  /* Deep navy neutrals; the accents below carry the color. */
+  --bg: #080e19;
+  --surface: #101a29;
+  --surface-raised: #19273a;
+  --surface-navigation: #0b1421;
   --text: #eef3fa;
   --muted: #a8b7ca;
-  --line: #2b3a4f;
+  --line: #27364c;
   --control-border: #71849f;
   --accent: #72b7ff;
   --accent-hover: #99cdff;
@@ -208,6 +209,7 @@ a {
 }
 .tone-vehicle,
 .stat-vehicle,
+.car-tab,
 .summary-icon,
 .vehicle-icon,
 .car-header-icon {
@@ -535,17 +537,17 @@ a {
   color: var(--accent);
   background: var(--accent-soft);
 }
-.stat-orange .stat-icon {
-  color: var(--orange);
-  background: var(--orange-soft);
+.stat-orange {
+  --accent: var(--orange);
+  --accent-soft: var(--orange-soft);
 }
-.stat-yellow .stat-icon {
-  color: var(--yellow);
-  background: var(--yellow-soft);
+.stat-yellow {
+  --accent: var(--yellow);
+  --accent-soft: var(--yellow-soft);
 }
-.stat-muted .stat-icon {
-  color: var(--muted);
-  background: var(--surface-raised);
+.stat-muted {
+  --accent: var(--muted);
+  --accent-soft: var(--surface-raised);
 }
 .stat-label {
   font-size: 0.875rem;
@@ -1970,4 +1972,136 @@ input[type='number'] {
   .saved-schedule-row {
     grid-template-columns: minmax(0, 1fr) 2.75rem 2.75rem;
   }
+}
+
+/* Accents layered on the blue base. */
+.app-shell,
+.auth-page {
+  position: relative;
+}
+.app-shell::before,
+.auth-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 31;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    var(--accent),
+    var(--violet),
+    var(--pink),
+    var(--orange),
+    var(--yellow),
+    var(--lime),
+    var(--teal)
+  );
+}
+.sidebar {
+  background:
+    radial-gradient(120% 38% at 0 0, var(--accent-soft), transparent 70%),
+    radial-gradient(120% 30% at 100% 100%, var(--violet-soft), transparent 70%),
+    var(--surface-navigation);
+}
+.auth-page {
+  background:
+    radial-gradient(circle at 70% 10%, var(--accent-soft), transparent 32%),
+    radial-gradient(circle at 12% 85%, var(--violet-soft), transparent 30%),
+    radial-gradient(circle at 92% 78%, var(--teal-soft), transparent 26%), var(--bg);
+}
+/* Each page tints its heading with the hue of its area. */
+.page-dashboard {
+  --page-accent: var(--lime);
+}
+.page-cars {
+  --page-accent: var(--violet);
+}
+.page-fuel {
+  --page-accent: var(--teal);
+}
+.page-reports {
+  --page-accent: var(--pink);
+}
+.page-heading .eyebrow {
+  color: var(--page-accent, var(--accent));
+}
+.stat-card {
+  border-top: 3px solid var(--accent);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent-soft) 45%, var(--surface)),
+    var(--surface) 65%
+  );
+}
+.section-heading .eyebrow {
+  color: var(--accent);
+}
+.attention-panel .section-heading .eyebrow {
+  color: var(--orange);
+}
+.today-pill svg {
+  color: var(--yellow);
+}
+.profile-trigger {
+  border-color: var(--violet);
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+.profile-trigger:hover {
+  background: var(--violet-soft);
+  color: var(--violet-hover);
+}
+.empty-hero {
+  background:
+    radial-gradient(circle at 15% 0, var(--violet-soft), transparent 38%),
+    radial-gradient(circle at 88% 100%, var(--teal-soft), transparent 36%), var(--surface);
+}
+.garage-benefits li:nth-child(3n + 1) svg {
+  color: var(--teal);
+}
+.garage-benefits li:nth-child(3n + 2) svg {
+  color: var(--yellow);
+}
+.garage-benefits li:nth-child(3n + 3) svg {
+  color: var(--pink);
+}
+.report-total {
+  --total-accent: var(--pink);
+  border-top: 3px solid var(--total-accent);
+}
+.report-total:nth-child(2) {
+  --total-accent: var(--violet);
+}
+.report-total .eyebrow {
+  color: var(--total-accent);
+}
+.bar-fill {
+  background: linear-gradient(90deg, var(--violet), var(--accent));
+}
+.breakdown-row > span::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 9px;
+  border-radius: 50%;
+  background: var(--dot, var(--accent));
+}
+.breakdown-row:nth-child(5n + 2) {
+  --dot: var(--teal);
+}
+.breakdown-row:nth-child(5n + 3) {
+  --dot: var(--violet);
+}
+.breakdown-row:nth-child(5n + 4) {
+  --dot: var(--pink);
+}
+.breakdown-row:nth-child(5n + 5) {
+  --dot: var(--yellow);
+}
+.info-callout:not(.warning) {
+  border-left: 3px solid var(--accent);
 }

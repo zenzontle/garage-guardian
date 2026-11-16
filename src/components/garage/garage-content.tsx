@@ -190,7 +190,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
             menuTrigger={menuTrigger}
             onMenuToggle={() => setMenuOpen(!menuOpen)}
           />
-          <main className="content">
+          <main className={`content page-${page}`}>
             {isCloudConfigured && !user && (
               <div className="storage-account">
                 {!user && <span>{t('app.guestStorage')}</span>}
