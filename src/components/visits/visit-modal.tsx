@@ -6,6 +6,7 @@ import { Plus, X } from 'lucide-react';
 import { latestOdometer } from '@/lib/maintenance/due';
 import { type Repository } from '@/lib/garage/repository';
 import {
+  activeCarsFirst,
   distanceUnitOrDefault,
   newId,
   type Car,
@@ -19,10 +20,11 @@ import { MoneyInput } from '../ui/money-input';
 import { failureOf, type AppFailure } from '@/lib/utils/app-error';
 import { Modal } from '../ui/modal';
 import { PhotoPicker, usePhotoAttachments } from '../ui/photo-attachments';
+import { CarOptions, CurrencyOptions } from '../ui/select-options';
 import { useFormInteraction } from '../interaction/use-form-interaction';
 import { todayISO } from '@/lib/utils/today-iso';
 import {
-  CURRENCIES,
+  centsToInput,
   currencyOrDefault,
   normalizeVisit,
   parseCents,
@@ -32,6 +34,15 @@ import {
 import { useReceiptConversion } from '@/lib/currency/use-receipt-conversion';
 
 type EditVisitItem = VisitItem & { key: string; costInput: string };
+
+const emptyItem = (): EditVisitItem => ({
+  id: newId(),
+  key: newId(),
+  name: '',
+  scheduleItemId: null,
+  costCents: null,
+  costInput: '',
+});
 
 export function VisitModal({
   item,
@@ -59,7 +70,7 @@ export function VisitModal({
   onSave: (visit: Visit, manualTargets?: Currency[]) => Promise<void>;
 }) {
   const t = useTranslations();
-  cars = [...cars].sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
+  cars = activeCarsFirst(cars);
   // A new visit defaults to an active car; an archived one is only used when asked for by id.
   const initialCarId = item?.carId ?? carId ?? cars.find((car) => !car.isArchived)?.id ?? '';
   const initialCar = cars.find((car) => car.id === initialCarId);
@@ -70,7 +81,7 @@ export function VisitModal({
       ? String(item.odometer ?? '')
       : String(initialCar ? latestOdometer(initialCar, visits, fuelEntries) : ''),
   );
-  const [totalCost, setTotalCost] = useState(item ? (item.totalCostCents / 100).toFixed(2) : '');
+  const [totalCost, setTotalCost] = useState(item ? centsToInput(item.totalCostCents) : '');
   const [currency, setCurrency] = useState<Currency>(
     item ? currencyOrDefault(item.currency) : homeCurrency,
   );
@@ -81,10 +92,8 @@ export function VisitModal({
     item?.items.map((entry) => ({
       ...entry,
       key: entry.id,
-      costInput: entry.costCents === null ? '' : (entry.costCents / 100).toFixed(2),
-    })) ?? [
-      { id: newId(), key: newId(), name: '', scheduleItemId: null, costCents: null, costInput: '' },
-    ],
+      costInput: entry.costCents === null ? '' : centsToInput(entry.costCents),
+    })) ?? [emptyItem()],
   );
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<AppFailure | null>(null);
@@ -226,16 +235,7 @@ export function VisitModal({
                     setSelectedCarId(e.target.value);
                     const car = cars.find((car) => car.id === e.target.value);
                     setOdometer(car ? String(latestOdometer(car, visits, fuelEntries)) : '');
-                    setItems([
-                      {
-                        id: newId(),
-                        key: newId(),
-                        name: '',
-                        scheduleItemId: null,
-                        costCents: null,
-                        costInput: '',
-                      },
-                    ]);
+                    setItems([emptyItem()]);
                   }}
                   required
                   disabled={Boolean(item)}
@@ -245,12 +245,7 @@ export function VisitModal({
                       {t('car.choose')}
                     </option>
                   )}
-                  {cars.map((car) => (
-                    <option key={car.id} value={car.id}>
-                      {car.name}
-                      {car.isArchived && ` (${t('archive.archived')})`}
-                    </option>
-                  ))}
+                  <CarOptions cars={cars} />
                 </select>
               </label>
               <label>
@@ -271,11 +266,7 @@ export function VisitModal({
                   value={currency}
                   onChange={(event) => setCurrency(event.target.value as Currency)}
                 >
-                  {CURRENCIES.map((code) => (
-                    <option key={code} value={code}>
-                      {code} — {t(`currency.${code}`)}
-                    </option>
-                  ))}
+                  <CurrencyOptions />
                 </select>
               </label>
             </div>
@@ -351,19 +342,7 @@ export function VisitModal({
                 <button
                   type="button"
                   className="text-link"
-                  onClick={() =>
-                    setItems((current) => [
-                      ...current,
-                      {
-                        id: newId(),
-                        key: newId(),
-                        name: '',
-                        scheduleItemId: null,
-                        costCents: null,
-                        costInput: '',
-                      },
-                    ])
-                  }
+                  onClick={() => setItems((current) => [...current, emptyItem()])}
                 >
                   <Plus size={16} />
                   {t('visit.addItem')}

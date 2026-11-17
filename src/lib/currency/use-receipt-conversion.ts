@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Visit } from '../garage/model';
 import {
   automaticConversion,
+  centsToInput,
   parseCents,
   receiptInputs,
   validConversion,
@@ -65,7 +66,7 @@ export function useReceiptConversion(
     conversion: valid,
     manualInput,
     status: valid ? ('saved' as const) : status,
-    value: manualInput ?? (valid ? (valid.convertedCents / 100).toFixed(2) : ''),
+    value: manualInput ?? (valid ? centsToInput(valid.convertedCents) : ''),
     change: (input: string) => {
       setManual({ key, input });
       const cents = input.trim() === '' ? null : parseCents(input);

@@ -25,6 +25,9 @@ export function validDate(value: unknown): value is string {
     new Date(value).toISOString().slice(0, 10) === value
   );
 }
+/** Cents as the text of a money field: 1250 → "12.50". */
+export const centsToInput = (cents: number) => (cents / 100).toFixed(2);
+
 export function parseCents(value: string): number | null {
   if (value.trim() === '') return 0;
   if (!/^\d+(\.\d{0,2})?$/.test(value)) return null;

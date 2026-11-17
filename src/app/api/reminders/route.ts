@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest } from 'next/server';
 import { reminderOrigin } from '@/lib/reminders/email';
 import { runReminders } from '@/lib/reminders/worker';
+import { cronClient, noStoreJson as reply } from '@/lib/utils/cron-route';
 import { cronAuthorized } from '@/lib/utils/cron-secret';
 
 export const runtime = 'nodejs';
@@ -9,8 +9,6 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const reply = (body: object, status = 200) =>
-    NextResponse.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
   if (!cronAuthorized(request.headers.get('authorization'), process.env.CRON_SECRET))
     return reply({ error: { code: 'unauthorized' } }, 401);
   if (process.env.REMINDERS_ENABLED !== 'true') return reply({ status: 'email_disabled' });
@@ -21,31 +19,17 @@ export async function GET(request: NextRequest) {
   let origin: string;
   try {
     origin = reminderOrigin(process.env.REMINDER_APP_ORIGIN);
-    if (!url || !key || !apiKey || !sender) throw new Error('configuration');
   } catch {
     return reply({ error: { code: 'reminderConfiguration' } }, 503);
   }
+  if (!url || !key || !apiKey || !sender)
+    return reply({ error: { code: 'reminderConfiguration' } }, 503);
   const started = Date.now();
-  // Bound the whole SDK workload as well as individual network calls.
-  const budget = AbortSignal.timeout(48_000);
-  const db = createClient(url!, key!, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: {
-      fetch: (input, init) =>
-        fetch(input, {
-          ...init,
-          signal: AbortSignal.any([
-            budget,
-            AbortSignal.timeout(5_000),
-            ...(init?.signal ? [init.signal] : []),
-          ]),
-        }),
-    },
-  });
+  const db = cronClient(url, key, { callMs: 5_000 });
   try {
     const counts = await runReminders(
       db,
-      { origin, sender: sender!, apiKey: apiKey! },
+      { origin, sender, apiKey },
       new Date(started),
       started + 30_000,
     );

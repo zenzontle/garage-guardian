@@ -174,6 +174,10 @@ export function normalizeCar(car: Car): Car {
   };
 }
 
+/** Active vehicles before archived ones, otherwise keeping the given order. */
+export const activeCarsFirst = (cars: Car[]) =>
+  [...cars].sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
+
 export const PLATE_MAX_LENGTH = 20;
 
 export function normalizePlate(plate?: string | null): string {

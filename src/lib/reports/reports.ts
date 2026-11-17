@@ -1,6 +1,7 @@
 import { distanceAbbreviation, type Car, type Visit } from '../garage/model';
 import {
   allocateConverted,
+  centsToInput,
   currencyOrDefault,
   reportingCents,
   type Currency,
@@ -76,36 +77,35 @@ export function visitsToCsv(visits: Visit[], cars: Car[], homeCurrency: Currency
     'Conversion source',
     'Rate date',
   ];
-  const rows = visits.map((visit) => [
-    visit.date,
-    cars.find((car) => car.id === visit.carId)?.name ?? 'Unknown car',
-    visit.odometer ?? '',
-    distanceAbbreviation(cars.find((car) => car.id === visit.carId)?.distanceUnit),
-    visit.provider,
-    visit.items.map((item) => item.name).join('; '),
-    (visit.totalCostCents / 100).toFixed(2),
-    visit.items
-      .map((item) =>
-        item.costCents === null ? '' : `${item.name}: ${(item.costCents / 100).toFixed(2)}`,
-      )
-      .filter(Boolean)
-      .join('; '),
-    visit.notes,
-    visit.photos.length,
-    currencyOrDefault(visit.currency),
-    homeCurrency,
-    reportingCents(visit, homeCurrency) === null
-      ? ''
-      : (reportingCents(visit, homeCurrency)! / 100).toFixed(2),
-    currencyOrDefault(visit.currency) === homeCurrency
-      ? 'same-currency'
-      : reportingCents(visit, homeCurrency) === null
-        ? ''
-        : (visit.conversions?.[homeCurrency]?.source ?? ''),
-    reportingCents(visit, homeCurrency) === null
-      ? ''
-      : (visit.conversions?.[homeCurrency]?.rateDate ?? ''),
-  ]);
+  const rows = visits.map((visit) => {
+    const car = cars.find((entry) => entry.id === visit.carId);
+    const currency = currencyOrDefault(visit.currency);
+    const converted = reportingCents(visit, homeCurrency);
+    // Conversion details are only reported while they still match the receipt.
+    const conversion = converted === null ? undefined : visit.conversions?.[homeCurrency];
+    return [
+      visit.date,
+      car?.name ?? 'Unknown car',
+      visit.odometer ?? '',
+      distanceAbbreviation(car?.distanceUnit),
+      visit.provider,
+      visit.items.map((item) => item.name).join('; '),
+      centsToInput(visit.totalCostCents),
+      visit.items
+        .map((item) =>
+          item.costCents === null ? '' : `${item.name}: ${centsToInput(item.costCents)}`,
+        )
+        .filter(Boolean)
+        .join('; '),
+      visit.notes,
+      visit.photos.length,
+      currency,
+      homeCurrency,
+      converted === null ? '' : centsToInput(converted),
+      currency === homeCurrency ? 'same-currency' : (conversion?.source ?? ''),
+      conversion?.rateDate ?? '',
+    ];
+  });
   return (
     '\uFEFF' + [headers, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\r\n') + '\r\n'
   );
