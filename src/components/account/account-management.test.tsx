@@ -1,4 +1,4 @@
-import { loadGarageTestApp, testRouter } from '../../test/garage-router';
+import { loadGarageTestApp, testRouter, waitForGarage } from '../../test/garage-router';
 import * as React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -44,6 +44,7 @@ describe.each([
     const App = await loadGarageTestApp();
     const user = userEvent.setup();
     render(<App />);
+    await waitForGarage();
     const email = within(await screen.findByRole('form', { name: copy.account.changeEmail }));
     const password = within(screen.getByRole('form', { name: copy.account.changePassword }));
     fireEvent.change(email.getByLabelText(copy.account.currentPassword), {
@@ -447,6 +448,7 @@ describe.each([
       const App = await loadGarageTestApp();
       const user = userEvent.setup();
       render(<App />);
+      await waitForGarage();
       const form = within(await screen.findByRole('form', { name: copy.account.deleteAccount }));
       const submit = form.getByRole('button', { name: copy.account.deleteAccount });
       await user.type(form.getByLabelText(copy.account.currentPassword), 'current-password');
@@ -479,6 +481,7 @@ describe.each([
     const App = await loadGarageTestApp();
     const user = userEvent.setup();
     render(<App />);
+    await waitForGarage();
     const form = within(await screen.findByRole('form', { name: copy.account.deleteAccount }));
     await user.type(form.getByLabelText(copy.account.currentPassword), 'wrong-password');
     await user.click(form.getByRole('checkbox', { name: copy.account.deleteAccountConfirm }));

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useRef, type ReactNode } from 'react';
 import Link from '../interaction/guarded-link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
@@ -251,7 +251,8 @@ export function GarageContent({ children }: { children: ReactNode }) {
                 {t('app.loading')}
               </p>
             )}
-            {children}
+            {/* Screens that read search params render on the client; the rest prerender. */}
+            <Suspense>{children}</Suspense>
             {(snapshot.pendingSyncCount ?? 0) > 0 && (
               <div className="demo-banner" role="status">
                 <span>

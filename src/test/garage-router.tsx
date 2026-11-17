@@ -1,5 +1,6 @@
 import { useSyncExternalStore, type ComponentType, type ReactNode } from 'react';
-import { vi } from 'vitest';
+import { screen, waitFor } from '@testing-library/react';
+import { expect, vi } from 'vitest';
 
 const testRouter = vi.hoisted(() => {
   let entries = ['/'];
@@ -136,3 +137,8 @@ export async function loadGarageTestApp() {
 }
 
 export { testRouter };
+
+/** Pages render their layout while records load; this waits until the garage has loaded. */
+export async function waitForGarage() {
+  await waitFor(() => expect(screen.getByRole('main').getAttribute('aria-busy')).toBeNull());
+}
