@@ -7,6 +7,7 @@ import { type Repository } from '@/lib/garage/repository';
 import { distanceInMiles, type Car, type Visit } from '@/lib/garage/model';
 import { visitsToCsv } from '@/lib/reports/reports';
 import { PageHeading } from '../ui/page-heading';
+import { CarOptions } from '../ui/select-options';
 import { EmptyPanel } from '../ui/empty-panel';
 import { HistoryRow } from './history-row';
 import { HistoryCard } from './history-card';
@@ -130,12 +131,7 @@ export function HistoryPage({
               onChange={(e) => onCarChange(e.target.value)}
             >
               <option value="">{t('shared.allCars')}</option>
-              {cars.map((car) => (
-                <option key={car.id} value={car.id}>
-                  {car.name}
-                  {car.isArchived && ` (${t('archive.archived')})`}
-                </option>
-              ))}
+              <CarOptions cars={cars} />
             </select>
           </label>
           <label className="date-filter">

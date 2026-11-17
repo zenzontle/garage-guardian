@@ -7,6 +7,7 @@ import { type Car, type Visit } from '@/lib/garage/model';
 import { reportTotals } from '@/lib/reports/reports';
 import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
+import { CarOptions } from '../ui/select-options';
 import { EmptyPanel } from '../ui/empty-panel';
 import type { Currency } from '@/lib/currency/currency';
 
@@ -44,12 +45,7 @@ export function ReportsPage({
           onChange={(e) => setCarId(e.target.value)}
         >
           <option value="">{t('shared.allCars')}</option>
-          {cars.map((car) => (
-            <option key={car.id} value={car.id}>
-              {car.name}
-              {car.isArchived && ` (${t('archive.archived')})`}
-            </option>
-          ))}
+          <CarOptions cars={cars} />
         </select>
         <select
           aria-label={t('reports.yearFilter')}

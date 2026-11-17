@@ -7,6 +7,7 @@ import type { Repository } from '@/lib/garage/repository';
 import type { Car, FuelEntry } from '@/lib/garage/model';
 import { fuelEconomy } from '@/lib/fuel/economy';
 import { PageHeading } from '../ui/page-heading';
+import { CarOptions } from '../ui/select-options';
 import { EmptyPanel } from '../ui/empty-panel';
 import { Stat } from '../ui/stat';
 import { FuelCard } from './fuel-card';
@@ -111,12 +112,7 @@ export function FuelPage({
               onChange={(e) => onCarChange(e.target.value)}
             >
               <option value="">{t('shared.allCars')}</option>
-              {cars.map((car) => (
-                <option key={car.id} value={car.id}>
-                  {car.name}
-                  {car.isArchived && ` (${t('archive.archived')})`}
-                </option>
-              ))}
+              <CarOptions cars={cars} />
             </select>
           </label>
         </div>

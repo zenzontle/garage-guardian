@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { CURRENCIES, type Currency } from '@/lib/currency/currency';
+import type { Currency } from '@/lib/currency/currency';
 import { useGarage } from '../garage/garage-provider';
 import { useFormInteraction } from '../interaction/use-form-interaction';
+import { CurrencyOptions } from '../ui/select-options';
 
 export function HomeCurrencyForm() {
   const t = useTranslations();
@@ -40,11 +41,7 @@ export function HomeCurrencyForm() {
           disabled={busy || !garage.repository}
           onChange={(event) => setCurrency(event.target.value as Currency)}
         >
-          {CURRENCIES.map((code) => (
-            <option key={code} value={code}>
-              {code} — {t(`currency.${code}`)}
-            </option>
-          ))}
+          <CurrencyOptions />
         </select>
       </label>
       <p className="section-hint">{t('currency.homeHint')}</p>

@@ -5,6 +5,7 @@ import { reportTotals, visitsToCsv } from '../reports/reports';
 import {
   allocateConverted,
   automaticConversion,
+  centsToInput,
   CURRENCIES,
   compareCost,
   convertCents,
@@ -46,6 +47,9 @@ describe('receipt currencies', () => {
     'rejects invalid money %s',
     (input) => expect(parseCents(input)).toBeNull(),
   );
+  it('formats cents as money field text', () => {
+    expect([0, 5, 1250, 199999].map(centsToInput)).toEqual(['0.00', '0.05', '12.50', '1999.99']);
+  });
   it.each(['', '0', '0.00'])('accepts zero costs %s', (input) => expect(parseCents(input)).toBe(0));
   it('rounds decimal rates exactly, including half cents and scientific notation', () => {
     expect(convertCents(100, 1.005)).toBe(101);

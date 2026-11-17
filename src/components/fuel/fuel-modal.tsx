@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { latestOdometer } from '@/lib/maintenance/due';
 import { type Repository } from '@/lib/garage/repository';
 import {
+  activeCarsFirst,
   distanceUnitOrDefault,
   newId,
   type Car,
@@ -27,7 +28,7 @@ import {
   type FuelType,
   type VolumeUnit,
 } from '@/lib/fuel/fuel';
-import { CURRENCIES, parseCents, validDate, type Currency } from '@/lib/currency/currency';
+import { centsToInput, parseCents, validDate, type Currency } from '@/lib/currency/currency';
 import { normalizeVehicleKey } from '@/lib/vehicles/vehicle-catalog';
 import { failureOf, type AppFailure } from '@/lib/utils/app-error';
 import { todayISO } from '@/lib/utils/today-iso';
@@ -35,6 +36,7 @@ import { MoneyInput } from '../ui/money-input';
 import { Modal } from '../ui/modal';
 import { EditableCombobox } from '../ui/editable-combobox';
 import { PhotoPicker, usePhotoAttachments } from '../ui/photo-attachments';
+import { CarOptions, CurrencyOptions } from '../ui/select-options';
 import { useFormInteraction } from '../interaction/use-form-interaction';
 
 type AmountField = 'volume' | 'price' | 'total';
@@ -75,7 +77,7 @@ export function FuelModal({
   homeCurrency?: Currency;
 }) {
   const t = useTranslations();
-  cars = [...cars].sort((a, b) => Number(a.isArchived) - Number(b.isArchived));
+  cars = activeCarsFirst(cars);
   // A new fill-up defaults to an active car; an archived one is only used when asked for by id.
   const initialCar = cars.find(
     (car) => car.id === (item?.carId ?? carId ?? cars.find((car) => !car.isArchived)?.id),
@@ -89,7 +91,7 @@ export function FuelModal({
   const [amounts, setAmounts] = useState<Record<AmountField, string>>({
     volume: item ? formatMilli(item.volumeMilli) : '',
     price: item ? formatMilli(item.unitPriceMilli) : '',
-    total: item ? (item.totalCostCents / 100).toFixed(2) : '',
+    total: item ? centsToInput(item.totalCostCents) : '',
   });
   // Most recently typed amounts first. The field outside the latest two is calculated, unless
   // the person typed over a calculated value, which then stays as entered.
@@ -142,7 +144,7 @@ export function FuelModal({
     const price = parseMilli(values.price);
     const total = values.total.trim() === '' ? null : parseCents(values.total);
     if (field === 'total' && volume !== null && price !== null)
-      return (computeTotalCents(volume, price) / 100).toFixed(2);
+      return centsToInput(computeTotalCents(volume, price));
     if (field === 'price' && volume !== null && total !== null) {
       const result = computeUnitPriceMilli(total, volume);
       return result === null ? null : formatMilli(result);
@@ -276,12 +278,7 @@ export function FuelModal({
                       {t('car.choose')}
                     </option>
                   )}
-                  {cars.map((car) => (
-                    <option key={car.id} value={car.id}>
-                      {car.name}
-                      {car.isArchived && ` (${t('archive.archived')})`}
-                    </option>
-                  ))}
+                  <CarOptions cars={cars} />
                 </select>
               </label>
               <label>
@@ -353,11 +350,7 @@ export function FuelModal({
                   value={currency}
                   onChange={(event) => setCurrency(event.target.value as Currency)}
                 >
-                  {CURRENCIES.map((code) => (
-                    <option key={code} value={code}>
-                      {code} — {t(`currency.${code}`)}
-                    </option>
-                  ))}
+                  <CurrencyOptions />
                 </select>
               </label>
             </div>
