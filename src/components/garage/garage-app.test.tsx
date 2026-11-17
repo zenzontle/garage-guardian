@@ -1,4 +1,4 @@
-import { loadGarageTestApp, testRouter } from '../../test/garage-router';
+import { loadGarageTestApp, testRouter, waitForGarage } from '../../test/garage-router';
 import * as React from 'react';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -742,6 +742,7 @@ it('hides language selection during a transfer, allows it in recovery, and retai
   expect(await local.load()).toMatchObject({ cars: [car], visits: [visit] });
   await user.click(screen.getByRole('button', { name: 'Reintentar' }));
   await screen.findByRole('heading', { name: 'Tu garaje de un vistazo' });
+  await waitForGarage();
   expect((await createRepository(account().id).load()).cars).toEqual([car]);
   await user.click(screen.getByRole('button', { name: 'Abrir menú de cuenta' }));
   await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }));

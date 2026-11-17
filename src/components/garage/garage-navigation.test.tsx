@@ -1,4 +1,4 @@
-import { loadGarageTestApp, testRouter } from '../../test/garage-router';
+import { loadGarageTestApp, testRouter, waitForGarage } from '../../test/garage-router';
 import * as React from 'react';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -51,6 +51,7 @@ it('returns from email notification settings through sign-in and loads the accou
   render(<App />);
   const user = userEvent.setup();
   await screen.findByRole('heading', { name: 'Notification settings' });
+  await waitForGarage();
   const links = screen.getAllByRole('link', { name: 'Sign in' });
   await user.click(links[links.length - 1]);
   expect(testRouter.url).toBe('/signin?returnTo=%2Fsettings%2Fnotifications');
@@ -66,6 +67,7 @@ it('does not offer an email opt-in for a local-only garage', async () => {
   const App = await loadGarageTestApp();
   render(<App />);
   await screen.findByRole('heading', { name: 'Notification settings' });
+  await waitForGarage();
   expect(screen.queryByRole('checkbox')).toBeNull();
   expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
 });
@@ -118,6 +120,7 @@ it.each(['account', 'security'] as const)(
     const user = userEvent.setup();
     const title = section === 'account' ? en.account.settings : en.account.security;
     await screen.findByRole('heading', { name: title });
+    await waitForGarage();
     expect(screen.queryByRole('form')).toBeNull();
     const links = screen.getAllByRole('link', { name: en.account.signIn });
     await user.click(links[links.length - 1]);
@@ -127,6 +130,7 @@ it.each(['account', 'security'] as const)(
     await user.click(screen.getByRole('button', { name: en.account.signIn }));
     const currentEmail = en.account.currentEmail.replace('{email}', account().email!);
     await screen.findByText(currentEmail);
+    await waitForGarage();
     expect(testRouter.url).toBe(`/settings/${section}`);
     // Security has the email, password, and account deletion forms.
     expect(screen.queryAllByRole('form')).toHaveLength(section === 'account' ? 0 : 3);
@@ -302,9 +306,11 @@ it.each([
   const App = await loadGarageTestApp();
   const app = render(<App />);
   await screen.findByRole('heading', { name: title });
+  await waitForGarage();
   app.unmount();
   render(<App />);
   await screen.findByRole('heading', { name: title });
+  await waitForGarage();
   expect(testRouter.url).toBe(url);
 });
 

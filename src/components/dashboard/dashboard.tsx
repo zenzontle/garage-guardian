@@ -20,6 +20,8 @@ import { type Car, type FuelEntry, type Visit } from '@/lib/garage/model';
 import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
 import { Stat } from '../ui/stat';
+import { Skeleton } from '../ui/skeleton';
+import { SkeletonRows } from '../ui/skeleton-rows';
 import { DueRow } from './due-row';
 import { useFuelDisplay } from '../fuel/use-fuel-display';
 import { reportTotals } from '@/lib/reports/reports';
@@ -34,7 +36,10 @@ export function Dashboard({
   onAddVisit,
   onAddFuel,
   homeCurrency = 'USD',
+  loading = false,
 }: {
+  /** Renders the layout with placeholders where records go. */
+  loading?: boolean;
   cars: Car[];
   visits: Visit[];
   fuelEntries?: FuelEntry[];
@@ -63,21 +68,28 @@ export function Dashboard({
         title={t('dashboard.title')}
         description={t('dashboard.description')}
         action={
-          <div className="account-actions">
-            {activeCars.length > 0 && onAddFuel && (
-              <button className="button primary tone-fuel" onClick={onAddFuel}>
-                <Fuel size={18} />
-                {t('dashboard.logFuel')}
+          loading ? (
+            <Skeleton className="skeleton-button" width="9rem" />
+          ) : (
+            <div className="account-actions">
+              {activeCars.length > 0 && onAddFuel && (
+                <button className="button primary tone-fuel" onClick={onAddFuel}>
+                  <Fuel size={18} />
+                  {t('dashboard.logFuel')}
+                </button>
+              )}
+              <button
+                className="button primary"
+                onClick={activeCars.length ? onAddVisit : onAddCar}
+              >
+                <Plus size={18} />
+                {activeCars.length ? t('shared.logService') : t('dashboard.firstCar')}
               </button>
-            )}
-            <button className="button primary" onClick={activeCars.length ? onAddVisit : onAddCar}>
-              <Plus size={18} />
-              {activeCars.length ? t('shared.logService') : t('dashboard.firstCar')}
-            </button>
-          </div>
+            </div>
+          )
         }
       />
-      {cars.length === 0 ? (
+      {cars.length === 0 && !loading ? (
         <div className="empty-hero">
           <div className="empty-illustration" aria-hidden="true">
             <CarFront size={55} strokeWidth={1.5} />
@@ -112,6 +124,7 @@ export function Dashboard({
               value={number(activeCars.length)}
               detail={t('app.inGarage')}
               tone="vehicle"
+              loading={loading}
             />
             <Stat
               icon={<CircleAlert size={20} />}
@@ -119,6 +132,7 @@ export function Dashboard({
               value={number(due.length)}
               detail={t('dashboard.attentionItems', { count: due.length })}
               tone="orange"
+              loading={loading}
             />
             <Stat
               icon={<CalendarDays size={20} />}
@@ -126,6 +140,7 @@ export function Dashboard({
               value={number(upcoming.length)}
               detail={t('dashboard.reminderWindows')}
               tone="yellow"
+              loading={loading}
             />
             <Stat
               icon={<ReceiptText size={20} />}
@@ -137,6 +152,7 @@ export function Dashboard({
                   : t('dashboard.allVehicles')
               }
               tone="spend"
+              loading={loading}
             />
           </div>
           <div className="dashboard-grid">
@@ -146,9 +162,13 @@ export function Dashboard({
                   <span className="eyebrow">{t('dashboard.maintenance')}</span>
                   <h2>{t('dashboard.attention')}</h2>
                 </div>
-                <span className="count-badge">{number(due.length + upcoming.length)}</span>
+                {!loading && (
+                  <span className="count-badge">{number(due.length + upcoming.length)}</span>
+                )}
               </div>
-              {due.length + upcoming.length ? (
+              {loading ? (
+                <SkeletonRows count={4} />
+              ) : due.length + upcoming.length ? (
                 <div className="due-list">
                   {[...due, ...upcoming].slice(0, 6).map((item) => (
                     <DueRow key={item.schedule.id} item={item} href={carPath(item.car.id)} />
@@ -184,8 +204,9 @@ export function Dashboard({
                   <h2>{t('dashboard.inGarage')}</h2>
                 </div>
               </div>
+              {loading && <SkeletonRows count={3} />}
               <div className="vehicle-list">
-                {activeCars.length === 0 && (
+                {activeCars.length === 0 && !loading && (
                   <div className="panel-empty">
                     <CarFront size={22} />
                     <div>
@@ -229,9 +250,11 @@ export function Dashboard({
                   );
                 })}
               </div>
-              <button className="text-link" onClick={onAddCar}>
-                <Plus size={16} /> {t('dashboard.addAnother')}
-              </button>
+              {!loading && (
+                <button className="text-link" onClick={onAddCar}>
+                  <Plus size={16} /> {t('dashboard.addAnother')}
+                </button>
+              )}
             </section>
           </div>
           <div className="recent-grid">
@@ -246,7 +269,9 @@ export function Dashboard({
                   <ArrowRight size={16} />
                 </Link>
               </div>
-              {visits.length ? (
+              {loading ? (
+                <SkeletonRows count={3} />
+              ) : visits.length ? (
                 <div className="recent-list">
                   {visits.slice(0, 5).map((visit) => (
                     <div className="recent-row" key={visit.id}>
@@ -290,7 +315,9 @@ export function Dashboard({
                   <ArrowRight size={16} />
                 </Link>
               </div>
-              {fuelEntries.length ? (
+              {loading ? (
+                <SkeletonRows count={3} />
+              ) : fuelEntries.length ? (
                 <div className="recent-list">
                   {fuelEntries.slice(0, 5).map((entry) => {
                     const car = cars.find((item) => item.id === entry.carId);

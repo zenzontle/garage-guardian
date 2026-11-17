@@ -2119,7 +2119,10 @@ input[type='number'] {
     var(--surface-raised) 75%
   );
   background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  /* Fades in after a beat so a quick local load swaps in records without a flash. */
+  animation:
+    skeleton-appear 0.2s ease-out 0.2s both,
+    skeleton-shimmer 1.4s ease-in-out infinite;
 }
 .skeleton-lines {
   display: grid;
@@ -2133,8 +2136,15 @@ input[type='number'] {
 .skeleton-heading {
   height: 1.125rem;
 }
-.skeleton-title {
-  height: 2.25rem;
+.skeleton-button,
+.skeleton-control {
+  height: 2.75rem;
+  border-radius: 8px;
+}
+.skeleton-tab {
+  height: 2.5rem;
+  border-radius: 8px;
+  flex: none;
 }
 .skeleton-value {
   height: 2rem;
@@ -2146,11 +2156,16 @@ input[type='number'] {
   height: 34px;
   border-radius: 9px;
 }
+.table-panel > .recent-list {
+  padding: 4px 18px;
+}
 .skeleton.avatar {
   border-radius: 50%;
 }
-.garage-skeleton .page-heading .skeleton-lines {
-  gap: 14px;
+@keyframes skeleton-appear {
+  from {
+    opacity: 0;
+  }
 }
 @keyframes skeleton-shimmer {
   from {

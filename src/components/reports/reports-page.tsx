@@ -9,13 +9,18 @@ import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
 import { CarOptions } from '../ui/select-options';
 import { EmptyPanel } from '../ui/empty-panel';
+import { Skeleton } from '../ui/skeleton';
+import { SkeletonRows } from '../ui/skeleton-rows';
 import type { Currency } from '@/lib/currency/currency';
 
 export function ReportsPage({
+  loading = false,
   cars,
   visits,
   homeCurrency = 'USD',
 }: {
+  /** Renders the layout with placeholders where records go. */
+  loading?: boolean;
   cars: Car[];
   visits: Visit[];
   homeCurrency?: Currency;
@@ -41,6 +46,7 @@ export function ReportsPage({
       <div className="report-filters">
         <select
           aria-label={t('reports.carFilter')}
+          disabled={loading}
           value={carId}
           onChange={(e) => setCarId(e.target.value)}
         >
@@ -49,6 +55,7 @@ export function ReportsPage({
         </select>
         <select
           aria-label={t('reports.yearFilter')}
+          disabled={loading}
           value={year}
           onChange={(e) => setYear(e.target.value)}
         >
@@ -63,23 +70,62 @@ export function ReportsPage({
       <div className="report-stat-grid">
         <div className="report-total">
           <span className="eyebrow">{t('reports.totalSpent')}</span>
-          <strong>{money(totals.totalCents)}</strong>
-          <small>{t('reports.visitCount', { count: filtered.length })}</small>
+          {loading ? (
+            <>
+              <Skeleton className="skeleton-value" width="45%" />
+              <Skeleton className="skeleton-small" width="30%" />
+            </>
+          ) : (
+            <>
+              <strong>{money(totals.totalCents)}</strong>
+              <small>{t('reports.visitCount', { count: filtered.length })}</small>
+            </>
+          )}
         </div>
         <div className="report-total">
           <span className="eyebrow">{t('reports.average')}</span>
-          <strong>
-            {money(
-              totals.convertedCount ? Math.round(totals.totalCents / totals.convertedCount) : 0,
-            )}
-          </strong>
-          <small>{t('reports.loggedVisits')}</small>
+          {loading ? (
+            <>
+              <Skeleton className="skeleton-value" width="45%" />
+              <Skeleton className="skeleton-small" width="30%" />
+            </>
+          ) : (
+            <>
+              <strong>
+                {money(
+                  totals.convertedCount ? Math.round(totals.totalCents / totals.convertedCount) : 0,
+                )}
+              </strong>
+              <small>{t('reports.loggedVisits')}</small>
+            </>
+          )}
         </div>
       </div>
       {totals.pendingCount > 0 && (
         <p role="status">{t('currency.incomplete', { count: totals.pendingCount })}</p>
       )}
-      {filtered.length ? (
+      {loading ? (
+        <div className="report-grid">
+          <section className="panel">
+            <div className="section-heading">
+              <div>
+                <span className="eyebrow">{t('reports.spending')}</span>
+                <h2>{t('reports.overTime')}</h2>
+              </div>
+            </div>
+            <SkeletonRows count={5} />
+          </section>
+          <section className="panel">
+            <div className="section-heading">
+              <div>
+                <span className="eyebrow">{t('reports.breakdown')}</span>
+                <h2>{t('reports.byVehicle')}</h2>
+              </div>
+            </div>
+            <SkeletonRows count={3} />
+          </section>
+        </div>
+      ) : filtered.length ? (
         <div className="report-grid">
           <section className="panel">
             <div className="section-heading">

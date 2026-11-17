@@ -4,9 +4,10 @@ import { Dashboard } from './dashboard';
 import { useGarage } from '../garage/garage-provider';
 
 export function DashboardScreen() {
-  const { snapshot, visits, fuelEntries, allDue, setModal, homeCurrency } = useGarage();
+  const { snapshot, visits, fuelEntries, allDue, setModal, homeCurrency, loading } = useGarage();
   return (
     <Dashboard
+      loading={loading}
       cars={snapshot.cars}
       visits={visits}
       fuelEntries={fuelEntries}

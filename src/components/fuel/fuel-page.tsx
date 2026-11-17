@@ -10,11 +10,14 @@ import { PageHeading } from '../ui/page-heading';
 import { CarOptions } from '../ui/select-options';
 import { EmptyPanel } from '../ui/empty-panel';
 import { Stat } from '../ui/stat';
+import { Skeleton } from '../ui/skeleton';
+import { SkeletonRows } from '../ui/skeleton-rows';
 import { FuelCard } from './fuel-card';
 import { FuelRow } from './fuel-row';
 import { useFuelDisplay } from './use-fuel-display';
 
 export function FuelPage({
+  loading = false,
   cars,
   fuelEntries,
   repository,
@@ -25,6 +28,8 @@ export function FuelPage({
   onEdit,
   onDelete,
 }: {
+  /** Renders the layout with placeholders where records go. */
+  loading?: boolean;
   cars: Car[];
   fuelEntries: FuelEntry[];
   repository: Repository;
@@ -72,7 +77,9 @@ export function FuelPage({
         title={t('navigation.fuel')}
         description={t('fuel.description')}
         action={
-          activeCars.length ? (
+          loading ? (
+            <Skeleton className="skeleton-button" width="8rem" />
+          ) : activeCars.length ? (
             <button className="button primary tone-fuel" onClick={onAdd}>
               <Plus size={18} />
               {t('fuel.log')}
@@ -108,6 +115,7 @@ export function FuelPage({
             <span>{t('fuel.filterCar')}</span>
             <select
               aria-label={t('fuel.filterCar')}
+              disabled={loading}
               value={carId}
               onChange={(e) => onCarChange(e.target.value)}
             >
@@ -116,7 +124,9 @@ export function FuelPage({
             </select>
           </label>
         </div>
-        {filtered.length ? (
+        {loading ? (
+          <SkeletonRows count={5} />
+        ) : filtered.length ? (
           <>
             <div className="table-scroll">
               <table>
@@ -156,7 +166,11 @@ export function FuelPage({
           />
         )}
         <div className="table-footer">
-          {t('fuel.showing', { count: filtered.length, total: fuelEntries.length })}
+          {loading ? (
+            <Skeleton className="skeleton-small" width="8rem" />
+          ) : (
+            t('fuel.showing', { count: filtered.length, total: fuelEntries.length })
+          )}
         </div>
       </div>
     </>
