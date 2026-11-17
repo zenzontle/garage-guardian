@@ -2105,3 +2105,63 @@ input[type='number'] {
 .info-callout:not(.warning) {
   border-left: 3px solid var(--accent);
 }
+
+/* Loading placeholders: a soft shimmer where records will appear. */
+.skeleton {
+  display: block;
+  height: 0.875rem;
+  max-width: 100%;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--surface-raised) 25%,
+    var(--line) 50%,
+    var(--surface-raised) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.skeleton-lines {
+  display: grid;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.skeleton-small {
+  height: 0.6875rem;
+}
+.skeleton-heading {
+  height: 1.125rem;
+}
+.skeleton-title {
+  height: 2.25rem;
+}
+.skeleton-value {
+  height: 2rem;
+  margin-bottom: 12px;
+}
+.skeleton-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+.skeleton.avatar {
+  border-radius: 50%;
+}
+.garage-skeleton .page-heading .skeleton-lines {
+  gap: 14px;
+}
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
