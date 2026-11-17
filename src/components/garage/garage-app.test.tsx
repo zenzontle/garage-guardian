@@ -724,7 +724,7 @@ it('hides language selection during a transfer, allows it in recovery, and retai
   const GarageApp = await loadGarageTestApp();
   const user = userEvent.setup();
   render(<GarageApp />);
-  expect(screen.getByRole('heading', { name: 'Opening your garage' })).toBeDefined();
+  expect(screen.getByText('Loading your records…')).toBeDefined();
   expect(screen.queryByRole('combobox', { name: 'Language' })).toBeNull();
   await screen.findByRole('heading', { name: 'Moving your garage to Supabase' });
   await waitFor(() => expect(cloud.execute).toHaveBeenCalledOnce());

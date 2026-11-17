@@ -11,11 +11,14 @@ import { GarageProfile } from './garage-profile';
 
 export function GarageTopbar({
   page,
+  loading = false,
   menuOpen,
   menuTrigger,
   onMenuToggle,
 }: {
   page: Page;
+  /** Hides language and account controls until the garage has loaded. */
+  loading?: boolean;
   menuOpen: boolean;
   menuTrigger: RefObject<HTMLButtonElement | null>;
   onMenuToggle: () => void;
@@ -60,12 +63,12 @@ export function GarageTopbar({
         </strong>
       </span>
       <div className="topbar-right">
-        <LocaleSelector />
+        {!loading && <LocaleSelector />}
         <span className="today-pill">
           <CalendarDays size={15} />
           {displayDate(todayISO())}
         </span>
-        <GarageProfile />
+        {loading ? <span className="skeleton avatar" aria-hidden="true" /> : <GarageProfile />}
       </div>
     </header>
   );

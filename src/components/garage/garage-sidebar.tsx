@@ -19,7 +19,8 @@ export function GarageSidebar({
   menuOpen: boolean;
   onNavigate: () => void;
   menuTrigger: RefObject<HTMLButtonElement | null>;
-  carCount: number;
+  /** Null while the garage is still loading. */
+  carCount: number | null;
 }) {
   const t = useTranslations();
   const sidebar = useRef<HTMLElement>(null);
@@ -98,8 +99,12 @@ export function GarageSidebar({
           <span className="summary-icon">
             <CarFront size={18} />
           </span>
-          <div>
-            <strong>{t('app.vehicleCount', { count: carCount })}</strong>
+          <div aria-hidden={carCount === null || undefined}>
+            {carCount === null ? (
+              <strong className="skeleton" style={{ width: '6rem' }} />
+            ) : (
+              <strong>{t('app.vehicleCount', { count: carCount })}</strong>
+            )}
             <small>{t('app.inGarage')}</small>
           </div>
         </div>

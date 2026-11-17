@@ -324,7 +324,7 @@ it('waits for garage loading before canonicalizing /cars and leaves no extra Bac
   testRouter.reset('/cars');
   const App = await loadGarageTestApp();
   render(<App />);
-  await screen.findByRole('heading', { name: 'Opening your garage' });
+  await screen.findByText('Loading your records…');
   expect(testRouter.url).toBe('/cars');
   expect(testRouter.replace).not.toHaveBeenCalled();
   release();

@@ -19,6 +19,7 @@ import { FuelModal } from '../fuel/fuel-modal';
 import { GarageSidebar } from './garage-sidebar';
 import { GarageTopbar } from './garage-topbar';
 import { GarageMobileNavigation } from './garage-mobile-navigation';
+import { GarageSkeleton } from './garage-skeleton';
 import { AccountSettingsDialog } from '../account/account-settings-dialog';
 import { AccountRecoveryScreen } from '../account/account-recovery-screen';
 import { SignOutDialog } from '../account/sign-out-dialog';
@@ -122,7 +123,10 @@ export function GarageContent({ children }: { children: ReactNode }) {
       onConfirm={garage.confirmSignOut}
     />
   );
-  if (loading || !repository)
+  // A plain load opens the workspace at once with placeholders. Sign-in pages keep the card, and
+  // so does a signup transfer once its pending check resolves.
+  const skeleton = loading && !transferring && !accountMode(pathname);
+  if (!skeleton && (loading || !repository))
     return (
       <>
         {reporter}
@@ -180,18 +184,19 @@ export function GarageContent({ children }: { children: ReactNode }) {
           menuOpen={menuOpen}
           onNavigate={closeMenu}
           menuTrigger={menuTrigger}
-          carCount={snapshot.cars.filter((car) => !car.isArchived).length}
+          carCount={skeleton ? null : snapshot.cars.filter((car) => !car.isArchived).length}
         />
 
         <div className="main-wrap">
           <GarageTopbar
             page={page}
+            loading={skeleton}
             menuOpen={menuOpen}
             menuTrigger={menuTrigger}
             onMenuToggle={() => setMenuOpen(!menuOpen)}
           />
           <main className={`content page-${page}`}>
-            {isCloudConfigured && !user && (
+            {isCloudConfigured && !user && !skeleton && (
               <div className="storage-account">
                 {!user && <span>{t('app.guestStorage')}</span>}
                 {accountActions}
@@ -241,7 +246,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
                 <span>{t('app.prototypeNotice')}</span>
               </div>
             )}
-            {children}
+            {skeleton ? <GarageSkeleton page={page} /> : children}
             {(snapshot.pendingSyncCount ?? 0) > 0 && (
               <div className="demo-banner" role="status">
                 <span>
