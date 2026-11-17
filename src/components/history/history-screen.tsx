@@ -14,12 +14,13 @@ export function HistoryScreen() {
   const display = useDisplay();
   const router = useRouter();
   const search = useSearchParams();
-  const { snapshot, visits, repository, setModal, perform, homeCurrency } = useGarage();
+  const { snapshot, visits, repository, setModal, perform, homeCurrency, loading } = useGarage();
   const requested = search.get('car') ?? '';
   // An unknown or deleted vehicle in the link shows every visit instead of an empty list.
   const carId = snapshot.cars.some((car) => car.id === requested) ? requested : '';
   return (
     <HistoryPage
+      loading={loading}
       cars={snapshot.cars}
       visits={visits}
       homeCurrency={homeCurrency}

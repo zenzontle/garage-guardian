@@ -19,7 +19,6 @@ import { FuelModal } from '../fuel/fuel-modal';
 import { GarageSidebar } from './garage-sidebar';
 import { GarageTopbar } from './garage-topbar';
 import { GarageMobileNavigation } from './garage-mobile-navigation';
-import { GarageSkeleton } from './garage-skeleton';
 import { AccountSettingsDialog } from '../account/account-settings-dialog';
 import { AccountRecoveryScreen } from '../account/account-recovery-screen';
 import { SignOutDialog } from '../account/sign-out-dialog';
@@ -123,8 +122,9 @@ export function GarageContent({ children }: { children: ReactNode }) {
       onConfirm={garage.confirmSignOut}
     />
   );
-  // A plain load opens the workspace at once with placeholders. Sign-in pages keep the card, and
-  // so does a signup transfer once its pending check resolves.
+  // A plain load opens the workspace at once: pages render their layout with placeholders where
+  // records go. Sign-in pages keep the card, and so does a signup transfer once its pending check
+  // resolves.
   const skeleton = loading && !transferring && !accountMode(pathname);
   if (!skeleton && (loading || !repository))
     return (
@@ -195,7 +195,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
             menuTrigger={menuTrigger}
             onMenuToggle={() => setMenuOpen(!menuOpen)}
           />
-          <main className={`content page-${page}`}>
+          <main className={`content page-${page}`} aria-busy={skeleton || undefined}>
             {isCloudConfigured && !user && !skeleton && (
               <div className="storage-account">
                 {!user && <span>{t('app.guestStorage')}</span>}
@@ -246,7 +246,12 @@ export function GarageContent({ children }: { children: ReactNode }) {
                 <span>{t('app.prototypeNotice')}</span>
               </div>
             )}
-            {skeleton ? <GarageSkeleton page={page} /> : children}
+            {skeleton && (
+              <p className="sr-only" role="status">
+                {t('app.loading')}
+              </p>
+            )}
+            {children}
             {(snapshot.pendingSyncCount ?? 0) > 0 && (
               <div className="demo-banner" role="status">
                 <span>

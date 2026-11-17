@@ -21,9 +21,11 @@ import { useFuelDisplay } from '../fuel/use-fuel-display';
 import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
 import { EmptyPanel } from '../ui/empty-panel';
+import { CarLoading } from './car-loading';
 import type { AppFailure } from '@/lib/utils/app-error';
 
 export function CarsPage({
+  loading = false,
   cars,
   archived,
   hasArchived,
@@ -44,6 +46,8 @@ export function CarsPage({
   onDeleteCar,
   onDeleteSchedule,
 }: {
+  /** Renders the layout with placeholders where records go. */
+  loading?: boolean;
   cars: Car[];
   archived: boolean;
   hasArchived: boolean;
@@ -80,7 +84,7 @@ export function CarsPage({
         title={t('navigation.cars')}
         description={t('car.description')}
         action={
-          <button disabled={archiveBusy} className="button primary" onClick={onAdd}>
+          <button disabled={archiveBusy || loading} className="button primary" onClick={onAdd}>
             <Plus size={18} />
             {t('shared.addCar')}
           </button>
@@ -104,7 +108,9 @@ export function CarsPage({
           </Link>
         </nav>
       )}
-      {!car ? (
+      {loading ? (
+        <CarLoading />
+      ) : !car ? (
         <EmptyPanel
           icon={<CarFront size={25} />}
           title={t(

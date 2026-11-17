@@ -11,6 +11,11 @@ import { accountPath, carPath } from '../../lib/navigation/garage-routes';
 import en from '../../../messages/en.json';
 import es from '../../../messages/es.json';
 
+/** Pages render their headings while records load; this waits until the garage has loaded. */
+async function loaded() {
+  await waitFor(() => expect(screen.getByRole('main').getAttribute('aria-busy')).toBeNull());
+}
+
 vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn() }));
 let cloud: ReturnType<typeof fakeSupabase>;
 beforeEach(async () => {
@@ -66,6 +71,7 @@ it('does not offer an email opt-in for a local-only garage', async () => {
   const App = await loadGarageTestApp();
   render(<App />);
   await screen.findByRole('heading', { name: 'Notification settings' });
+  await loaded();
   expect(screen.queryByRole('checkbox')).toBeNull();
   expect(screen.queryByRole('link', { name: 'Sign in' })).toBeNull();
 });
@@ -118,6 +124,7 @@ it.each(['account', 'security'] as const)(
     const user = userEvent.setup();
     const title = section === 'account' ? en.account.settings : en.account.security;
     await screen.findByRole('heading', { name: title });
+    await loaded();
     expect(screen.queryByRole('form')).toBeNull();
     const links = screen.getAllByRole('link', { name: en.account.signIn });
     await user.click(links[links.length - 1]);
@@ -302,9 +309,11 @@ it.each([
   const App = await loadGarageTestApp();
   const app = render(<App />);
   await screen.findByRole('heading', { name: title });
+  await loaded();
   app.unmount();
   render(<App />);
   await screen.findByRole('heading', { name: title });
+  await loaded();
   expect(testRouter.url).toBe(url);
 });
 

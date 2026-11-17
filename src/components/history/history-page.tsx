@@ -9,12 +9,15 @@ import { visitsToCsv } from '@/lib/reports/reports';
 import { PageHeading } from '../ui/page-heading';
 import { CarOptions } from '../ui/select-options';
 import { EmptyPanel } from '../ui/empty-panel';
+import { Skeleton } from '../ui/skeleton';
+import { SkeletonRows } from '../ui/skeleton-rows';
 import { HistoryRow } from './history-row';
 import { HistoryCard } from './history-card';
 import { compareCost, type Currency } from '@/lib/currency/currency';
 import { downloadUrl } from '@/lib/utils/download-url';
 
 export function HistoryPage({
+  loading = false,
   cars,
   visits,
   repository,
@@ -26,6 +29,8 @@ export function HistoryPage({
   onDelete,
   homeCurrency = 'USD',
 }: {
+  /** Renders the layout with placeholders where records go. */
+  loading?: boolean;
   cars: Car[];
   visits: Visit[];
   repository: Repository;
@@ -96,7 +101,9 @@ export function HistoryPage({
         title={t('navigation.history')}
         description={t('history.description')}
         action={
-          activeCars.length ? (
+          loading ? (
+            <Skeleton className="skeleton-button" width="9rem" />
+          ) : activeCars.length ? (
             <button className="button primary" onClick={onAdd}>
               <Plus size={18} />
               {t('shared.logService')}
@@ -127,6 +134,7 @@ export function HistoryPage({
             <span>{t('history.filterCar')}</span>
             <select
               aria-label={t('history.filterCar')}
+              disabled={loading}
               value={carId}
               onChange={(e) => onCarChange(e.target.value)}
             >
@@ -161,7 +169,9 @@ export function HistoryPage({
             {t('history.export')}
           </button>
         </div>
-        {filtered.length ? (
+        {loading ? (
+          <SkeletonRows count={5} />
+        ) : filtered.length ? (
           <>
             <div className="table-scroll">
               <table>
@@ -218,7 +228,11 @@ export function HistoryPage({
           />
         )}
         <div className="table-footer">
-          {t('history.showing', { count: filtered.length, total: visits.length })}
+          {loading ? (
+            <Skeleton className="skeleton-small" width="8rem" />
+          ) : (
+            t('history.showing', { count: filtered.length, total: visits.length })
+          )}
         </div>
       </div>
     </>

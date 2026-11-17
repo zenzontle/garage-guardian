@@ -29,6 +29,7 @@ export function CarsScreen({ carId }: { carId?: string }) {
     perform,
     currentPath,
     setCarArchived,
+    loading,
   } = useGarage();
   const router = useRouter();
   const pathname = usePathname();
@@ -63,7 +64,7 @@ export function CarsScreen({ carId }: { carId?: string }) {
   }, [carId, firstCar, router]);
 
   if (!carId && firstCar) return <p role="status">{t('app.loading')}</p>;
-  if (carId && !selectedCar)
+  if (carId && !selectedCar && !loading)
     return (
       <>
         <PageHeading
@@ -92,6 +93,7 @@ export function CarsScreen({ carId }: { carId?: string }) {
     );
   return (
     <CarsPage
+      loading={loading}
       cars={cars}
       archived={archived}
       hasArchived={snapshot.cars.some((car) => car.isArchived)}
