@@ -32,6 +32,7 @@ import {
   withAccountLock,
 } from '../account/account-session';
 import { OfflineReceipts } from '../currency/offline-receipts';
+import { retryAfterDelay } from '../utils/retry-after';
 import en from '../../../messages/en.json';
 
 export type MutationResult = { refreshed: boolean };
@@ -461,9 +462,9 @@ export function useGarageSession() {
     if (!response.ok) {
       const code = body?.error?.code;
       // A daily limit can mean hours, not the few minutes rateLimited suggests.
-      const retryAfter = Number(response.headers.get('retry-after'));
+      const retryAfter = retryAfterDelay(response.headers.get('retry-after'));
       if (response.status === 429 && code === 'rateLimited' && retryAfter > 0)
-        throw new AppError('accountRateLimited', { minutes: Math.ceil(retryAfter / 60) });
+        throw new AppError('accountRateLimited', { minutes: Math.ceil(retryAfter / 60_000) });
       throw new AppError(
         code && Object.hasOwn(en.errors, code) ? (code as keyof typeof en.errors) : 'auth',
       );

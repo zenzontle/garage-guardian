@@ -5,37 +5,16 @@ on:
     # synchronize covers PRs opened with merge conflicts, which trigger no workflows until a push.
     types: [opened, reopened, ready_for_review, synchronize]
 
-permissions:
-  contents: write
-  pull-requests: write
-
 # Only the latest push decides whether auto-merge stays on.
 concurrency:
   group: auto-merge-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  enable-automerge:
-    if: >-
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.user.login != 'dependabot[bot]'
-
-    runs-on: ubuntu-latest
-
-    steps:
-      # Paths in CODEOWNERS need a human to merge them (see REVIEW.md), so auto-merge is
-      # turned off when a PR touches them. Keep this list in sync with .github/CODEOWNERS.
-      - name: Enable or disable auto-merge
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-        run: |
-          sensitive=$(gh pr diff "$PR_URL" --name-only | grep -E '^(\.github/|REVIEW\.md$|\.claude/commands/pr-review\.|\.claude/settings\.json$|\.claude/hooks/|supabase/|src/app/api/|vercel\.json$|src/lib/account/|src/app/\(garage\)/auth/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)' || true)
-          if [ -n "$sensitive" ]; then
-            echo "Sensitive paths changed; a human must merge this PR:"
-            echo "$sensitive"
-            gh pr merge "$PR_URL" --disable-auto || true
-          else
-            gh pr merge "$PR_URL" --auto --merge
-          fi
+  auto-merge:
+    name: Auto-merge
+    # Turned off for PRs that touch a path in .github/CODEOWNERS; see REVIEW.md.
+    uses: zenzontle/workflows/.github/workflows/auto-merge.yml@d20960c4116a2bea0412b2d717ed3034a4ed5c99 # main
+    permissions:
+      contents: write
+      pull-requests: write

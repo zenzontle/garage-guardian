@@ -38,8 +38,13 @@ export function contentSecurityPolicy({
     'form-action': ["'self'"],
     'frame-ancestors': ["'none'"],
   };
+  return serializeCsp(directives);
+}
+
+/** Joins CSP directives into a header value; a directive with no sources stands alone. */
+export function serializeCsp(directives: Record<string, readonly string[]>): string {
   return Object.entries(directives)
-    .map(([name, sources]) => `${name} ${sources.join(' ')}`)
+    .map(([name, sources]) => [name, ...sources].join(' '))
     .join('; ');
 }
 

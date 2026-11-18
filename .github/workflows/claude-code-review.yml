@@ -3,12 +3,6 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
 
 # A new push makes the review of the previous commit obsolete.
 concurrency:
@@ -16,166 +10,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  claude-review:
-    # /pr-review skips drafts without posting, which the gate below would read as a failure.
-    # The ready_for_review event runs the review once the PR leaves draft.
-    if: github.event.pull_request.draft == false
-
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
-
-    runs-on: ubuntu-latest
+  claude:
+    name: Claude
+    uses: zenzontle/workflows/.github/workflows/claude-review.yml@d20960c4116a2bea0412b2d717ed3034a4ed5c99 # main
     permissions:
       contents: read
       pull-requests: read
       issues: read
       id-token: write
-
-    steps:
-      # Comments from earlier runs on the same commit must not affect this run.
-      - name: Record review start
-        id: review-start
-        run: echo "at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout repository
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
-        with:
-          fetch-depth: 1
-
-      # Third-party plugin code runs in this job (skills, and any hooks it declares) next to
-      # the OAuth token and the merge gate, so install a reviewed commit, never a branch.
-      # The upstream marketplace points its plugin at the default branch, so it is
-      # redirected to this checkout. Review the diff before changing AGENT_SKILLS_SHA.
-      - name: Fetch pinned review skills
-        env:
-          AGENT_SKILLS_SHA: 301b02b12bff98e4688e6984af6556802322bbde
-          SKILLS_DIR: ${{ runner.temp }}/agent-skills
-        run: |
-          git init -q "$SKILLS_DIR"
-          git -C "$SKILLS_DIR" fetch -q --depth 1 https://github.com/addyosmani/agent-skills.git "$AGENT_SKILLS_SHA"
-          git -C "$SKILLS_DIR" checkout -q --detach FETCH_HEAD
-          test "$(git -C "$SKILLS_DIR" rev-parse HEAD)" = "$AGENT_SKILLS_SHA"
-          manifest="$SKILLS_DIR/.claude-plugin/marketplace.json"
-          jq -e '.name == "addy-agent-skills" and any(.plugins[]; .name == "agent-skills")' "$manifest" > /dev/null
-          jq '.plugins |= map(select(.name == "agent-skills") | .source = "./")' "$manifest" > "$manifest.pinned"
-          mv "$manifest.pinned" "$manifest"
-
-      - name: Run Claude Code Review
-        id: claude-review
-        uses: anthropics/claude-code-action@8041f1d17e0e7d2f2cfe35002962e9f26237c0bb
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: |
-            ${{ runner.temp }}/agent-skills
-          plugins: |
-            agent-skills@addy-agent-skills
-          # /pr-review is the repo's copy of the code-review plugin's command
-          # (.claude/commands/pr-review.md). It reviews every pushed commit, unlike the
-          # plugin, which stays silent once Claude has commented. On PRs the action
-          # restores .claude/ from the base branch, so a PR cannot change its own review.
-          # The skills only add review criteria; the "Fail if Claude reported issues"
-          # step depends on /pr-review's comment format, so it must own the output.
-          prompt: |
-            Read REVIEW.md at the repository root. It defines what counts as a finding,
-            what not to flag, and which paths to ignore for this repository.
-
-            Load these skills with the Skill tool and use their criteria as additional
-            review guidance. Do not use their output formats.
-            - agent-skills:code-review-and-quality
-            - agent-skills:security-and-hardening
-
-            Then run /pr-review --comment ${{ github.repository }}/pull/${{ github.event.pull_request.number }}
-            and post findings only in the format that command specifies.
-          claude_args: '--allowedTools "Read,Skill,mcp__github_inline_comment__create_inline_comment"'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-
-      # Claude posts inline comments for findings, or a "No issues found" summary otherwise.
-      # No output at all means the review did not run, so the gate fails.
-      - name: Fail if Claude reported issues
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          REVIEW_START: ${{ steps.review-start.outputs.at }}
-        with:
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const pull_number = context.payload.pull_request.number;
-            const headSha = context.payload.pull_request.head.sha;
-            const since = process.env.REVIEW_START;
-            const claudeLogin = 'claude[bot]';
-
-            const reviewComments = await github.paginate(
-              github.rest.pulls.listReviewComments,
-              { owner, repo, pull_number, per_page: 100 }
-            );
-            const findings = reviewComments.filter(comment =>
-              comment.user?.login === claudeLogin &&
-              comment.original_commit_id === headSha &&
-              comment.created_at >= since
-            );
-
-            if (findings.length) {
-              core.setFailed(
-                `Claude reported ${findings.length} issue(s) on ${headSha}:\n` +
-                findings
-                  .map(comment =>
-                    `- ${comment.path}:${comment.original_line ?? comment.line ?? '?'} ` +
-                    comment.html_url
-                  )
-                  .join('\n')
-              );
-              return;
-            }
-
-            const issueComments = await github.paginate(
-              github.rest.issues.listComments,
-              { owner, repo, issue_number: pull_number, since, per_page: 100 }
-            );
-            const summaries = issueComments.filter(comment =>
-              comment.user?.login === claudeLogin &&
-              comment.created_at >= since &&
-              comment.body?.startsWith('## Code review')
-            );
-
-            // claude-code-action refuses to run while this workflow differs from main's copy.
-            // Such PRs touch .github/, so CODEOWNERS already requires a human merge.
-            const files = await github.paginate(
-              github.rest.pulls.listFiles,
-              { owner, repo, pull_number, per_page: 100 }
-            );
-            const changesThisWorkflow = files.some(
-              file => file.filename === '.github/workflows/claude-code-review.yml'
-            );
-
-            if (!summaries.length && changesThisWorkflow) {
-              core.warning(
-                `Claude review cannot run on a PR that changes this workflow. ` +
-                `${headSha} needs a human review before merge.`
-              );
-              return;
-            }
-
-            // A skipped or failed review posts nothing; that must not pass as clean.
-            if (!summaries.length) {
-              core.setFailed(
-                `Claude posted no review on ${headSha}. Check the "Run Claude Code Review" step log.`
-              );
-              return;
-            }
-
-            const summaryWithFindings = summaries.find(
-              comment => !comment.body.includes('No issues found')
-            );
-
-            if (summaryWithFindings) {
-              core.setFailed(
-                `Claude reported issues on ${headSha}: ${summaryWithFindings.html_url}`
-              );
-              return;
-            }
-
-            core.info(`Claude found no issues on ${headSha}.`);
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

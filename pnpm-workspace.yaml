@@ -1,18 +1,36 @@
-# Keep supply-chain checks active, including for frozen installs in CI.
+# Shared supply-chain policy, kept identical across repositories. Add repository-specific
+# exceptions below this block, each with a reason and a review date.
+
+# Corepack uses the package.json pin; keep pnpm's own version out of the lockfile.
+pmOnFail: ignore
+
+# Enforce the release delay even when no older version satisfies a requested range.
 minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true
 minimumReleaseAgeIgnoreMissingTime: false
+
 blockExoticSubdeps: true
 trustPolicy: no-downgrade
+# Recheck locked packages against the policy, including frozen installs in CI.
+trustLockfile: false
+
+# New install scripts require review; approvals apply only to reviewed versions.
+strictDepBuilds: true
+
 # Existing releases without provenance; registry integrity matches the committed lockfile.
 # Reviewed 2026-11-13. Revisit on dependency updates; do not broaden these selectors.
 trustPolicyExclude:
   - eslint-import-resolver-typescript@3.10.1 # Published 2025-04-21.
   - undici-types@6.21.0 # Published 2024-11-13.
-trustLockfile: false
 
-# New install scripts require review; approvals apply only to reviewed versions.
-strictDepBuilds: true
+# Install scripts reviewed and not needed.
 allowBuilds:
   '@parcel/watcher': false
   '@swc/core': false
+
+# GHSA-g3hv-75wg-m249: no typescript-eslint release allows a patched minimatch yet.
+# Dev-only. Remove once typescript-eslint accepts minimatch >=11.0.1; review by 2026-12-09.
+overrides:
+  '@typescript-eslint/typescript-estree>minimatch': ^11.0.1
+  'eslint>minimatch': ^11.0.1
+  '@eslint/config-array>minimatch': ^11.0.1

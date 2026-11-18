@@ -36,7 +36,7 @@ pnpm build
 pnpm e2e
 ```
 
-CI runs `pnpm exec prettier --check .` and `pnpm exec eslint . --max-warnings 0` (warnings fail), then typecheck, test, and build. A separate browser-test job builds the app and runs `pnpm e2e`, uploading the Playwright report and traces when a test fails.
+CI runs `pnpm format:check` and `pnpm lint` (warnings fail), then `pnpm typecheck`, `pnpm test`, and `pnpm build`; `pnpm check` runs the first three locally. The jobs come from the shared [zenzontle/workflows](https://github.com/zenzontle/workflows) repository, pinned to a commit. A separate browser-test job builds the app and runs `pnpm e2e`, uploading the Playwright report and traces when a test fails.
 
 Browser tests in `e2e` run the production build in local prototype mode, in Chromium at a desktop size and a phone size (Pixel 7). They cover vehicles, maintenance reminders, service visits with photos, history filters and CSV export, fuel economy, reports, unsaved-change prompts, language switching, and navigation. Run `pnpm exec playwright install chromium` once, then `pnpm build` before `pnpm e2e`; the tests start the built app on port 3210, which must be free. They run without retries, so a flaky test fails. Build without Supabase variables (move `.env.local` aside), or the app will not run in prototype mode. Each test opens a fresh browser context, so IndexedDB starts empty.
 
@@ -44,7 +44,7 @@ ESLint checks JavaScript, TypeScript, and TSX files with the recommended Next.js
 
 TypeScript is installed twice. `pnpm typecheck` runs the TypeScript 7 compiler, installed as `@typescript/native`. TypeScript 7 has no JavaScript API yet, so the `typescript` package is an alias for `@typescript/typescript6`, which keeps the 6.0 API for typescript-eslint and Next.js. When typescript-eslint supports TypeScript 7, point `typescript` back at the real package and remove `@typescript/native`.
 
-Prettier is installed locally with a pinned version. Run `pnpm format` to format supported project files, or `pnpm format:check` to check formatting without changing files. The configuration uses single quotes, semicolons, trailing commas, two-space indentation, a 100-character print width, and LF line endings enforced by `.gitattributes`. Generated files and build output are excluded through `.prettierignore`; Prettier also respects `.gitignore`. To format only files changed during a task, run `pnpm exec prettier --write path/to/file.ts` with the relevant file paths.
+Prettier is installed locally with a pinned version. Run `pnpm format` to format supported project files, or `pnpm format:check` to check formatting without changing files. The configuration uses single quotes, semicolons, trailing commas, two-space indentation, a 100-character print width, and CRLF line endings. `.gitattributes` checks out text files with CRLF on every platform; Git stores LF. Generated files and build output are excluded through `.prettierignore`; Prettier also respects `.gitignore`. To format only files changed during a task, run `pnpm exec prettier --write path/to/file.ts` with the relevant file paths.
 
 Automated tests use fakes, stand-ins, or mocked HTTP for Supabase, Brevo, GitHub, Upstash, and the exchange-rate provider; they never send real email or publish real issues. Browser tests use no cloud services. Live provider behavior is checked by the staging and smoke tests described in each feature guide.
 
