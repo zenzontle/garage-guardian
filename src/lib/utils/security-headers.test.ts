@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { contentSecurityPolicy, securityHeaders } from './security-headers';
+import { contentSecurityPolicy, securityHeaders, serializeCsp } from './security-headers';
 
 const directives = (policy: string) =>
   Object.fromEntries(
@@ -67,5 +67,17 @@ describe('security headers', () => {
       'Strict-Transport-Security': 'max-age=63072000',
     });
     expect(headers['Permissions-Policy']).toContain('camera=()');
+  });
+});
+
+describe('serializeCsp', () => {
+  it('joins directives in order and keeps source-less directives bare', () => {
+    expect(
+      serializeCsp({
+        'default-src': ["'self'"],
+        'img-src': ["'self'", 'data:'],
+        'upgrade-insecure-requests': [],
+      }),
+    ).toBe("default-src 'self'; img-src 'self' data:; upgrade-insecure-requests");
   });
 });

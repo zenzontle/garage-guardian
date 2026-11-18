@@ -9,6 +9,7 @@ const config = [
     ignores: ['.next/**', 'out/**', 'coverage/**', 'next-env.d.ts'],
   },
   js.configs.recommended,
+  { linterOptions: { reportUnusedDisableDirectives: 'error' } },
   ...nextVitals,
   ...nextTypescript,
   {
@@ -21,7 +22,7 @@ const config = [
     },
   },
   {
-    files: ['*.mjs', 'scripts/**/*.mjs'],
+    files: ['*.mjs', 'scripts/**/*.mjs', '.claude/hooks/**/*.mjs'],
     languageOptions: { globals: globals.node },
   },
   prettier,

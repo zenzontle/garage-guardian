@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ReportError, describeCause, identifier, type ReportConfig } from './server-config';
+import { retryAfterSeconds } from '@/lib/utils/retry-after';
 import { LINEAR_ASSET_URL, REPORT_LIMITS } from './shared';
 
 const LINEAR_API = 'https://api.linear.app/graphql';
@@ -104,12 +105,11 @@ export function linearAdapter(config: ReportConfig) {
       throw failure(operation, describeCause(cause), creating);
     }
     if (!response.ok) {
-      const retry = Number(response.headers.get('retry-after'));
       throw failure(
         operation,
         await describeResponse(response, sensitive),
         creating && response.status >= 500,
-        retry > 0 && retry <= 86400 ? retry : undefined,
+        retryAfterSeconds(response.headers.get('retry-after')),
       );
     }
     return response;

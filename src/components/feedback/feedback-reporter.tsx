@@ -23,6 +23,7 @@ import {
   type PublicMetadata,
   type ReportContext,
 } from '@/lib/feedback/shared';
+import { retryAfterSeconds } from '@/lib/utils/retry-after';
 
 type ReporterErrorCode = keyof typeof en.feedback.errors;
 type ReporterProblem = { code: ReporterErrorCode; retryAfter?: number };
@@ -269,10 +270,9 @@ export function FeedbackReporter({
             setSent(false);
           }
         }
-        const wait = Number(response.headers.get('retry-after'));
         throw new ReporterFailure(
           isReporterErrorCode(result.code) ? result.code : 'SUBMIT_FAILED',
-          Number.isInteger(wait) && wait > 0 && wait <= 86400 ? wait : undefined,
+          retryAfterSeconds(response.headers.get('retry-after')),
         );
       }
       if (result.state === 'succeeded') {

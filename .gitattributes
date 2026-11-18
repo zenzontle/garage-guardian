@@ -1,1 +1,5 @@
-* text=auto eol=lf
+# Match Prettier's CRLF setting on every platform; keep binary files unchanged.
+* text=auto eol=crlf
+
+# pnpm writes its lockfile with LF, and Prettier skips it.
+pnpm-lock.yaml text eol=lf
