@@ -14,8 +14,9 @@ import { getAllDue } from '@/lib/maintenance/due';
 import { useGarageSession } from '@/lib/garage/use-garage-session';
 import { currencyOrDefault } from '@/lib/currency/currency';
 import { useBackgroundConversions } from '@/lib/currency/use-background-conversions';
-import type { Car, FuelEntry, ScheduleItem, Visit } from '@/lib/garage/model';
+import type { Car, Expense, FuelEntry, ScheduleItem, Visit } from '@/lib/garage/model';
 import { sortFuelEntries } from '@/lib/fuel/fuel';
+import { getRenewals, sortExpenses } from '@/lib/expenses/expenses';
 import { todayISO } from '@/lib/utils/today-iso';
 import { useInteractions } from '../interaction/interaction-provider';
 import { useFormInteraction } from '../interaction/use-form-interaction';
@@ -23,8 +24,10 @@ import { useFormInteraction } from '../interaction/use-form-interaction';
 type ModalState =
   | { kind: 'car'; item?: Car }
   | { kind: 'schedule'; item?: ScheduleItem; carId: string }
-  | { kind: 'visit'; item?: Visit; carId?: string }
+  // A schedule ID starts a new visit with that task completed.
+  | { kind: 'visit'; item?: Visit; carId?: string; scheduleId?: string }
   | { kind: 'fuel'; item?: FuelEntry; carId?: string }
+  | { kind: 'expense'; item?: Expense; carId?: string; next?: Expense }
   | { kind: 'account'; section?: 'security' }
   | null;
 
@@ -36,6 +39,8 @@ function useGarageState() {
     garage.snapshot.visits,
     homeCurrency,
     garage.refreshConversions,
+    garage.snapshot.fuelEntries,
+    garage.snapshot.expenses,
   );
   const refreshConversions = garage.refreshConversions;
   useEffect(() => {
@@ -96,6 +101,14 @@ function useGarageState() {
     () => sortFuelEntries(garage.snapshot.fuelEntries),
     [garage.snapshot.fuelEntries],
   );
+  const expenses = useMemo(
+    () => sortExpenses(garage.snapshot.expenses),
+    [garage.snapshot.expenses],
+  );
+  const renewals = useMemo(
+    () => getRenewals(garage.snapshot.cars, garage.snapshot.expenses, todayISO()),
+    [garage.snapshot.cars, garage.snapshot.expenses],
+  );
 
   function guardedSignOut(approvedUnsynced: string[]) {
     const action = () => void garage.signOut('global', approvedUnsynced);
@@ -117,6 +130,8 @@ function useGarageState() {
     allDue,
     visits,
     fuelEntries,
+    expenses,
+    renewals,
     modal,
     setModal,
     notice,

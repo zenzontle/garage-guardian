@@ -113,6 +113,7 @@ describe('signup transfer', () => {
         schedules: edit === 'none' ? [] : edit === 'new task' ? [guest.schedules[1]] : [edited],
         visits: [],
         fuelEntries: [],
+        expenses: [],
       });
       expect(await get(`photo:${photo.path}`)).toBeUndefined();
       expect(cloud.from).not.toHaveBeenCalled();
@@ -167,6 +168,7 @@ describe('signup transfer', () => {
         schedules: edit === 'none' ? [] : [edited],
         visits: [],
         fuelEntries: [],
+        expenses: [],
       });
       expect(await get(`photo:${photo.path}`)).toBeUndefined();
       expect(cloud.tables.get('schedule_items')!.get(schedule.id)).toMatchObject({
@@ -226,6 +228,7 @@ describe('signup transfer', () => {
       schedules: [],
       visits: [],
       fuelEntries: [],
+      expenses: [],
     });
     expect(await pendingTransfer(project)).toBeUndefined();
   });
@@ -274,6 +277,7 @@ describe('signup transfer', () => {
         schedules: [],
         visits: [],
         fuelEntries: [],
+        expenses: [],
       });
       expect(await pendingTransfer(project)).toBeUndefined();
     },
@@ -301,6 +305,7 @@ describe('signup transfer', () => {
         schedules: [],
         visits: [],
         fuelEntries: [],
+        expenses: [],
       });
       expect(await pendingTransfer(project)).toBeUndefined();
       if (status !== 'uploaded') {
@@ -337,6 +342,7 @@ describe('signup transfer', () => {
       schedules: [],
       visits: [],
       fuelEntries: [],
+      expenses: [],
     });
     expect(await pendingTransfer(project)).toBeUndefined();
   });
@@ -379,6 +385,7 @@ describe('signup transfer', () => {
       schedules: [schedule],
       visits: [visit],
       fuelEntries: [],
+      expenses: [],
     });
     await registerSignup(project, account(), true);
     await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
@@ -402,6 +409,7 @@ describe('signup transfer', () => {
       schedules: [schedule],
       visits: [visit],
       fuelEntries: [],
+      expenses: [],
     });
     expect(await local.load()).toEqual({
       homeCurrency: 'USD',
@@ -409,6 +417,7 @@ describe('signup transfer', () => {
       schedules: [],
       visits: [],
       fuelEntries: [],
+      expenses: [],
     });
   });
 
@@ -433,6 +442,7 @@ describe('signup transfer', () => {
       schedules: [],
       visits: [],
       fuelEntries: [],
+      expenses: [],
     });
     expect(await get(`photo:${photo.path}`)).toBeUndefined();
     expect(await pendingTransfer(project)).toBeUndefined();
@@ -480,9 +490,13 @@ describe('signup transfer', () => {
     const { local, snapshot } = await seedLocal(false);
     const cloud = fakeSupabase();
     cloud.emit(account());
-    const load = vi
-      .spyOn(SupabaseRepository.prototype, 'load')
-      .mockResolvedValueOnce({ cars: [], schedules: [], visits: [], fuelEntries: [] });
+    const load = vi.spyOn(SupabaseRepository.prototype, 'load').mockResolvedValueOnce({
+      cars: [],
+      schedules: [],
+      visits: [],
+      fuelEntries: [],
+      expenses: [],
+    });
     await registerSignup(project, account(), true);
     await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
       'could not be verified',
@@ -533,6 +547,7 @@ describe('signup transfer', () => {
       schedules: [],
       visits: [],
       fuelEntries: [],
+      expenses: [],
     });
   });
 
@@ -697,7 +712,7 @@ describe('signup transfer of fill-ups', () => {
       this: InstanceType<typeof SupabaseRepository>,
     ) {
       const snapshot = await load.call(this);
-      return { ...snapshot, fuelEntries: [] };
+      return { ...snapshot, fuelEntries: [], expenses: [] };
     });
     await expect(transferSignupData(cloud.client, project, account().id)).rejects.toThrow(
       'upload could not be verified',

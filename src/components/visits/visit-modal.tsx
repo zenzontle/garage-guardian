@@ -47,6 +47,7 @@ const emptyItem = (): EditVisitItem => ({
 export function VisitModal({
   item,
   carId,
+  scheduleId,
   cars,
   visits,
   fuelEntries = [],
@@ -61,6 +62,8 @@ export function VisitModal({
   cloud?: boolean;
   homeCurrency?: Currency;
   carId?: string;
+  /** Starts a new visit with this scheduled task as its completed item. */
+  scheduleId?: string;
   cars: Car[];
   visits: Visit[];
   fuelEntries?: FuelEntry[];
@@ -88,13 +91,18 @@ export function VisitModal({
   const conversion = useReceiptConversion(item, currency, date, totalCost, homeCurrency);
   const [provider, setProvider] = useState(item?.provider ?? '');
   const [notes, setNotes] = useState(item?.notes ?? '');
-  const [items, setItems] = useState<EditVisitItem[]>(
-    item?.items.map((entry) => ({
-      ...entry,
-      key: entry.id,
-      costInput: entry.costCents === null ? '' : centsToInput(entry.costCents),
-    })) ?? [emptyItem()],
-  );
+  const [items, setItems] = useState<EditVisitItem[]>(() => {
+    if (item)
+      return item.items.map((entry) => ({
+        ...entry,
+        key: entry.id,
+        costInput: entry.costCents === null ? '' : centsToInput(entry.costCents),
+      }));
+    const task = schedules.find(
+      (schedule) => schedule.id === scheduleId && schedule.carId === initialCarId,
+    );
+    return [task ? { ...emptyItem(), name: task.name, scheduleItemId: task.id } : emptyItem()];
+  });
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<AppFailure | null>(null);
   const attachments = usePhotoAttachments(item?.photos ?? [], setFormError);

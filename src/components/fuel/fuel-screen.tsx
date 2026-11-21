@@ -14,7 +14,8 @@ export function FuelScreen() {
   const display = useDisplay();
   const router = useRouter();
   const search = useSearchParams();
-  const { snapshot, fuelEntries, repository, setModal, perform, loading } = useGarage();
+  const { snapshot, fuelEntries, repository, homeCurrency, setModal, perform, loading } =
+    useGarage();
   const requested = search.get('car') ?? '';
   // An unknown or deleted vehicle in the link shows every fill-up instead of an empty list.
   const carId = snapshot.cars.some((car) => car.id === requested) ? requested : '';
@@ -25,6 +26,7 @@ export function FuelScreen() {
       fuelEntries={fuelEntries}
       repository={repository!}
       carId={carId}
+      homeCurrency={homeCurrency}
       onCarChange={(id) => router.replace(fuelPath(id))}
       onAdd={() => setModal({ kind: 'fuel', carId: carId || undefined })}
       onAddCar={() => setModal({ kind: 'car' })}

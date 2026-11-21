@@ -145,11 +145,15 @@ async function runTransfer(
       await uploadPhotos(entry);
       await cloud.saveFuelEntry(entry);
     }
+    for (const expense of expected.expenses) {
+      assertActive();
+      await cloud.saveExpense(expense);
+    }
     assertActive();
     onProgress?.({ phase: 'verifying' });
     const saved = await cloud.load();
     if (saved.homeCurrency !== expected.homeCurrency) throw new AppError('transferVerification');
-    for (const key of ['cars', 'schedules', 'visits', 'fuelEntries'] as const) {
+    for (const key of ['cars', 'schedules', 'visits', 'fuelEntries', 'expenses'] as const) {
       for (const item of expected[key]) {
         if (
           !sameRecord(

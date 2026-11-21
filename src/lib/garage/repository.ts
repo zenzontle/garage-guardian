@@ -25,16 +25,19 @@ import {
   validDate,
   type Currency,
   type Conversion,
+  type Conversions,
 } from '../currency/currency';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { checkedFuelEntry } from '../fuel/fuel';
 import { fuelFromRow, fuelToRow } from '../fuel/fuel-rows';
+import { checkedExpense, expenseFromRow, expenseToRow } from '../expenses/expenses';
 import {
   EMPTY_SNAPSHOT,
   normalizeCar,
   normalizePlate,
   normalizeSnapshot,
   type Car,
+  type Expense,
   type FuelEntry,
   type Photo,
   type ScheduleItem,
@@ -45,6 +48,8 @@ import {
 export type Repository = {
   saveHomeCurrency(currency: Currency): Promise<void>;
   saveConversion(visit: Visit, target: Currency, conversion: Conversion): Promise<void>;
+  saveFuelConversion(entry: FuelEntry, target: Currency, conversion: Conversion): Promise<void>;
+  saveExpenseConversion(expense: Expense, target: Currency, conversion: Conversion): Promise<void>;
   load(): Promise<Snapshot>;
   saveCar(car: Car): Promise<void>;
   setCarArchived(id: string, archived: boolean): Promise<void>;
@@ -55,6 +60,8 @@ export type Repository = {
   deleteVisit(visit: Visit): Promise<void>;
   saveFuelEntry(entry: FuelEntry): Promise<void>;
   deleteFuelEntry(entry: FuelEntry): Promise<void>;
+  saveExpense(expense: Expense): Promise<void>;
+  deleteExpense(expense: Expense): Promise<void>;
   // Photos are stored under the owning visit's or fill-up's ID.
   uploadPhoto(recordId: string, file: File): Promise<Photo>;
   photoUrl(photo: Photo): Promise<string>;
@@ -73,7 +80,42 @@ function snapshotData(snapshot: Snapshot): Snapshot {
     schedules: snapshot.schedules,
     visits: snapshot.visits,
     fuelEntries: snapshot.fuelEntries ?? [],
+    expenses: snapshot.expenses ?? [],
   };
+}
+
+type ReceiptRecord = { id: string } & Parameters<typeof receiptInputs>[0] & {
+    conversions?: Conversions;
+  };
+
+// Adds a background conversion only while the saved receipt still has the same inputs.
+function addConversion<T extends ReceiptRecord>(
+  records: T[],
+  record: T,
+  target: Currency,
+  conversion: Conversion,
+) {
+  const current = records.find((entry) => entry.id === record.id);
+  if (
+    !current ||
+    !sameInputs(receiptInputs(current), receiptInputs(record)) ||
+    current.conversions?.[target]
+  )
+    return;
+  current.conversions = { ...current.conversions, [target]: conversion };
+}
+
+// Keeps saved conversions across edits that do not change the receipt's inputs.
+function keepConversions<T extends ReceiptRecord>(records: T[], record: T): T {
+  const current = records.find((entry) => entry.id === record.id);
+  return current && sameInputs(receiptInputs(current), receiptInputs(record))
+    ? { ...record, conversions: mergeConversions(current.conversions, record.conversions) }
+    : record;
+}
+
+function checkedConversion(record: ReceiptRecord, target: Currency, conversion: Conversion) {
+  if (!isCurrency(target) || !validConversion(conversion, receiptInputs(record)))
+    throw new AppError('visitFields');
 }
 
 function checkedVisit(visit: Visit, manualTargets: Currency[]): Visit {
@@ -104,18 +146,16 @@ export class LocalRepository implements Repository {
     });
   }
   async saveConversion(visit: Visit, target: Currency, conversion: Conversion) {
-    if (!isCurrency(target) || !validConversion(conversion, receiptInputs(visit)))
-      throw new AppError('visitFields');
-    await this.write((snapshot) => {
-      const current = snapshot.visits.find((entry) => entry.id === visit.id);
-      if (
-        !current ||
-        !sameInputs(receiptInputs(current), receiptInputs(visit)) ||
-        current.conversions?.[target]
-      )
-        return;
-      current.conversions = { ...current.conversions, [target]: conversion };
-    });
+    checkedConversion(visit, target, conversion);
+    await this.write((snapshot) => addConversion(snapshot.visits, visit, target, conversion));
+  }
+  async saveFuelConversion(entry: FuelEntry, target: Currency, conversion: Conversion) {
+    checkedConversion(entry, target, conversion);
+    await this.write((snapshot) => addConversion(snapshot.fuelEntries, entry, target, conversion));
+  }
+  async saveExpenseConversion(expense: Expense, target: Currency, conversion: Conversion) {
+    checkedConversion(expense, target, conversion);
+    await this.write((snapshot) => addConversion(snapshot.expenses, expense, target, conversion));
   }
   async load(): Promise<Snapshot> {
     const snapshot = normalizeSnapshot(
@@ -159,6 +199,7 @@ export class LocalRepository implements Repository {
       current.schedules = current.schedules.filter((item) => item.carId !== id);
       current.visits = current.visits.filter((visit) => visit.carId !== id);
       current.fuelEntries = current.fuelEntries.filter((entry) => entry.carId !== id);
+      current.expenses = current.expenses.filter((expense) => expense.carId !== id);
     });
   }
   async setCarArchived(id: string, archived: boolean) {
@@ -210,7 +251,10 @@ export class LocalRepository implements Repository {
     entry = checkedFuelEntry(entry);
     const previous = (await this.load()).fuelEntries.find((current) => current.id === entry.id);
     await this.write((snapshot) => {
-      snapshot.fuelEntries = upsert(snapshot.fuelEntries, entry);
+      snapshot.fuelEntries = upsert(
+        snapshot.fuelEntries,
+        keepConversions(snapshot.fuelEntries, entry),
+      );
     });
     for (const photo of previous?.photos ?? []) {
       if (!entry.photos.some((current) => current.path === photo.path))
@@ -221,6 +265,18 @@ export class LocalRepository implements Repository {
     for (const photo of entry.photos) await del(`photo:${photo.path}`);
     await this.write((snapshot) => {
       snapshot.fuelEntries = snapshot.fuelEntries.filter((item) => item.id !== entry.id);
+    });
+  }
+  async saveExpense(expense: Expense) {
+    expense = checkedExpense(expense);
+    await this.write((snapshot) => {
+      if (!snapshot.cars.some((car) => car.id === expense.carId)) throw new AppError('save');
+      snapshot.expenses = upsert(snapshot.expenses, keepConversions(snapshot.expenses, expense));
+    });
+  }
+  async deleteExpense(expense: Expense) {
+    await this.write((snapshot) => {
+      snapshot.expenses = snapshot.expenses.filter((item) => item.id !== expense.id);
     });
   }
   async uploadPhoto(recordId: string, file: File): Promise<Photo> {
@@ -258,6 +314,7 @@ export class LocalRepository implements Repository {
       current.fuelEntries = current.fuelEntries.filter((item) =>
         changed(item, transferred.fuelEntries),
       );
+      current.expenses = current.expenses.filter((item) => changed(item, transferred.expenses));
       const neededSchedules = new Set(
         current.visits.flatMap((visit) => visit.items.map((item) => item.scheduleItemId)),
       );
@@ -265,7 +322,9 @@ export class LocalRepository implements Repository {
         (item) => changed(item, cleanupSchedules) || neededSchedules.has(item.id),
       );
       const neededCars = new Set(
-        [...current.schedules, ...current.visits, ...current.fuelEntries].map((item) => item.carId),
+        [...current.schedules, ...current.visits, ...current.fuelEntries, ...current.expenses].map(
+          (item) => item.carId,
+        ),
       );
       current.cars = current.cars.filter(
         (item) => changed(item, transferred.cars) || neededCars.has(item.id),
@@ -354,6 +413,14 @@ const scheduleToRow = (item: ScheduleItem, userId: string) => ({
   is_active: item.isActive,
   created_at: item.createdAt,
 });
+export type SaveReceiptConversionArgs = {
+  p_id: string;
+  p_currency: Currency;
+  p_date: string;
+  p_total: number;
+  p_target: Currency;
+  p_conversion: Conversion;
+};
 export type SaveScheduleWithDefaultsArgs = {
   p_user_id: string;
   p_item: ReturnType<typeof scheduleToRow>;
@@ -396,9 +463,37 @@ export class SupabaseRepository implements Repository {
     if (error) throw error;
   }
   async saveConversion(visit: Visit, target: Currency, conversion: Conversion) {
-    if (!isCurrency(target) || !validConversion(conversion, receiptInputs(visit)))
-      throw new AppError('visitFields');
+    checkedConversion(visit, target, conversion);
     return this.withReceiptLock(() => this.saveConversionOnline(visit, target, conversion));
+  }
+  async saveFuelConversion(entry: FuelEntry, target: Currency, conversion: Conversion) {
+    checkedConversion(entry, target, conversion);
+    return this.withReceiptLock(() =>
+      this.saveReceiptConversion('save_fuel_conversion', entry, target, conversion),
+    );
+  }
+  async saveExpenseConversion(expense: Expense, target: Currency, conversion: Conversion) {
+    checkedConversion(expense, target, conversion);
+    return this.withReceiptLock(() =>
+      this.saveReceiptConversion('save_expense_conversion', expense, target, conversion),
+    );
+  }
+  // One conditional owner-scoped UPDATE: a changed receipt or an existing conversion wins.
+  private async saveReceiptConversion(
+    name: 'save_fuel_conversion' | 'save_expense_conversion',
+    record: ReceiptRecord,
+    target: Currency,
+    conversion: Conversion,
+  ) {
+    const { error } = await this.client.rpc(name, {
+      p_id: record.id,
+      p_currency: currencyOrDefault(record.currency),
+      p_date: record.date,
+      p_total: record.totalCostCents,
+      p_target: target,
+      p_conversion: conversion,
+    } satisfies SaveReceiptConversionArgs);
+    if (error) throw error;
   }
   private async saveConversionOnline(visit: Visit, target: Currency, conversion: Conversion) {
     if (this.offline)
@@ -449,7 +544,7 @@ export class SupabaseRepository implements Repository {
   }
 
   private async loadOnline(): Promise<Snapshot> {
-    const [cars, schedules, visits, fuelEntries, settings] = await Promise.all([
+    const [cars, schedules, visits, fuelEntries, expenses, settings] = await Promise.all([
       this.client.from('cars').select('*').eq('user_id', this.userId).order('created_at'),
       this.client.from('schedule_items').select('*').eq('user_id', this.userId).order('created_at'),
       this.client
@@ -462,9 +557,14 @@ export class SupabaseRepository implements Repository {
         .select('*')
         .eq('user_id', this.userId)
         .order('fuel_date', { ascending: false }),
+      this.client
+        .from('expenses')
+        .select('*')
+        .eq('user_id', this.userId)
+        .order('expense_date', { ascending: false }),
       this.client.from('garage_settings').select('*').eq('user_id', this.userId).maybeSingle(),
     ]);
-    for (const result of [cars, schedules, visits, fuelEntries, settings])
+    for (const result of [cars, schedules, visits, fuelEntries, expenses, settings])
       if (result.error) throw result.error;
     const snapshot: Snapshot = {
       homeCurrency: currencyOrDefault(settings.data?.home_currency),
@@ -512,6 +612,7 @@ export class SupabaseRepository implements Repository {
         createdAt: row.created_at,
       })),
       fuelEntries: (fuelEntries.data ?? []).map(fuelFromRow),
+      expenses: (expenses.data ?? []).map(expenseFromRow),
     };
     return initializeCloudSchedules(this.client, this.userId, snapshot, todayISO());
   }
@@ -690,6 +791,28 @@ export class SupabaseRepository implements Repository {
       await this.client.storage
         .from('visit-photos')
         .remove(entry.photos.map((photo) => photo.path));
+  }
+  // Like fill-ups, other costs have no offline queue: saving needs a connection.
+  async saveExpense(expense: Expense) {
+    expense = checkedExpense(expense);
+    return this.withReceiptLock(async () => {
+      const { error } = await this.client
+        .from('expenses')
+        .upsert(expenseToRow(expense, this.userId));
+      if (error) throw error;
+      await this.offline?.rememberExpense(expense).catch(recordDiagnostic);
+    });
+  }
+  async deleteExpense(expense: Expense) {
+    return this.withReceiptLock(async () => {
+      const { error } = await this.client
+        .from('expenses')
+        .delete()
+        .eq('user_id', this.userId)
+        .eq('id', expense.id);
+      if (error) throw error;
+      await this.offline?.removeExpense(expense.id).catch(recordDiagnostic);
+    });
   }
   async uploadPhoto(recordId: string, file: File): Promise<Photo> {
     const id = crypto.randomUUID();

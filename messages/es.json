@@ -49,7 +49,8 @@
     "notificationSave": "No se pudieron cargar o guardar las preferencias de recordatorios. Inténtalo de nuevo.",
     "archive": "No se pudo cambiar el estado del vehículo. Inténtalo de nuevo; los cambios en la nube requieren conexión.",
     "fuelFields": "Revisa el vehículo, el odómetro, el volumen, el precio y el total.",
-    "fuelOdometerOrder": "El odómetro no puede ser menor que el de una carga anterior ni mayor que el de una posterior de este vehículo."
+    "fuelOdometerOrder": "El odómetro no puede ser menor que el de una carga anterior ni mayor que el de una posterior de este vehículo.",
+    "expenseFields": "Revisa el vehículo, la fecha, el importe y la fecha de renovación. La renovación debe ser posterior a la fecha del gasto."
   },
   "shared": {
     "language": "Idioma",
@@ -87,7 +88,9 @@
     "reports": "Informes",
     "historyShort": "Historial",
     "fuel": "Combustible",
-    "fuelShort": "Combustible"
+    "fuelShort": "Combustible",
+    "costs": "Otros gastos",
+    "costsShort": "Gastos"
   },
   "app": {
     "tagline": "CUIDA CADA RECORRIDO",
@@ -158,8 +161,8 @@
     "transferBlocked": "Termina la transferencia de registro antes de cambiar tu cuenta.",
     "requestAnother": "Solicitar otro correo de recuperación",
     "deleteAccount": "Eliminar cuenta",
-    "deleteAccountDescription": "Elimina permanentemente tu cuenta y todo lo que contiene: vehículos, programas de mantenimiento, visitas de servicio, cargas de combustible, recibos, fotos y la configuración de notificaciones y moneda. Se cerrará la sesión en todos los dispositivos. Esta acción no se puede deshacer.",
-    "deleteAccountKeep": "Para conservar una copia, exporta primero tu historial de servicio a CSV. Los registros de invitado guardados en este navegador sin una cuenta no se verán afectados.",
+    "deleteAccountDescription": "Elimina permanentemente tu cuenta y todo lo que contiene: vehículos, programas de mantenimiento, visitas de servicio, cargas de combustible, otros gastos, recibos, fotos y la configuración de notificaciones y moneda. Se cerrará la sesión en todos los dispositivos. Esta acción no se puede deshacer.",
+    "deleteAccountKeep": "Para conservar una copia, exporta primero a CSV tu historial de servicio, tu registro de combustible y tus otros gastos. Los registros de invitado guardados en este navegador sin una cuenta no se verán afectados.",
     "deleteAccountConfirm": "Entiendo que mi cuenta y todos sus datos se eliminarán permanentemente.",
     "accountDeleted": "Tu cuenta y todos sus datos se eliminaron.",
     "deletionScheduled": "Tu cuenta está programada para eliminarse. Ya no puede iniciar sesión y sus datos restantes se eliminarán en un plazo de 24 horas."
@@ -173,7 +176,7 @@
     "emptyDescription": "Añade un vehículo para organizar su historial de servicio y crear un plan de mantenimiento según el manual del propietario.",
     "benefitHistory": "Todo tu historial en un solo lugar",
     "benefitSchedule": "Consulta el próximo mantenimiento",
-    "benefitSpending": "Lleva el control de tus gastos",
+    "benefitSpending": "Controla lo que cuesta tener tus autos",
     "vehicles": "Vehículos",
     "attentionItems": "{count, plural, one {tarea requiere atención} other {tareas requieren atención}}",
     "reminderWindows": "dentro de los plazos de aviso",
@@ -193,7 +196,10 @@
     "noVisits": "Aún no hay visitas de servicio",
     "historyPlaceholder": "Tu historial de mantenimiento aparecerá aquí.",
     "dueCount": "{count, plural, one {# pendiente} other {# pendientes}}",
-    "logFuel": "Registrar carga"
+    "logFuel": "Registrar carga",
+    "logIt": "Registrar",
+    "logNamed": "Registrar {name}",
+    "renewals": "Renovaciones"
   },
   "car": {
     "description": "El historial y el plan de mantenimiento de cada vehículo, en un solo lugar.",
@@ -311,7 +317,7 @@
   },
   "reports": {
     "insights": "ANÁLISIS",
-    "description": "Consulta cuánto ha costado cuidar tus autos a lo largo del tiempo.",
+    "description": "Consulta lo que ha costado tener tus autos con el tiempo: servicio, combustible y todo lo demás.",
     "carFilter": "Auto del informe",
     "yearFilter": "Año del informe",
     "allTime": "Todo el período",
@@ -328,7 +334,17 @@
     "unknownCar": "Auto desconocido",
     "costHint": "Los costos sin importes por tarea aparecen como «Sin asignar».",
     "empty": "Aún no hay datos para el informe",
-    "emptyHint": "Registra una visita de servicio para ver tus gastos aquí."
+    "emptyHint": "Registra un servicio, una carga u otro gasto para ver tus gastos aquí.",
+    "recordCount": "{count, plural, one {# registro en esta vista} other {# registros en esta vista}}",
+    "costPerMile": "COSTO POR MILLA",
+    "costPerKilometer": "COSTO POR KILÓMETRO",
+    "costPerDistance": "COSTO POR DISTANCIA",
+    "distanceDriven": "en {distance} de lecturas de odómetro registradas",
+    "noDistance": "Registra lecturas del odómetro en dos fechas para ver esto.",
+    "mixedUnits": "Elige un auto: tus autos usan unidades de distancia diferentes.",
+    "byType": "Por tipo",
+    "service": "Servicio",
+    "fuel": "Combustible"
   },
   "due": {
     "setup": "Añade un intervalo de repetición o un vencimiento único",
@@ -453,7 +469,7 @@
     "deleting": "Eliminando…",
     "deleteFailed": "No se pudo eliminar este registro. Inténtalo de nuevo.",
     "deleteTitle": "¿Eliminar {name}?",
-    "deleteCar": "Esto elimina permanentemente el vehículo, sus tareas de mantenimiento, visitas de servicio, cargas de combustible y fotos. No se puede deshacer.",
+    "deleteCar": "Esto elimina permanentemente el vehículo, sus tareas de mantenimiento, visitas de servicio, cargas de combustible, otros gastos y fotos. No se puede deshacer.",
     "deleteTask": "Esto elimina permanentemente la tarea de mantenimiento. El historial de servicio se conserva. No se puede deshacer.",
     "deleteVisit": "Esto elimina permanentemente la visita de servicio y sus fotos. No se puede deshacer.",
     "visitName": "{vehicle} — {date}",
@@ -483,7 +499,11 @@
     "fuelName": "la carga de {vehicle} — {date}",
     "fuelSaved": "Carga de combustible guardada.",
     "fuelDeleted": "Carga de combustible eliminada.",
-    "savingFuel": "Guardando carga…"
+    "savingFuel": "Guardando carga…",
+    "deleteExpense": "Esto elimina el gasto de forma permanente. No se puede deshacer.",
+    "expenseName": "{vehicle}: {category} — {date}",
+    "expenseSaved": "Gasto guardado.",
+    "expenseDeleted": "Gasto eliminado."
   },
   "currency": {
     "home": "Moneda principal",
@@ -578,6 +598,55 @@
     "deleteEntry": "Eliminar carga",
     "recent": "Cargas recientes",
     "viewAll": "Ver registro de combustible",
+    "unknown": "Desconocido",
+    "export": "Exportar CSV",
+    "trendEyebrow": "TENDENCIA",
+    "trend": "Rendimiento en el tiempo",
+    "trendHint": "Cada punto va de un tanque lleno al siguiente. La línea punteada es el promedio del vehículo. {direction}",
+    "betterUp": "Más alto es mejor.",
+    "betterDown": "Más bajo es mejor.",
+    "trendEmpty": "Registra al menos dos tanques medidos para ver una tendencia.",
+    "trendChoose": "Elige un vehículo para ver la tendencia de su rendimiento.",
+    "trendLabel": "Rendimiento de {vehicle} en {count, plural, one {# tanque} other {# tanques}}, de {first} a {last}. Promedio {average}."
+  },
+  "expenses": {
+    "eyebrow": "PROPIEDAD",
+    "description": "Seguro, tenencia, verificación y todo lo demás que cuesta mantener un auto en circulación.",
+    "log": "Registrar gasto",
+    "edit": "Editar gasto",
+    "subtitle": "Gastos aparte del servicio y el combustible. Agrega una fecha de renovación para recibir un recordatorio.",
+    "category": "Categoría",
+    "categories": {
+      "insurance": "Seguro",
+      "registration": "Placas y registro",
+      "inspection": "Verificación o inspección",
+      "tax": "Tenencia o impuesto",
+      "financing": "Pago de crédito o arrendamiento",
+      "parking": "Estacionamiento",
+      "tolls": "Casetas",
+      "washing": "Lavado y detallado",
+      "other": "Otro"
+    },
+    "descriptionLabel": "Descripción",
+    "descriptionExample": "p. ej. póliza semestral",
+    "amount": "Importe ({currency})",
+    "renewsOn": "Se renueva el",
+    "renewsHint": "Cuándo vuelve a tocar este gasto, como el fin de una póliza. Aparece en Qué necesita atención dentro de la ventana de próximos del vehículo.",
+    "notesExample": "Número de póliza, cobertura o cualquier cosa que quieras recordar",
+    "save": "Guardar gasto",
+    "filterCar": "Filtrar por vehículo",
+    "export": "Exportar CSV",
+    "empty": "Aún no hay otros gastos",
+    "firstEntry": "Registra el seguro, la tenencia y otros gastos para ver lo que cuesta tener cada auto.",
+    "noMatches": "No hay gastos de este vehículo",
+    "changeFilter": "Elige otro vehículo o registra un gasto.",
+    "showing": "Mostrando {count} de {total, plural, one {# gasto} other {# gastos}}",
+    "renews": "Renovación",
+    "renewsDate": "Se renueva el {date}",
+    "renewalName": "Renovación: {category}",
+    "renewalDue": "La renovación vencía el {date}",
+    "editEntry": "Editar {name}",
+    "deleteEntry": "Eliminar {name}",
     "unknown": "Desconocido"
   }
 }

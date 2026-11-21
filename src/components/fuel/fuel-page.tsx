@@ -2,10 +2,13 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Fuel, Plus } from 'lucide-react';
+import { ArrowDownToLine, Fuel, Plus } from 'lucide-react';
 import type { Repository } from '@/lib/garage/repository';
 import type { Car, FuelEntry } from '@/lib/garage/model';
 import { fuelEconomy } from '@/lib/fuel/economy';
+import { fuelToCsv } from '@/lib/reports/reports';
+import { downloadUrl } from '@/lib/utils/download-url';
+import type { Currency } from '@/lib/currency/currency';
 import { PageHeading } from '../ui/page-heading';
 import { CarOptions } from '../ui/select-options';
 import { EmptyPanel } from '../ui/empty-panel';
@@ -14,6 +17,7 @@ import { Skeleton } from '../ui/skeleton';
 import { SkeletonRows } from '../ui/skeleton-rows';
 import { FuelCard } from './fuel-card';
 import { FuelRow } from './fuel-row';
+import { FuelTrend } from './fuel-trend';
 import { useFuelDisplay } from './use-fuel-display';
 
 export function FuelPage({
@@ -22,6 +26,7 @@ export function FuelPage({
   fuelEntries,
   repository,
   carId,
+  homeCurrency = 'USD',
   onCarChange,
   onAdd,
   onAddCar,
@@ -34,6 +39,7 @@ export function FuelPage({
   fuelEntries: FuelEntry[];
   repository: Repository;
   carId: string;
+  homeCurrency?: Currency;
   onCarChange: (carId: string) => void;
   onAdd: () => void;
   onAddCar: () => void;
@@ -60,6 +66,23 @@ export function FuelPage({
   const averageCars = cars.filter(
     (car) => (!carId || car.id === carId) && fuelEntries.some((entry) => entry.carId === car.id),
   );
+  // The trend follows the chosen vehicle, or the only one with fill-ups.
+  const trendCar = carId
+    ? cars.find((car) => car.id === carId)
+    : averageCars.length === 1
+      ? averageCars[0]
+      : undefined;
+  const trendEconomy = trendCar ? economies.get(trendCar.id) : undefined;
+  function downloadCsv() {
+    const csv = fuelToCsv(
+      filtered,
+      cars,
+      homeCurrency,
+      (entry) => economies.get(entry.carId)?.byEntry.get(entry.id) ?? null,
+    );
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    downloadUrl(URL.createObjectURL(blob), 'garage-guardian-fuel-log.csv');
+  }
   const props = (entry: FuelEntry) => ({
     entry,
     car: cars.find((car) => car.id === entry.carId),
@@ -109,6 +132,31 @@ export function FuelPage({
           })}
         </div>
       )}
+      {!loading && averageCars.length > 0 && (
+        <section className="panel tone-fuel fuel-trend-panel">
+          <div className="section-heading">
+            <div>
+              <span className="eyebrow">{t('fuel.trendEyebrow')}</span>
+              <h2>
+                {t('fuel.trend')}
+                {trendCar && ` · ${trendCar.name}`}
+              </h2>
+            </div>
+          </div>
+          {trendCar && trendEconomy ? (
+            <>
+              <FuelTrend car={trendCar} entries={fuelEntries} economy={trendEconomy} />
+              <p className="section-hint">
+                {t('fuel.trendHint', {
+                  direction: t(trendEconomy.unit === 'mpg' ? 'fuel.betterUp' : 'fuel.betterDown'),
+                })}
+              </p>
+            </>
+          ) : (
+            <p className="section-hint">{t('fuel.trendChoose')}</p>
+          )}
+        </section>
+      )}
       <div className="panel table-panel tone-fuel">
         <div className="table-toolbar history-toolbar">
           <label className="history-filter">
@@ -123,6 +171,14 @@ export function FuelPage({
               <CarOptions cars={cars} />
             </select>
           </label>
+          <button
+            className="button secondary"
+            onClick={downloadCsv}
+            disabled={loading || !filtered.length}
+          >
+            <ArrowDownToLine size={17} />
+            {t('fuel.export')}
+          </button>
         </div>
         {loading ? (
           <SkeletonRows count={5} />
