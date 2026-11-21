@@ -1,5 +1,3 @@
-import type { Visit } from '../garage/model';
-
 export const CURRENCIES = ['USD', 'MXN', 'CAD'] as const;
 export type Currency = (typeof CURRENCIES)[number];
 export type ReceiptInputs = { currency: Currency; date: string; totalCostCents: number };
@@ -10,6 +8,13 @@ export type Conversion = ReceiptInputs & {
   rateDate: string | null;
 };
 export type Conversions = Partial<Record<Currency, Conversion>>;
+/** Anything with a dated total in one currency: service visits, fill-ups, and other costs. */
+export type Receipt = {
+  currency?: Currency;
+  date: string;
+  totalCostCents: number;
+  conversions?: Conversions;
+};
 export type Rate = { rate: number; rateDate: string };
 export const MAX_CENTS = 2147483647;
 export const isCurrency = (value: unknown): value is Currency =>
@@ -35,11 +40,11 @@ export function parseCents(value: string): number | null {
   return validCents(cents) ? cents : null;
 }
 export const receiptInputs = (
-  visit: Pick<Visit, 'currency' | 'date' | 'totalCostCents'>,
+  receipt: Pick<Receipt, 'currency' | 'date' | 'totalCostCents'>,
 ): ReceiptInputs => ({
-  currency: currencyOrDefault(visit.currency),
-  date: visit.date,
-  totalCostCents: visit.totalCostCents,
+  currency: currencyOrDefault(receipt.currency),
+  date: receipt.date,
+  totalCostCents: receipt.totalCostCents,
 });
 export const sameInputs = (a: ReceiptInputs, b: ReceiptInputs) =>
   a.currency === b.currency && a.date === b.date && a.totalCostCents === b.totalCostCents;
@@ -71,15 +76,19 @@ export function validConversion(value: unknown, inputs: ReceiptInputs): value is
         convertCents(inputs.totalCostCents, c.rate) === c.convertedCents)
   );
 }
-export function normalizeVisit(visit: Visit): Visit {
-  const inputs = receiptInputs(visit);
+/** Defaults the currency and keeps only the conversions that still match the receipt. */
+export function normalizeReceipt<T extends Receipt>(
+  receipt: T,
+): T & { currency: Currency; conversions: Conversions } {
+  const inputs = receiptInputs(receipt);
   const conversions: Conversions = {};
   for (const target of CURRENCIES) {
-    const value = visit.conversions?.[target];
+    const value = receipt.conversions?.[target];
     if (target !== inputs.currency && validConversion(value, inputs)) conversions[target] = value;
   }
-  return { ...visit, currency: inputs.currency, conversions };
+  return { ...receipt, currency: inputs.currency, conversions };
 }
+export const normalizeVisit = normalizeReceipt;
 export function mergeConversions(saved: Conversions = {}, incoming: Conversions = {}): Conversions {
   const result = { ...saved };
   for (const target of CURRENCIES) {
@@ -89,10 +98,10 @@ export function mergeConversions(saved: Conversions = {}, incoming: Conversions 
   }
   return result;
 }
-export function reportingCents(visit: Visit, target: Currency): number | null {
-  const inputs = receiptInputs(visit);
+export function reportingCents(receipt: Receipt, target: Currency): number | null {
+  const inputs = receiptInputs(receipt);
   if (inputs.currency === target) return inputs.totalCostCents;
-  const conversion = visit.conversions?.[target];
+  const conversion = receipt.conversions?.[target];
   return validConversion(conversion, inputs) ? conversion.convertedCents : null;
 }
 export function automaticConversion(inputs: ReceiptInputs, rate: Rate): Conversion {
@@ -105,7 +114,7 @@ export function automaticConversion(inputs: ReceiptInputs, rate: Rate): Conversi
   if (!validConversion(conversion, inputs)) throw new Error('Invalid conversion');
   return conversion;
 }
-export function compareCost(a: Visit, b: Visit, target: Currency, descending: boolean) {
+export function compareCost(a: Receipt, b: Receipt, target: Currency, descending: boolean) {
   const left = reportingCents(a, target),
     right = reportingCents(b, target);
   if (left === null) return right === null ? 0 : 1;
@@ -115,7 +124,10 @@ export function compareCost(a: Visit, b: Visit, target: Currency, descending: bo
 
 // Largest remainders, with receipt order as the tie breaker (unallocated last).
 // BigInt keeps cent allocation exact even at the database's maximum receipt size.
-export function allocateConverted(visit: Visit, total: number): number[] {
+export function allocateConverted(
+  visit: Pick<Receipt, 'totalCostCents'> & { items: { costCents: number | null }[] },
+  total: number,
+): number[] {
   const weights = visit.items.map((item) => Math.max(0, item.costCents ?? 0));
   weights.push(Math.max(0, visit.totalCostCents - weights.reduce((sum, cost) => sum + cost, 0)));
   const denominator = weights.reduce((sum, cost) => sum + cost, 0);

@@ -2,7 +2,13 @@
 
 import { del, get, update } from 'idb-keyval';
 import { withNamedLock } from '../utils/named-lock';
-import { normalizeSnapshot, type FuelEntry, type Snapshot, type Visit } from '../garage/model';
+import {
+  normalizeSnapshot,
+  type Expense,
+  type FuelEntry,
+  type Snapshot,
+  type Visit,
+} from '../garage/model';
 import { mergeConversions, receiptInputs, sameInputs, type Currency } from './currency';
 
 type PendingReceipt = { visit: Visit; manualTargets: Currency[] };
@@ -55,28 +61,48 @@ export class OfflineReceipts {
       };
     });
   }
-  // Fill-ups are cached for offline reading only; they are never queued.
+  // Fill-ups and other costs are cached for offline reading only; they are never queued.
   async rememberFuelEntry(entry: FuelEntry) {
+    await this.rememberRecord('fuelEntries', entry);
+  }
+  async removeFuelEntry(id: string) {
+    await this.removeRecord('fuelEntries', id);
+  }
+  async rememberExpense(expense: Expense) {
+    await this.rememberRecord('expenses', expense);
+  }
+  async removeExpense(id: string) {
+    await this.removeRecord('expenses', id);
+  }
+  private async rememberRecord<K extends 'fuelEntries' | 'expenses'>(
+    key: K,
+    record: Snapshot[K][number],
+  ) {
     await update<CachedGarage | undefined>(this.key, (current) => {
       if (!current) return current;
-      const entries = current.snapshot.fuelEntries ?? [];
+      const records = (current.snapshot[key] ?? []) as Snapshot[K];
+      const previous = records.find((item) => item.id === record.id);
+      const merged =
+        previous && sameInputs(receiptInputs(previous), receiptInputs(record))
+          ? { ...record, conversions: mergeConversions(previous.conversions, record.conversions) }
+          : record;
       return {
         ...current,
         snapshot: {
           ...current.snapshot,
-          fuelEntries: [...entries.filter((item) => item.id !== entry.id), entry],
+          [key]: [...records.filter((item) => item.id !== record.id), merged],
         },
       };
     });
   }
-  async removeFuelEntry(id: string) {
+  private async removeRecord(key: 'fuelEntries' | 'expenses', id: string) {
     await update<CachedGarage | undefined>(this.key, (current) => {
       if (!current) return current;
       return {
         ...current,
         snapshot: {
           ...current.snapshot,
-          fuelEntries: (current.snapshot.fuelEntries ?? []).filter((entry) => entry.id !== id),
+          [key]: (current.snapshot[key] ?? []).filter((item: { id: string }) => item.id !== id),
         },
       };
     });
@@ -193,6 +219,7 @@ export class OfflineReceipts {
           fuelEntries: (current.snapshot.fuelEntries ?? []).filter(
             (entry) => entry.carId !== carId,
           ),
+          expenses: (current.snapshot.expenses ?? []).filter((expense) => expense.carId !== carId),
           pendingSyncCount: pending.length,
           syncConflictCount: missingVehicleCount(current.snapshot, pending),
         },

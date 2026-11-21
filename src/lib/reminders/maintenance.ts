@@ -72,6 +72,8 @@ export async function loadReminderItems(db: SupabaseClient, userId: string, toda
       createdAt: row.created_at,
     })),
     fuelEntries: fuelEntries.map(fuelFromRow),
+    // Renewal reminders are in-app only; the weekly email covers maintenance.
+    expenses: [],
   };
   const initialized = await initializeCloudSchedules(db, userId, snapshot, today);
   return getAllDue(

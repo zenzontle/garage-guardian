@@ -26,6 +26,7 @@ test.describe('mobile menu', () => {
       ['My cars', '/cars', 'My cars'],
       ['Fuel log', '/fuel', 'Fuel log'],
       ['Service history', '/history', 'Service history'],
+      ['Other costs', '/costs', 'Other costs'],
       ['Reports', '/reports', 'Reports'],
       ['Dashboard', '/', 'Your garage at a glance'],
     ]) {

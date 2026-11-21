@@ -11,7 +11,7 @@ Log each fill-up from **Fuel log**, a vehicle's page, or the dashboard's **Log f
 | Volume and unit       | US gallons or liters, chosen per fill-up. Stored as integer thousandths (12.345 gal → `12345`).                       |
 | Gas type              | Regular, midgrade, premium, diesel, E85, or other.                                                                    |
 | Price per unit, total | Price is stored in thousandths of the currency per unit ($3.459 → `3459`); the total in cents.                        |
-| Currency              | USD, MXN, or CAD. Fill-ups are not yet converted to the home currency or included in reports.                         |
+| Currency              | USD, MXN, or CAD. Converted to the home currency in the background and included in reports.                           |
 | Full tank             | On by default. Economy is measured between full tanks.                                                                |
 | Missed previous       | Marks that a fill-up before this one was never logged, so the economy for that stretch is skipped instead of guessed. |
 | Station, notes        | Optional. Stations suggest names used before for the same vehicle.                                                    |
@@ -35,6 +35,14 @@ Fill-ups for each vehicle are ordered by odometer, then date. Each full-tank fil
 
 Volumes are converted to liters (1 US gallon = 3.785411784 L). Mile vehicles show miles per US gallon (MPG); kilometer vehicles show liters per 100 km. The vehicle average is total distance over total fuel across its measured segments, not the mean of segment results.
 
+### Economy trend
+
+The Fuel log charts each measured segment's economy over time, with the vehicle average as a dashed line, for the vehicle chosen in the filter (or the only vehicle with fill-ups). Hovering a point shows its value and date; the table below lists every value, so the chart is never the only place to read one.
+
+## Reports and export
+
+Fill-ups count toward the dashboard's year-to-date spending and the Reports totals, by-month, by-vehicle, and by-type breakdowns, in the home currency. Their odometer readings also measure the distance behind Reports' cost per mile or kilometer. See [other costs](costs.md#currency-and-reports). **Export CSV** on the Fuel log downloads the filtered fill-ups with their economy and home-currency columns.
+
 ## Storage and accounts
 
 Guest fill-ups and photos stay in the browser and move to the account on signup, verified like visits and their photos. Account fill-ups are stored in `fuel_entries` with owner-only row security; photos use the private visit photo bucket. Deleting a vehicle deletes its fill-ups and their photos.
@@ -43,4 +51,4 @@ Signed-in accounts can read cached fill-ups offline, but saving or deleting a fi
 
 ## Deployment
 
-Apply `supabase/migrations/0012_fuel_entries.sql` **before** deploying the application, then run `supabase/tests/fuel_entries.sql` as an administrator. The migration adds the `fuel_entries` table and replaces `initialize_schedule_defaults` so cloud first due points also count fill-up readings, matching the browser.
+Apply `supabase/migrations/0012_fuel_entries.sql` **before** deploying the application, then run `supabase/tests/fuel_entries.sql` as an administrator. Fill-up conversions need `0015_ownership_costs.sql`; see [other costs](costs.md#deployment). The migration adds the `fuel_entries` table and replaces `initialize_schedule_defaults` so cloud first due points also count fill-up readings, matching the browser.

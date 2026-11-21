@@ -1097,7 +1097,7 @@ td strong {
 }
 .report-stat-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
   gap: 16px;
   margin-bottom: 18px;
 }
@@ -1543,11 +1543,11 @@ td strong {
     align-items: center;
     flex-direction: column;
     gap: 3px;
-    padding: 10px 4px;
+    padding: 10px 2px;
     font-size: 0.75rem;
     font-weight: 750;
     min-width: 0;
-    flex: 1;
+    flex: 1 1 auto;
   }
   .mobile-tabs a.active {
     color: var(--accent);
@@ -2022,6 +2022,7 @@ input[type='number'] {
 .page-fuel {
   --page-accent: var(--teal);
 }
+.page-costs,
 .page-reports {
   --page-accent: var(--pink);
 }
@@ -2179,4 +2180,96 @@ input[type='number'] {
   .skeleton {
     animation: none;
   }
+}
+
+/* Fuel economy trend: a single 2px series against hairline grid and a dashed average. */
+.fuel-trend {
+  position: relative;
+}
+.fuel-trend svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: pan-y;
+}
+.trend-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.trend-axis {
+  fill: var(--muted);
+  font-size: 12px;
+}
+.trend-average {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.trend-crosshair {
+  stroke: var(--control-border);
+  stroke-width: 1;
+}
+.trend-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.trend-point {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+.trend-tooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 12px));
+  pointer-events: none;
+  display: grid;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.trend-tooltip span {
+  color: var(--muted);
+}
+.fuel-trend-panel {
+  margin-bottom: 18px;
+  padding: 24px;
+}
+.fuel-trend-panel .section-hint {
+  margin-top: 10px;
+}
+@media (max-width: 720px) {
+  .fuel-trend-panel {
+    padding: 17px;
+  }
+}
+
+/* A due row with its log button: the button sits beside the link, never inside it. */
+.due-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+}
+.due-item:first-child {
+  border-top: 0;
+}
+.due-item > .due-row {
+  border-top: 0;
+  flex: 1;
+  min-width: 0;
+}
+.due-log {
+  flex: none;
+  min-height: 2.75rem;
+}
+td small {
+  display: block;
+  color: var(--muted);
 }

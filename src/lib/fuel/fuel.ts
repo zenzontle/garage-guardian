@@ -1,5 +1,11 @@
 import { AppError } from '../utils/app-error';
-import { currencyOrDefault, isCurrency, validCents, validDate } from '../currency/currency';
+import {
+  currencyOrDefault,
+  isCurrency,
+  normalizeReceipt,
+  validCents,
+  validDate,
+} from '../currency/currency';
 import type { Car, FuelEntry } from '../garage/model';
 
 // US gallons. Each fill-up chooses its own unit, independent of the car's distance unit.
@@ -27,10 +33,9 @@ const characters = (value: string) => Array.from(value).length;
 
 export function normalizeFuelEntry(entry: FuelEntry): FuelEntry {
   return {
-    ...entry,
+    ...normalizeReceipt({ ...entry, currency: currencyOrDefault(entry.currency) }),
     volumeUnit: isVolumeUnit(entry.volumeUnit) ? entry.volumeUnit : 'gallons',
     fuelType: isFuelType(entry.fuelType) ? entry.fuelType : 'other',
-    currency: currencyOrDefault(entry.currency),
     isFullTank: entry.isFullTank ?? true,
     missedPrevious: entry.missedPrevious ?? false,
     station: entry.station ?? '',
@@ -61,7 +66,16 @@ export function checkedFuelEntry(entry: FuelEntry): FuelEntry {
     entry.photos.length > FUEL_PHOTO_LIMIT
   )
     throw new AppError('fuelFields');
-  return { ...entry, station, notes };
+  // Fill-ups only carry automatic conversions; a stale or manual one is dropped.
+  const { conversions } = normalizeReceipt(entry);
+  return {
+    ...entry,
+    station,
+    notes,
+    conversions: Object.fromEntries(
+      Object.entries(conversions).filter(([, conversion]) => conversion.source === 'automatic'),
+    ),
+  };
 }
 
 // Parse a decimal with up to three places into integer thousandths. Empty input is missing.

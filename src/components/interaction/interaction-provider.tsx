@@ -28,7 +28,9 @@ type SuccessKey =
   | 'interactions.carDeleted'
   | 'interactions.taskDeleted'
   | 'interactions.visitDeleted'
-  | 'interactions.fuelDeleted';
+  | 'interactions.fuelDeleted'
+  | 'interactions.expenseSaved'
+  | 'interactions.expenseDeleted';
 type DeleteRequest = {
   title: string;
   description: string;

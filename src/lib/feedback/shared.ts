@@ -43,6 +43,7 @@ export const contextSchema = z.strictObject({
     'cars',
     'history',
     'fuel',
+    'costs',
     'reports',
     'notifications',
     'account',
@@ -50,7 +51,7 @@ export const contextSchema = z.strictObject({
     'loading',
     'recovery',
   ]),
-  dialog: z.enum(['none', 'add-car', 'edit-car', 'schedule', 'visit', 'fuel']),
+  dialog: z.enum(['none', 'add-car', 'edit-car', 'schedule', 'visit', 'fuel', 'expense']),
   viewport: z.strictObject({
     width: z.number().int().min(1).max(32768),
     height: z.number().int().min(1).max(32768),

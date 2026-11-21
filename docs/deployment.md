@@ -36,6 +36,7 @@ Apply migrations in numeric order, each **before** deploying the application cod
 | `0012_fuel_entries.sql`            | Owner-scoped fill-ups, and first due baselines that also count fill-up odometers                                       | `supabase/tests/fuel_entries.sql`          | [Fuel log](fuel.md#deployment)                             |
 | `0013_jpeg_photos.sql`             | JPEG photos in the photo bucket, for browsers such as Safari that cannot encode WebP                                   | `supabase/tests/jpeg_photos.sql`           |                                                            |
 | `0014_account_deletion.sql`        | Server-only account deletion queue, its claim and photo-listing functions, and upload blocks for deleted accounts      | `supabase/tests/account_deletion.sql`      | [Account deletion](account-management.md#account-deletion) |
+| `0015_ownership_costs.sql`         | Owner-scoped other costs with renewal dates, and home-currency conversions for fill-ups and costs                      | `supabase/tests/ownership_costs.sql`       | [Other costs](costs.md#deployment)                         |
 
 Shipped migrations are never edited; schema changes go in a new numbered file.
 

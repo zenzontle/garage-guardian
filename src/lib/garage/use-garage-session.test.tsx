@@ -82,6 +82,7 @@ it('bootstraps a recovery callback processed by the SDK before the hook subscrib
     schedules: [],
     visits: [],
     fuelEntries: [],
+    expenses: [],
   });
   const marker = localStorage.getItem(`garage-guardian:recovery:${project}`)!;
   expect(marker).not.toContain(session.access_token);
@@ -533,6 +534,7 @@ it('moves guest data after immediate signup, then uses only cloud storage and lo
     schedules: [],
     visits: [],
     fuelEntries: [],
+    expenses: [],
   });
   await act(async () => {
     await hook.result.current.run(() =>
@@ -873,7 +875,7 @@ it('serializes refresh and mutations and keeps the last snapshot while refreshin
   expect(action).not.toHaveBeenCalled();
   expect(load).toHaveBeenCalledTimes(1);
   await act(async () => {
-    release({ cars: [car], schedules: [], visits: [], fuelEntries: [] });
+    release({ cars: [car], schedules: [], visits: [], fuelEntries: [], expenses: [] });
     await refresh;
   });
   expect(hook.result.current.refreshing).toBe(false);

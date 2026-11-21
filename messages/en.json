@@ -49,7 +49,8 @@
     "notificationSave": "Could not load or save reminder preferences. Try again.",
     "archive": "Could not change vehicle archive status. Try again; cloud changes require an online save.",
     "fuelFields": "Check the vehicle, odometer, volume, price, and total fields.",
-    "fuelOdometerOrder": "The odometer cannot be lower than an earlier fill-up or higher than a later one for this vehicle."
+    "fuelOdometerOrder": "The odometer cannot be lower than an earlier fill-up or higher than a later one for this vehicle.",
+    "expenseFields": "Check the vehicle, date, amount, and renewal date. A renewal date must be after the cost date."
   },
   "shared": {
     "language": "Language",
@@ -87,7 +88,9 @@
     "reports": "Reports",
     "historyShort": "History",
     "fuel": "Fuel log",
-    "fuelShort": "Fuel"
+    "fuelShort": "Fuel",
+    "costs": "Other costs",
+    "costsShort": "Costs"
   },
   "app": {
     "tagline": "CARE FOR THE DRIVE",
@@ -158,8 +161,8 @@
     "transferBlocked": "Finish your signup transfer before changing your account.",
     "requestAnother": "Request another recovery email",
     "deleteAccount": "Delete account",
-    "deleteAccountDescription": "Permanently delete your account and everything stored in it: vehicles, maintenance schedules, service visits, fill-ups, receipts, photos, and notification and currency settings. Every device is signed out. This cannot be undone.",
-    "deleteAccountKeep": "To keep a copy, export your service history to CSV first. Guest records kept in this browser without an account are not affected.",
+    "deleteAccountDescription": "Permanently delete your account and everything stored in it: vehicles, maintenance schedules, service visits, fill-ups, other costs, receipts, photos, and notification and currency settings. Every device is signed out. This cannot be undone.",
+    "deleteAccountKeep": "To keep a copy, export your service history, fuel log, and other costs to CSV first. Guest records kept in this browser without an account are not affected.",
     "deleteAccountConfirm": "I understand that my account and all of its data will be permanently deleted.",
     "accountDeleted": "Your account and all of its data were deleted.",
     "deletionScheduled": "Your account is scheduled for deletion. It can no longer sign in, and its remaining data will be removed within 24 hours."
@@ -173,7 +176,7 @@
     "emptyDescription": "Add a vehicle to organize its service history and set a maintenance schedule from your owner’s manual.",
     "benefitHistory": "Keep every service in one place",
     "benefitSchedule": "See what’s due next",
-    "benefitSpending": "Track your maintenance spending",
+    "benefitSpending": "Track what your cars cost to own",
     "vehicles": "Vehicles",
     "attentionItems": "{count, plural, one {item needs attention} other {items need attention}}",
     "reminderWindows": "within reminder windows",
@@ -193,7 +196,10 @@
     "noVisits": "No service visits yet",
     "historyPlaceholder": "Your maintenance history will appear here.",
     "dueCount": "{count, plural, one {# due} other {# due}}",
-    "logFuel": "Log fuel"
+    "logFuel": "Log fuel",
+    "logIt": "Log",
+    "logNamed": "Log {name}",
+    "renewals": "Renewals"
   },
   "car": {
     "description": "Every vehicle’s history and maintenance plan, in one place.",
@@ -311,7 +317,7 @@
   },
   "reports": {
     "insights": "INSIGHTS",
-    "description": "See what caring for your cars has cost over time.",
+    "description": "See what owning your cars has cost over time: service, fuel, and everything else.",
     "carFilter": "Report car",
     "yearFilter": "Report year",
     "allTime": "All time",
@@ -328,7 +334,17 @@
     "unknownCar": "Unknown car",
     "costHint": "Costs without item-level amounts appear as unallocated.",
     "empty": "Nothing to report yet",
-    "emptyHint": "Log a service visit to see your spending here."
+    "emptyHint": "Log a service visit, fill-up, or other cost to see your spending here.",
+    "recordCount": "{count, plural, one {# record in this view} other {# records in this view}}",
+    "costPerMile": "COST PER MILE",
+    "costPerKilometer": "COST PER KILOMETER",
+    "costPerDistance": "COST PER DISTANCE",
+    "distanceDriven": "over {distance} of logged odometer readings",
+    "noDistance": "Log odometer readings on two dates to see this.",
+    "mixedUnits": "Choose one car: your cars use different distance units.",
+    "byType": "By type",
+    "service": "Service",
+    "fuel": "Fuel"
   },
   "due": {
     "setup": "Add a repeat interval or a one-time due point",
@@ -453,7 +469,7 @@
     "deleting": "Deleting…",
     "deleteFailed": "Could not delete this record. Please try again.",
     "deleteTitle": "Delete {name}?",
-    "deleteCar": "This permanently deletes this vehicle, its maintenance tasks, service visits, fill-ups, and photos. This cannot be undone.",
+    "deleteCar": "This permanently deletes this vehicle, its maintenance tasks, service visits, fill-ups, other costs, and photos. This cannot be undone.",
     "deleteTask": "This permanently deletes the maintenance task. Existing service history is kept. This cannot be undone.",
     "deleteVisit": "This permanently deletes the service visit and its photos. This cannot be undone.",
     "visitName": "{vehicle} — {date}",
@@ -483,7 +499,11 @@
     "fuelName": "{vehicle} fill-up — {date}",
     "fuelSaved": "Fill-up saved.",
     "fuelDeleted": "Fill-up deleted.",
-    "savingFuel": "Saving fill-up…"
+    "savingFuel": "Saving fill-up…",
+    "deleteExpense": "This permanently deletes the cost. This cannot be undone.",
+    "expenseName": "{vehicle} {category} — {date}",
+    "expenseSaved": "Cost saved.",
+    "expenseDeleted": "Cost deleted."
   },
   "currency": {
     "home": "Home currency",
@@ -578,6 +598,55 @@
     "deleteEntry": "Delete fill-up",
     "recent": "Recent fill-ups",
     "viewAll": "View fuel log",
+    "unknown": "Unknown",
+    "export": "Export CSV",
+    "trendEyebrow": "TREND",
+    "trend": "Economy over time",
+    "trendHint": "Each point is one full tank to the next. The dashed line is the vehicle average. {direction}",
+    "betterUp": "Higher is better.",
+    "betterDown": "Lower is better.",
+    "trendEmpty": "Log at least two measured tanks to see a trend.",
+    "trendChoose": "Choose a vehicle to see its economy trend.",
+    "trendLabel": "{vehicle} fuel economy across {count, plural, one {# tank} other {# tanks}}, from {first} to {last}. Average {average}."
+  },
+  "expenses": {
+    "eyebrow": "OWNERSHIP",
+    "description": "Insurance, registration, and everything else it takes to keep a car on the road.",
+    "log": "Log cost",
+    "edit": "Edit cost",
+    "subtitle": "Costs beyond service and fuel. Add a renewal date to be reminded.",
+    "category": "Category",
+    "categories": {
+      "insurance": "Insurance",
+      "registration": "Registration",
+      "inspection": "Inspection or emissions",
+      "tax": "Vehicle tax",
+      "financing": "Loan or lease payment",
+      "parking": "Parking",
+      "tolls": "Tolls",
+      "washing": "Washing and detailing",
+      "other": "Other"
+    },
+    "descriptionLabel": "Description",
+    "descriptionExample": "e.g. 6-month policy",
+    "amount": "Amount ({currency})",
+    "renewsOn": "Renews on",
+    "renewsHint": "When this cost is due again, such as a policy’s end date. It appears under What needs attention within the vehicle’s coming-up window.",
+    "notesExample": "Policy number, coverage, or anything to remember",
+    "save": "Save cost",
+    "filterCar": "Filter by vehicle",
+    "export": "Export CSV",
+    "empty": "No other costs yet",
+    "firstEntry": "Log insurance, registration, and other costs to see what each car costs to own.",
+    "noMatches": "No costs for this vehicle",
+    "changeFilter": "Choose another vehicle or log a cost.",
+    "showing": "Showing {count} of {total, plural, one {# cost} other {# costs}}",
+    "renews": "Renews",
+    "renewsDate": "Renews {date}",
+    "renewalName": "{category} renewal",
+    "renewalDue": "Renewal was due {date}",
+    "editEntry": "Edit {name}",
+    "deleteEntry": "Delete {name}",
     "unknown": "Unknown"
   }
 }

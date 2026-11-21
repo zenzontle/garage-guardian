@@ -119,6 +119,7 @@ describe('cloud initialization safeguards', () => {
     schedules: [intervalOnly],
     visits: [],
     fuelEntries: [],
+    expenses: [],
   };
 
   it.each([

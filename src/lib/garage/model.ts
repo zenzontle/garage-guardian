@@ -1,5 +1,6 @@
 import { AppError } from '../utils/app-error';
 import { normalizeFuelEntry, type FuelType, type VolumeUnit } from '../fuel/fuel';
+import { normalizeExpense, type ExpenseCategory } from '../expenses/expenses';
 import {
   normalizeVisit,
   currencyOrDefault,
@@ -9,6 +10,7 @@ import {
 
 export type { Currency } from '../currency/currency';
 export type { FuelType, VolumeUnit } from '../fuel/fuel';
+export type { ExpenseCategory } from '../expenses/expenses';
 
 export type DistanceUnit = 'miles' | 'kilometers';
 
@@ -84,11 +86,29 @@ export type FuelEntry = {
   unitPriceMilli: number;
   totalCostCents: number;
   currency: Currency;
+  // Home-currency conversions, made in the background like service visits' (never manual).
+  conversions?: Conversions;
   isFullTank: boolean;
   missedPrevious: boolean;
   station: string;
   notes: string;
   photos: Photo[];
+  createdAt: string;
+};
+
+// Ownership costs other than service and fuel, such as insurance or registration. A renewal
+// date makes the cost recur: the latest renewal per vehicle and category is a reminder.
+export type Expense = {
+  id: string;
+  carId: string;
+  date: string;
+  category: ExpenseCategory;
+  description: string;
+  totalCostCents: number;
+  currency: Currency;
+  conversions?: Conversions;
+  renewsOn: string | null;
+  notes: string;
   createdAt: string;
 };
 
@@ -100,9 +120,16 @@ export type Snapshot = {
   schedules: ScheduleItem[];
   visits: Visit[];
   fuelEntries: FuelEntry[];
+  expenses: Expense[];
 };
 
-export const EMPTY_SNAPSHOT: Snapshot = { cars: [], schedules: [], visits: [], fuelEntries: [] };
+export const EMPTY_SNAPSHOT: Snapshot = {
+  cars: [],
+  schedules: [],
+  visits: [],
+  fuelEntries: [],
+  expenses: [],
+};
 
 const STARTER_DEFAULTS = [
   { name: 'Oil change', months: 12, miles: 7500, kilometers: 12000 },
@@ -191,7 +218,8 @@ export function normalizePlate(plate?: string | null): string {
 
 // Browser, offline, and pending-transfer snapshots saved before fill-ups have no fuel entries.
 export function normalizeSnapshot(
-  snapshot: Omit<Snapshot, 'fuelEntries'> & Partial<Pick<Snapshot, 'fuelEntries'>>,
+  snapshot: Omit<Snapshot, 'fuelEntries' | 'expenses'> &
+    Partial<Pick<Snapshot, 'fuelEntries' | 'expenses'>>,
 ): Snapshot {
   return {
     ...snapshot,
@@ -199,6 +227,7 @@ export function normalizeSnapshot(
     cars: snapshot.cars.map(normalizeCar),
     visits: snapshot.visits.map(normalizeVisit),
     fuelEntries: (snapshot.fuelEntries ?? []).map(normalizeFuelEntry),
+    expenses: (snapshot.expenses ?? []).map(normalizeExpense),
   };
 }
 
