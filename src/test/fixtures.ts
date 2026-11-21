@@ -1,4 +1,4 @@
-import type { Car, FuelEntry, ScheduleItem, Visit } from '../lib/garage/model';
+import type { Car, Expense, FuelEntry, ScheduleItem, Visit } from '../lib/garage/model';
 
 export const car: Car = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -52,10 +52,24 @@ export const fuelEntry: FuelEntry = {
   unitPriceMilli: 3459,
   totalCostCents: 3459,
   currency: 'USD',
+  conversions: {},
   isFullTank: true,
   missedPrevious: false,
   station: 'Corner station',
   notes: '',
   photos: [],
+  createdAt: car.createdAt,
+};
+export const expense: Expense = {
+  id: '66666666-6666-4666-8666-666666666666',
+  carId: car.id,
+  date: '2026-09-01',
+  category: 'insurance',
+  description: '6-month policy',
+  totalCostCents: 42000,
+  currency: 'USD',
+  conversions: {},
+  renewsOn: '2027-03-01',
+  notes: '',
   createdAt: car.createdAt,
 };

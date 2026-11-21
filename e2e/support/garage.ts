@@ -5,12 +5,13 @@ import path from 'node:path';
 
 export const receiptPhoto = path.join(__dirname, '..', 'fixtures', 'receipt.jpg');
 
-export type Screen = 'dashboard' | 'cars' | 'fuel' | 'history' | 'reports';
+export type Screen = 'dashboard' | 'cars' | 'fuel' | 'history' | 'costs' | 'reports';
 const screenPaths: Record<Screen, string> = {
   dashboard: '/',
   cars: '/cars',
   fuel: '/fuel',
   history: '/history',
+  costs: '/costs',
   reports: '/reports',
 };
 

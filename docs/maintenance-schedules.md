@@ -8,6 +8,10 @@ Repeat intervals alone are enough. With no first due point, a distance interval 
 
 An explicit first due point is preserved, and linked service visits advance repeats from their recorded date/odometer. Tasks with neither intervals nor a due point still appear in dashboard setup guidance, with links to their vehicle schedules.
 
+## Logging a task from the dashboard
+
+Due and coming-up tasks under **What needs attention** have a **Log** button. It opens a new service visit for that vehicle with the task already chosen as its completed item, so saving it advances the schedule like any linked visit.
+
 ## Visit odometer readings
 
 A service visit's odometer is optional; unknown readings are stored as null rather than zero (`0006_optional_visit_odometer.sql`). A service visit without an odometer does not advance a distance target.

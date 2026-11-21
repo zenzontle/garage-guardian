@@ -22,7 +22,9 @@ export function GarageMobileNavigation({ page }: { page: Page }) {
               ? t('navigation.historyShort')
               : id === 'fuel'
                 ? t('navigation.fuelShort')
-                : t(`navigation.${id}`)}
+                : id === 'costs'
+                  ? t('navigation.costsShort')
+                  : t(`navigation.${id}`)}
           </span>
         </Link>
       ))}

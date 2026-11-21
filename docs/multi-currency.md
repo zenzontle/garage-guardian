@@ -28,7 +28,7 @@ If an outbox receipt's vehicle was deleted on another device, its foreign-key co
 
 ## Reporting and rollout
 
-Dashboard spending, report totals, charts, category breakdowns, averages, and cost sorting use home-currency amounts. Pending conversions are excluded, visibly counted, and sorted last in both cost directions. History and receipt details retain original amounts and explicit currency codes. CSV headers stay in English and include original currency/amounts, reporting currency, converted total, source, and rate date; unavailable conversions are blank.
+Fill-ups and [other costs](costs.md) carry the same `conversions` map and are converted by the same background worker, but only automatically: they have no manual override, and the database rejects manual conversions for them. Dashboard spending, report totals, charts, category breakdowns, averages, and cost sorting use home-currency amounts. Pending conversions are excluded, visibly counted, and sorted last in both cost directions. History and receipt details retain original amounts and explicit currency codes. CSV headers stay in English and include original currency/amounts, reporting currency, converted total, source, and rate date; unavailable conversions are blank.
 
 Apply `supabase/migrations/0010_multi_currency.sql` **before** deploying application code. It adds garage settings with owner RLS, receipt currency and conversion constraints, preservation/invalidation triggers, and the conditional background-save function. No API key or paid rate service is required.
 

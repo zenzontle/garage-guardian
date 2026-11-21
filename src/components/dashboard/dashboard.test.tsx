@@ -14,7 +14,7 @@ const unconfigured = { ...intervalOnly, intervalMiles: null, intervalMonths: nul
 
 function dashboard(schedules: ScheduleItem[], visits: Visit[] = [], locale: Locale = 'en') {
   const snapshot = initializeSnapshotSchedules(
-    { cars: [car], schedules, visits, fuelEntries: [] },
+    { cars: [car], schedules, visits, fuelEntries: [], expenses: [] },
     '2026-10-13',
   );
   return (

@@ -16,6 +16,7 @@ import { CarModal } from '../vehicles/car-modal';
 import { ScheduleModal } from '../maintenance/schedule-modal';
 import { VisitModal } from '../visits/visit-modal';
 import { FuelModal } from '../fuel/fuel-modal';
+import { ExpenseModal } from '../expenses/expense-modal';
 import { GarageSidebar } from './garage-sidebar';
 import { GarageTopbar } from './garage-topbar';
 import { GarageMobileNavigation } from './garage-mobile-navigation';
@@ -58,9 +59,11 @@ export function GarageContent({ children }: { children: ReactNode }) {
     if (garage.recovering && pathname !== '/auth/recovery') router.replace('/auth/recovery');
   }, [garage.recovering, pathname, router]);
   const page = workspaceScreen(pathname);
-  const pendingConversions = snapshot.visits.filter(
-    (visit) => reportingCents(visit, garage.homeCurrency) === null,
-  ).length;
+  const pendingConversions = [
+    ...snapshot.visits,
+    ...snapshot.fuelEntries,
+    ...snapshot.expenses,
+  ].filter((receipt) => reportingCents(receipt, garage.homeCurrency) === null).length;
   const reporter = (
     <FeedbackReporter
       key={user?.id ?? 'guest'}
@@ -361,6 +364,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
           <VisitModal
             item={modal.item}
             carId={modal.carId}
+            scheduleId={modal.scheduleId}
             cars={snapshot.cars}
             visits={visits}
             fuelEntries={fuelEntries}
@@ -389,6 +393,20 @@ export function GarageContent({ children }: { children: ReactNode }) {
             onSave={async (entry) => {
               await perform(() => repository!.saveFuelEntry(entry));
               interactions?.notify('interactions.fuelSaved');
+            }}
+          />
+        )}
+        {modal?.kind === 'expense' && (
+          <ExpenseModal
+            item={modal.item}
+            carId={modal.carId}
+            next={modal.next}
+            cars={snapshot.cars}
+            homeCurrency={garage.homeCurrency}
+            onClose={() => setModal(null)}
+            onSave={async (expense) => {
+              await perform(() => repository!.saveExpense(expense));
+              interactions?.notify('interactions.expenseSaved');
             }}
           />
         )}

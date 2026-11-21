@@ -289,6 +289,7 @@ describe.each(['local', 'cloud'] as const)('%s plate persistence', (mode) => {
         schedules: [schedule],
         visits: [visit],
         fuelEntries: [],
+        expenses: [],
       });
     },
   );
@@ -353,6 +354,7 @@ describe.each([
       schedules: [schedule],
       visits: [{ ...visit, photos: [photo] }],
       fuelEntries: [],
+      expenses: [],
     });
     await reloaded.saveCar({ ...car, distanceUnit: 'kilometers', reminderMiles: 1000 });
     expect((await reloaded.load()).cars[0]).toEqual({
@@ -392,6 +394,7 @@ describe.each([
       schedules: [],
       visits: [],
       fuelEntries: [],
+      expenses: [],
     });
   });
 });
@@ -412,6 +415,7 @@ it('loads legacy guest records as Miles without rewriting readings or custom win
     schedules: [schedule],
     visits: [visit],
     fuelEntries: [],
+    expenses: [],
   });
   await local.saveCar({ ...(await local.load()).cars[0], name: 'Edited legacy' });
   expect((await get<{ cars: (typeof car)[] }>('garage-guardian:local:v1'))?.cars[0]).toMatchObject({

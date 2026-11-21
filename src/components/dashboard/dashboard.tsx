@@ -1,7 +1,7 @@
 'use client';
 
 import Link from '../interaction/guarded-link';
-import { carPath, fuelPath } from '@/lib/navigation/garage-routes';
+import { carPath, costsPath, fuelPath } from '@/lib/navigation/garage-routes';
 import { useTranslations } from 'next-intl';
 import {
   ArrowRight,
@@ -16,13 +16,15 @@ import {
   Wrench,
 } from 'lucide-react';
 import { latestOdometer, type DueItem } from '@/lib/maintenance/due';
-import { type Car, type FuelEntry, type Visit } from '@/lib/garage/model';
+import { type Car, type Expense, type FuelEntry, type Visit } from '@/lib/garage/model';
+import type { Renewal } from '@/lib/expenses/expenses';
 import { useDisplay } from '@/i18n/use-display';
 import { PageHeading } from '../ui/page-heading';
 import { Stat } from '../ui/stat';
 import { Skeleton } from '../ui/skeleton';
 import { SkeletonRows } from '../ui/skeleton-rows';
 import { DueRow } from './due-row';
+import { RenewalRow } from './renewal-row';
 import { useFuelDisplay } from '../fuel/use-fuel-display';
 import { reportTotals } from '@/lib/reports/reports';
 import type { Currency } from '@/lib/currency/currency';
@@ -31,10 +33,14 @@ export function Dashboard({
   cars,
   visits,
   fuelEntries = [],
+  expenses = [],
   allDue,
+  renewals = [],
   onAddCar,
   onAddVisit,
   onAddFuel,
+  onLogTask,
+  onLogRenewal,
   homeCurrency = 'USD',
   loading = false,
 }: {
@@ -43,10 +49,14 @@ export function Dashboard({
   cars: Car[];
   visits: Visit[];
   fuelEntries?: FuelEntry[];
+  expenses?: Expense[];
   allDue: DueItem[];
+  renewals?: Renewal[];
   onAddCar: () => void;
   onAddVisit: () => void;
   onAddFuel?: () => void;
+  onLogTask?: (item: DueItem) => void;
+  onLogRenewal?: (renewal: Renewal) => void;
   homeCurrency?: Currency;
 }) {
   const t = useTranslations();
@@ -56,10 +66,18 @@ export function Dashboard({
   const due = allDue.filter((item) => item.status === 'due');
   const upcoming = allDue.filter((item) => item.status === 'upcoming');
   const setup = allDue.filter((item) => item.status === 'setup');
+  const dueRenewals = renewals.filter((renewal) => renewal.status === 'due');
+  const upcomingRenewals = renewals.filter((renewal) => renewal.status === 'upcoming');
+  const dueCount = due.length + dueRenewals.length;
+  const upcomingCount = upcoming.length + upcomingRenewals.length;
+  const thisYear = (record: { date: string }) =>
+    record.date.startsWith(String(new Date().getFullYear()));
   const spending = reportTotals(
-    visits.filter((visit) => visit.date.startsWith(String(new Date().getFullYear()))),
+    visits.filter(thisYear),
     cars,
     homeCurrency,
+    fuelEntries.filter(thisYear),
+    expenses.filter(thisYear),
   );
   return (
     <>
@@ -129,15 +147,15 @@ export function Dashboard({
             <Stat
               icon={<CircleAlert size={20} />}
               label={t('shared.dueNow')}
-              value={number(due.length)}
-              detail={t('dashboard.attentionItems', { count: due.length })}
+              value={number(dueCount)}
+              detail={t('dashboard.attentionItems', { count: dueCount })}
               tone="orange"
               loading={loading}
             />
             <Stat
               icon={<CalendarDays size={20} />}
               label={t('shared.comingUp')}
-              value={number(upcoming.length)}
+              value={number(upcomingCount)}
               detail={t('dashboard.reminderWindows')}
               tone="yellow"
               loading={loading}
@@ -163,16 +181,38 @@ export function Dashboard({
                   <h2>{t('dashboard.attention')}</h2>
                 </div>
                 {!loading && (
-                  <span className="count-badge">{number(due.length + upcoming.length)}</span>
+                  <span className="count-badge">{number(dueCount + upcomingCount)}</span>
                 )}
               </div>
               {loading ? (
                 <SkeletonRows count={4} />
-              ) : due.length + upcoming.length ? (
+              ) : dueCount + upcomingCount ? (
                 <div className="due-list">
-                  {[...due, ...upcoming].slice(0, 6).map((item) => (
-                    <DueRow key={item.schedule.id} item={item} href={carPath(item.car.id)} />
-                  ))}
+                  {/* Everything due comes before anything coming up, tasks and renewals alike. */}
+                  {[
+                    ...due.map((item) => ({ item })),
+                    ...dueRenewals.map((renewal) => ({ renewal })),
+                    ...upcoming.map((item) => ({ item })),
+                    ...upcomingRenewals.map((renewal) => ({ renewal })),
+                  ]
+                    .slice(0, 6)
+                    .map((row) =>
+                      'item' in row ? (
+                        <DueRow
+                          key={row.item.schedule.id}
+                          item={row.item}
+                          href={carPath(row.item.car.id)}
+                          onLog={onLogTask && (() => onLogTask(row.item))}
+                        />
+                      ) : (
+                        <RenewalRow
+                          key={row.renewal.expense.id}
+                          renewal={row.renewal}
+                          href={costsPath(row.renewal.car.id)}
+                          onLog={onLogRenewal && (() => onLogRenewal(row.renewal))}
+                        />
+                      ),
+                    )}
                 </div>
               ) : (
                 <div className="panel-empty">
@@ -224,9 +264,9 @@ export function Dashboard({
                   </div>
                 )}
                 {activeCars.map((car) => {
-                  const count = allDue.filter(
-                    (item) => item.car.id === car.id && item.status === 'due',
-                  ).length;
+                  const count =
+                    due.filter((item) => item.car.id === car.id).length +
+                    dueRenewals.filter((renewal) => renewal.car.id === car.id).length;
                   return (
                     <Link className="vehicle-row" key={car.id} href={carPath(car.id)}>
                       <span className="vehicle-icon">

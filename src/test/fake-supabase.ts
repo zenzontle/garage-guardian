@@ -1,7 +1,10 @@
 import { vi } from 'vitest';
 import type { AuthChangeEvent, Session, SupabaseClient, User } from '@supabase/supabase-js';
 import type { InitializeScheduleDefaultsArgs } from '@/lib/maintenance/schedule-defaults';
-import type { SaveScheduleWithDefaultsArgs } from '@/lib/garage/repository';
+import type {
+  SaveReceiptConversionArgs,
+  SaveScheduleWithDefaultsArgs,
+} from '@/lib/garage/repository';
 import { scheduleDefaultsRpc } from './schedule-defaults-rpc';
 import {
   mergeConversions,
@@ -14,6 +17,11 @@ import {
 
 type Row = Record<string, unknown> & { id: string; user_id?: string };
 type Result = { data: unknown; error: Error | null };
+const receiptDateColumns: Record<string, string> = {
+  visits: 'service_date',
+  fuel_entries: 'fuel_date',
+  expenses: 'expense_date',
+};
 export const account = (id = '44444444-4444-4444-8444-444444444444'): User =>
   ({ id, email: `${id}@example.com`, identities: [{ id: 'identity' }] }) as User;
 
@@ -73,10 +81,12 @@ export function fakeSupabase() {
         const id = name === 'garage_settings' ? row.user_id : row.id;
         const previous = table.get(id);
         if (name === 'cars' && previous) row.is_archived = previous.is_archived;
-        if (name === 'visits' && previous) {
+        // Mirrors the conversion-preserving update triggers of 0010 and 0015.
+        const dateColumn = receiptDateColumns[name];
+        if (dateColumn && previous) {
           const unchanged =
             previous.currency === row.currency &&
-            previous.service_date === row.service_date &&
+            previous[dateColumn] === row[dateColumn] &&
             previous.total_cost_cents === row.total_cost_cents;
           if (unchanged)
             row.conversions = mergeConversions(
@@ -98,7 +108,7 @@ export function fakeSupabase() {
         for (const entry of matches) {
           table.delete(entry.id);
           if (name === 'cars')
-            for (const childName of ['schedule_items', 'visits', 'fuel_entries']) {
+            for (const childName of ['schedule_items', 'visits', 'fuel_entries', 'expenses']) {
               for (const child of getTable(childName).values())
                 if (child.car_id === entry.id) getTable(childName).delete(child.id);
             }
@@ -218,6 +228,7 @@ export function fakeSupabase() {
         | { p_car: Row }
         | InitializeScheduleDefaultsArgs
         | SaveScheduleWithDefaultsArgs
+        | SaveReceiptConversionArgs
         | {
             p_visit_id: string;
             p_currency: Currency;
@@ -230,8 +241,19 @@ export function fakeSupabase() {
       if (name === 'save_car' && 'p_car' in args) {
         return execute('cars', 'upsert', [], args.p_car);
       }
-      if (name === 'save_visit_conversion' && 'p_visit_id' in args) {
-        const row = getTable('visits').get(args.p_visit_id);
+      const receiptTable =
+        name === 'save_visit_conversion'
+          ? 'visits'
+          : name === 'save_fuel_conversion'
+            ? 'fuel_entries'
+            : name === 'save_expense_conversion'
+              ? 'expenses'
+              : null;
+      if (receiptTable && ('p_visit_id' in args || 'p_id' in args)) {
+        const row = getTable(receiptTable).get('p_visit_id' in args ? args.p_visit_id : args.p_id);
+        // Fill-ups and other costs only accept automatic conversions.
+        if (receiptTable !== 'visits' && args.p_conversion.source !== 'automatic')
+          return { data: null, error: new Error('Invalid conversion') };
         const inputs = {
           currency: args.p_currency,
           date: args.p_date,
@@ -243,7 +265,7 @@ export function fakeSupabase() {
           sameInputs(
             receiptInputs({
               currency: row!.currency as Currency,
-              date: row!.service_date as string,
+              date: row![receiptDateColumns[receiptTable]] as string,
               totalCostCents: row!.total_cost_cents as number,
             }),
             inputs,

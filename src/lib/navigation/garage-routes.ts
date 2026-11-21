@@ -3,6 +3,7 @@ export const workspacePaths = {
   cars: '/cars',
   history: '/history',
   fuel: '/fuel',
+  costs: '/costs',
   reports: '/reports',
 } as const;
 
@@ -22,6 +23,10 @@ export function fuelPath(carId?: string) {
   return carId ? `/fuel?${new URLSearchParams({ car: carId })}` : '/fuel';
 }
 
+export function costsPath(carId?: string) {
+  return carId ? `/costs?${new URLSearchParams({ car: carId })}` : '/costs';
+}
+
 export function workspaceScreen(pathname: string): WorkspaceScreen {
   if (pathname === '/settings/account') return 'account';
   if (pathname === '/settings/security') return 'security';
@@ -29,6 +34,7 @@ export function workspaceScreen(pathname: string): WorkspaceScreen {
   if (pathname === '/cars' || pathname.startsWith('/cars/')) return 'cars';
   if (pathname === '/history') return 'history';
   if (pathname === '/fuel') return 'fuel';
+  if (pathname === '/costs') return 'costs';
   if (pathname === '/reports') return 'reports';
   return 'dashboard';
 }
@@ -68,6 +74,7 @@ export const reportPaths = [
   '/cars/[carId]',
   '/history',
   '/fuel',
+  '/costs',
   '/reports',
   '/settings/notifications',
   '/settings/account',
