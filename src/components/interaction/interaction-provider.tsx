@@ -30,7 +30,9 @@ type SuccessKey =
   | 'interactions.visitDeleted'
   | 'interactions.fuelDeleted'
   | 'interactions.expenseSaved'
-  | 'interactions.expenseDeleted';
+  | 'interactions.expenseDeleted'
+  | 'interactions.imported';
+type ToastValues = Record<string, number>;
 type DeleteRequest = {
   title: string;
   description: string;
@@ -41,7 +43,7 @@ type Interactions = {
   register: (id: string, read: () => FormState) => () => void;
   syncProtection: () => void;
   request: (action: () => void, scope?: string) => void;
-  notify: (key: SuccessKey) => void;
+  notify: (key: SuccessKey, values?: ToastValues) => void;
   confirmDelete: (request: DeleteRequest) => void;
   clear: () => void;
 };
@@ -60,7 +62,11 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
   const deleting = useRef(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [deleteError, setDeleteError] = useState<AppFailure | null>(null);
-  const [toast, setToast] = useState<{ key: SuccessKey; id: number } | null>(null);
+  const [toast, setToast] = useState<{
+    key: SuccessKey;
+    values?: ToastValues;
+    id: number;
+  } | null>(null);
   const toastSequence = useRef(0);
   const generation = useRef(0);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -121,7 +127,7 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
       },
       request,
       syncProtection,
-      notify: (key) => setToast({ key, id: ++toastSequence.current }),
+      notify: (key, values) => setToast({ key, values, id: ++toastSequence.current }),
       confirmDelete: (next) =>
         request(() => {
           setDeleteError(null);
@@ -169,7 +175,13 @@ export function InteractionProvider({ children }: { children: ReactNode }) {
   return (
     <InteractionContext.Provider value={value}>
       {children}
-      {toast && <SuccessToast key={toast.id} message={t(toast.key)} onDismiss={dismissToast} />}
+      {toast && (
+        <SuccessToast
+          key={toast.id}
+          message={t(toast.key, toast.values)}
+          onDismiss={dismissToast}
+        />
+      )}
       {deletion && (
         <Modal
           title={deletion.title}

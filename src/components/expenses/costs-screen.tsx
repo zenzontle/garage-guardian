@@ -28,6 +28,9 @@ export function CostsScreen() {
       onCarChange={(id) => router.replace(costsPath(id))}
       onAdd={() => setModal({ kind: 'expense', carId: carId || undefined })}
       onAddCar={() => setModal({ kind: 'car' })}
+      onImport={() =>
+        setModal({ kind: 'import', importKind: 'expense', carId: carId || undefined })
+      }
       onEdit={(item) => setModal({ kind: 'expense', item })}
       onDelete={(expense) =>
         interactions?.confirmDelete({

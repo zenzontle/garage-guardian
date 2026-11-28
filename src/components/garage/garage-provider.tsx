@@ -18,6 +18,7 @@ import type { Car, Expense, FuelEntry, ScheduleItem, Visit } from '@/lib/garage/
 import { sortFuelEntries } from '@/lib/fuel/fuel';
 import { getRenewals, sortExpenses } from '@/lib/expenses/expenses';
 import { todayISO } from '@/lib/utils/today-iso';
+import type { ImportKind } from '@/lib/import/import';
 import { useInteractions } from '../interaction/interaction-provider';
 import { useFormInteraction } from '../interaction/use-form-interaction';
 
@@ -28,6 +29,7 @@ type ModalState =
   | { kind: 'visit'; item?: Visit; carId?: string; scheduleId?: string }
   | { kind: 'fuel'; item?: FuelEntry; carId?: string }
   | { kind: 'expense'; item?: Expense; carId?: string; next?: Expense }
+  | { kind: 'import'; importKind: ImportKind; carId?: string }
   | { kind: 'account'; section?: 'security' }
   | null;
 

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowDownToLine, ClipboardList, Plus, Search } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, ClipboardList, Plus, Search } from 'lucide-react';
 import { type Repository } from '@/lib/garage/repository';
 import { distanceInMiles, type Car, type Visit } from '@/lib/garage/model';
 import { visitsToCsv } from '@/lib/reports/reports';
@@ -25,6 +25,7 @@ export function HistoryPage({
   onCarChange,
   onAdd,
   onAddCar,
+  onImport,
   onEdit,
   onDelete,
   homeCurrency = 'USD',
@@ -38,6 +39,8 @@ export function HistoryPage({
   onCarChange: (carId: string) => void;
   onAdd: () => void;
   onAddCar: () => void;
+  /** Opens the CSV import; vehicles are required first. */
+  onImport?: () => void;
   onEdit: (visit: Visit) => void;
   onDelete: (visit: Visit) => void;
   homeCurrency?: Currency;
@@ -164,6 +167,16 @@ export function HistoryPage({
               <option value="odometer_high">{t('history.highOdometer')}</option>
             </select>
           </label>
+          {onImport && (
+            <button
+              className="button secondary"
+              onClick={onImport}
+              disabled={loading || !cars.length}
+            >
+              <ArrowUpFromLine size={17} />
+              {t('import.button')}
+            </button>
+          )}
           <button className="button secondary" onClick={downloadCsv} disabled={!filtered.length}>
             <ArrowDownToLine size={17} />
             {t('history.export')}

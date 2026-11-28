@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { ArrowDownToLine, Plus, Settings2, Trash2, Wallet } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Plus, Settings2, Trash2, Wallet } from 'lucide-react';
 import type { Car, Expense } from '@/lib/garage/model';
 import type { Currency } from '@/lib/currency/currency';
 import { expensesToCsv } from '@/lib/reports/reports';
@@ -22,6 +22,7 @@ export function CostsPage({
   onCarChange,
   onAdd,
   onAddCar,
+  onImport,
   onEdit,
   onDelete,
 }: {
@@ -34,6 +35,8 @@ export function CostsPage({
   onCarChange: (carId: string) => void;
   onAdd: () => void;
   onAddCar: () => void;
+  /** Opens the CSV import; vehicles are required first. */
+  onImport?: () => void;
   onEdit: (expense: Expense) => void;
   onDelete: (expense: Expense) => void;
 }) {
@@ -105,6 +108,16 @@ export function CostsPage({
               <CarOptions cars={cars} />
             </select>
           </label>
+          {onImport && (
+            <button
+              className="button secondary"
+              onClick={onImport}
+              disabled={loading || !cars.length}
+            >
+              <ArrowUpFromLine size={17} />
+              {t('import.button')}
+            </button>
+          )}
           <button
             className="button secondary"
             onClick={downloadCsv}
