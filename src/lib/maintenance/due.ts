@@ -6,6 +6,7 @@ import {
   type ScheduleItem,
   type Visit,
 } from '../garage/model';
+import { drivingForecast, forecastDistanceDate, type DrivingForecast } from './forecast';
 
 export type DueStatus = 'setup' | 'upcoming' | 'due' | 'later' | 'completed';
 export type DueItem = {
@@ -17,6 +18,12 @@ export type DueItem = {
   daysRemaining: number | null;
   milesRemaining: number | null;
   lastDone: Visit | null;
+  /**
+   * Approximate date the task falls due, from the car's recent driving: the day it is
+   * expected to reach `dueMiles`, or `dueDate` if that comes first. Null when the task is not
+   * pending, has no distance target, or the readings are too sparse for an estimate.
+   */
+  forecastDate: string | null;
 };
 
 export function addMonths(iso: string, count: number): string {
@@ -49,6 +56,8 @@ export function getDueItem(
   visits: Visit[],
   today: string,
   fuelEntries: FuelEntry[] = [],
+  // Computed here when not given; getAllDue passes it in to estimate once per car.
+  driving?: DrivingForecast | null,
 ): DueItem {
   const completed = visits
     .filter(
@@ -69,6 +78,7 @@ export function getDueItem(
       daysRemaining: null,
       milesRemaining: null,
       lastDone,
+      forecastDate: null,
     };
   }
 
@@ -86,8 +96,8 @@ export function getDueItem(
         : null
     : schedule.firstDueMiles;
   const daysRemaining = dueDate ? daysBetween(today, dueDate) : null;
-  const milesRemaining =
-    dueMiles !== null ? dueMiles - latestOdometer(car, visits, fuelEntries) : null;
+  const currentOdometer = latestOdometer(car, visits, fuelEntries);
+  const milesRemaining = dueMiles !== null ? dueMiles - currentOdometer : null;
   let status: DueStatus = 'later';
   if (dueDate === null && dueMiles === null) status = 'setup';
   else if (
@@ -101,7 +111,32 @@ export function getDueItem(
       milesRemaining <= (car.reminderMiles ?? defaultReminderDistance(car.distanceUnit)))
   )
     status = 'upcoming';
-  return { schedule, car, status, dueDate, dueMiles, daysRemaining, milesRemaining, lastDone };
+  let forecastDate: string | null = null;
+  if (dueMiles !== null && (status === 'upcoming' || status === 'later')) {
+    const forecast =
+      driving === undefined ? drivingForecast(car, visits, fuelEntries, today) : driving;
+    const reached = forecast && forecastDistanceDate(forecast, dueMiles, currentOdometer, today);
+    if (reached) forecastDate = dueDate && dueDate < reached ? dueDate : reached;
+  }
+  return {
+    schedule,
+    car,
+    status,
+    dueDate,
+    dueMiles,
+    daysRemaining,
+    milesRemaining,
+    lastDone,
+    forecastDate,
+  };
+}
+
+/**
+ * The forecast worth showing as approximate: null when there is none, or when it is the
+ * task's own due date, which is already shown as exact.
+ */
+export function approximateDueDate(item: DueItem): string | null {
+  return item.forecastDate !== item.dueDate ? item.forecastDate : null;
 }
 
 export function getAllDue(
@@ -113,11 +148,16 @@ export function getAllDue(
 ): DueItem[] {
   const carMap = new Map(cars.filter((car) => !car.isArchived).map((car) => [car.id, car]));
   const rank: Record<DueStatus, number> = { due: 0, upcoming: 1, later: 2, setup: 3, completed: 4 };
+  const driving = new Map<string, DrivingForecast | null>();
+  const forecastFor = (car: Car) => {
+    if (!driving.has(car.id)) driving.set(car.id, drivingForecast(car, visits, fuelEntries, today));
+    return driving.get(car.id)!;
+  };
   return schedules
     .filter((item) => item.isActive)
     .flatMap((item) => {
       const car = carMap.get(item.carId);
-      return car ? [getDueItem(item, car, visits, today, fuelEntries)] : [];
+      return car ? [getDueItem(item, car, visits, today, fuelEntries, forecastFor(car))] : [];
     })
     .sort(
       (a, b) => rank[a.status] - rank[b.status] || a.schedule.name.localeCompare(b.schedule.name),
