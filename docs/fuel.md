@@ -41,7 +41,7 @@ The Fuel log charts each measured segment's economy over time, with the vehicle 
 
 ## Reports and export
 
-Fill-ups count toward the dashboard's year-to-date spending and the Reports totals, by-month, by-vehicle, and by-type breakdowns, in the home currency. Their odometer readings also measure the distance behind Reports' cost per mile or kilometer. See [other costs](costs.md#currency-and-reports). **Export CSV** on the Fuel log downloads the filtered fill-ups with their economy and home-currency columns.
+Fill-ups count toward the dashboard's year-to-date spending and the Reports totals, by-month, by-vehicle, and by-type breakdowns, in the home currency. Their odometer readings also measure the distance behind Reports' cost per mile or kilometer. See [other costs](costs.md#currency-and-reports). **Export CSV** on the Fuel log downloads the filtered fill-ups with their economy and home-currency columns. **Import CSV** adds fill-ups from a spreadsheet or an export; see [CSV import](csv-import.md).
 
 ## Storage and accounts
 

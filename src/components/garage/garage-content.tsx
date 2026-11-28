@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { CircleAlert, LogOut, X } from 'lucide-react';
 import { isCloudConfigured } from '@/lib/garage/repository';
-import { makeStarterSchedules } from '@/lib/garage/model';
+import { makeStarterSchedules, type Expense, type FuelEntry, type Visit } from '@/lib/garage/model';
 import { reportingCents } from '@/lib/currency/currency';
 import { accountMode, accountPath, carPath, workspaceScreen } from '@/lib/navigation/garage-routes';
 import { useGarage } from './garage-provider';
@@ -17,6 +17,7 @@ import { ScheduleModal } from '../maintenance/schedule-modal';
 import { VisitModal } from '../visits/visit-modal';
 import { FuelModal } from '../fuel/fuel-modal';
 import { ExpenseModal } from '../expenses/expense-modal';
+import { ImportModal } from '../import/import-modal';
 import { GarageSidebar } from './garage-sidebar';
 import { GarageTopbar } from './garage-topbar';
 import { GarageMobileNavigation } from './garage-mobile-navigation';
@@ -74,7 +75,7 @@ export function GarageContent({ children }: { children: ReactNode }) {
           ? modal.item
             ? 'edit-car'
             : 'add-car'
-          : modal?.kind === 'account'
+          : modal?.kind === 'account' || modal?.kind === 'import'
             ? 'none'
             : (modal?.kind ?? 'none')
       }
@@ -407,6 +408,37 @@ export function GarageContent({ children }: { children: ReactNode }) {
             onSave={async (expense) => {
               await perform(() => repository!.saveExpense(expense));
               interactions?.notify('interactions.expenseSaved');
+            }}
+          />
+        )}
+        {modal?.kind === 'import' && (
+          <ImportModal
+            kind={modal.importKind}
+            carId={modal.carId}
+            snapshot={snapshot}
+            homeCurrency={garage.homeCurrency}
+            onClose={() => setModal(null)}
+            onImport={async (records, onSaved) => {
+              const save = {
+                visit: (record: unknown) => repository!.saveVisit(record as Visit),
+                fuel: (record: unknown) => repository!.saveFuelEntry(record as FuelEntry),
+                expense: (record: unknown) => repository!.saveExpense(record as Expense),
+              }[modal.importKind];
+              let count = 0;
+              try {
+                // One record at a time, in file order, so a failure stops at a known row.
+                await perform(async () => {
+                  for (const record of records) {
+                    await save(record);
+                    onSaved(++count);
+                  }
+                });
+              } catch (cause) {
+                // Records saved before the failure stay saved; show them, and as duplicates.
+                if (count) await refresh();
+                throw cause;
+              }
+              interactions?.notify('interactions.imported', { count });
             }}
           />
         )}

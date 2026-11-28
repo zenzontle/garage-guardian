@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { ArrowDownToLine, Fuel, Plus } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Fuel, Plus } from 'lucide-react';
 import type { Repository } from '@/lib/garage/repository';
 import type { Car, FuelEntry } from '@/lib/garage/model';
 import { fuelEconomy } from '@/lib/fuel/economy';
@@ -30,6 +30,7 @@ export function FuelPage({
   onCarChange,
   onAdd,
   onAddCar,
+  onImport,
   onEdit,
   onDelete,
 }: {
@@ -43,6 +44,8 @@ export function FuelPage({
   onCarChange: (carId: string) => void;
   onAdd: () => void;
   onAddCar: () => void;
+  /** Opens the CSV import; vehicles are required first. */
+  onImport?: () => void;
   onEdit: (entry: FuelEntry) => void;
   onDelete: (entry: FuelEntry) => void;
 }) {
@@ -171,6 +174,16 @@ export function FuelPage({
               <CarOptions cars={cars} />
             </select>
           </label>
+          {onImport && (
+            <button
+              className="button secondary"
+              onClick={onImport}
+              disabled={loading || !cars.length}
+            >
+              <ArrowUpFromLine size={17} />
+              {t('import.button')}
+            </button>
+          )}
           <button
             className="button secondary"
             onClick={downloadCsv}

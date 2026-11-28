@@ -29,6 +29,7 @@ export function HistoryScreen() {
       onCarChange={(id) => router.replace(historyPath(id))}
       onAdd={() => setModal({ kind: 'visit', carId: carId || undefined })}
       onAddCar={() => setModal({ kind: 'car' })}
+      onImport={() => setModal({ kind: 'import', importKind: 'visit', carId: carId || undefined })}
       onEdit={(item) => setModal({ kind: 'visit', item })}
       onDelete={(visit) =>
         interactions?.confirmDelete({

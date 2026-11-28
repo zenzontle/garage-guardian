@@ -1,6 +1,6 @@
 # Garage Guardian
 
-A private, responsive car maintenance tracker. Record multiple cars and service visits, set maintenance schedules from an owner's manual, see what is due, review the full cost of ownership, and export records to CSV. VIN lookup, automatic manufacturer schedules, spreadsheet import, and native apps are future work.
+A private, responsive car maintenance tracker. Record multiple cars and service visits, set maintenance schedules from an owner's manual, see what is due, review the full cost of ownership, and import or export records as CSV. VIN lookup, automatic manufacturer schedules, and native apps are future work.
 
 ## Features
 
@@ -8,6 +8,7 @@ A private, responsive car maintenance tracker. Record multiple cars and service 
 - **Maintenance schedules** driven by repeat intervals, with persisted first due points. See [maintenance schedules](docs/maintenance-schedules.md).
 - **Fuel log** with per-fill-up gallons or liters, fuel economy (MPG or L/100 km) and its trend, CSV export, and fill-up odometers that keep distance reminders current. See [fuel log](docs/fuel.md).
 - **Other costs** such as insurance and registration, with renewal reminders. Reports cover service, fuel, and other costs, with cost per mile or kilometer. See [other costs](docs/costs.md).
+- **CSV import** of service visits, fill-ups, and other costs from spreadsheets or the app's own exports, with column matching in English and Spanish, a preview of problems and duplicates, and nothing saved until confirmed. See [CSV import](docs/csv-import.md).
 - **Receipts** in USD, MXN, or CAD, with home-currency reports and offline receipt retry. See [multi-currency](docs/multi-currency.md).
 - **Guest mode and accounts**: use everything without signing in, then transfer to a private cloud account on signup. Accounts can be permanently deleted with all of their data. See [deployment](docs/deployment.md#guest-data-and-signup) and [account management](docs/account-management.md).
 - **Weekly email reminders** (opt-in) alongside in-app due reminders. See [account reminders](docs/account-reminders.md).

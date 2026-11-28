@@ -13,7 +13,7 @@
 | Renews on     | Optional. When the cost is due again, such as a policy's end date. Must be after the cost's date. |
 | Notes         | Optional, up to 2,000 characters.                                                                 |
 
-Costs have no photos. Costs export to CSV from the page (headers in English, with the same home-currency columns as the service history export).
+Costs have no photos. Costs export to CSV from the page (headers in English, with the same home-currency columns as the service history export), and **Import CSV** adds costs from a file; see [CSV import](csv-import.md).
 
 ## Renewals
 

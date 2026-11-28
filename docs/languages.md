@@ -6,7 +6,7 @@ Use the **English / Español** selector in the header, account screens, or open 
 
 ## What is and isn't translated
 
-Neutral Spanish uses `es` number/date formatting. Each vehicle keeps its **mi/km** unit, and form values remain canonical numbers, integer cents, and ISO dates. Receipt and reporting currencies are independent of language; see [multi-currency](multi-currency.md). Date-only displays use UTC explicitly so the calendar day never shifts. Stored names, notes, categories, and other user-entered text are never translated or renamed. New starter tasks use the language selected when the car is saved. CSV headers, values, fallback labels, units, and escaping remain canonical English regardless of the export button's language.
+Neutral Spanish uses `es` number/date formatting. Each vehicle keeps its **mi/km** unit, and form values remain canonical numbers, integer cents, and ISO dates. Receipt and reporting currencies are independent of language; see [multi-currency](multi-currency.md). Date-only displays use UTC explicitly so the calendar day never shifts. Stored names, notes, categories, and other user-entered text are never translated or renamed. New starter tasks use the language selected when the car is saved. CSV headers, values, fallback labels, units, and escaping remain canonical English regardless of the export button's language. [CSV import](csv-import.md) reads English and Spanish column names and values.
 
 Provider-owned confirmation emails remain in their provider language. Weekly reminder emails have a separate English/Spanish preference saved to each account; see [account reminders](account-reminders.md).
 
