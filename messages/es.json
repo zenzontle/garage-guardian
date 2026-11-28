@@ -351,7 +351,8 @@
     "completed": "Tarea única completada",
     "date": "para el {date}",
     "distance": "a los {distance}",
-    "combined": "para el {date} o a los {distance}"
+    "combined": "para el {date} o a los {distance}",
+    "forecast": "{description}, hacia el {date}"
   },
   "starter": {
     "oil": "Cambio de aceite",

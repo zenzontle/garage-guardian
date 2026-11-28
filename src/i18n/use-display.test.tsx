@@ -65,3 +65,23 @@ it('renders whole due descriptions for both languages without changing calculati
     milesRemaining: 4900,
   });
 });
+
+it('adds an approximate date in both languages only when it differs from the due date', () => {
+  const en = display('en'),
+    es = display('es');
+  const base = getDueItem({ ...schedule, firstDueDate: null }, car, [], '2026-09-20');
+  const forecast = { ...base, forecastDate: '2027-03-12' };
+  expect(en.dueDescription(forecast)).toBe('at 5,000 mi, around Mar 12, 2027');
+  expect(es.dueDescription(forecast)).toBe(
+    `a los ${es.formatDistance(5000, 'miles')}, hacia el ${es.displayDate('2027-03-12')}`,
+  );
+  expect(en.dueDescription({ ...forecast, dueDate: '2027-06-01' })).toBe(
+    'by Jun 1, 2027 or at 5,000 mi, around Mar 12, 2027',
+  );
+  expect(en.dueDescription({ ...forecast, dueDate: '2027-03-12' })).toBe(
+    'by Mar 12, 2027 or at 5,000 mi',
+  );
+  expect(en.dueDescription({ ...forecast, car: { ...car, distanceUnit: 'kilometers' } })).toBe(
+    'at 5,000 km, around Mar 12, 2027',
+  );
+});

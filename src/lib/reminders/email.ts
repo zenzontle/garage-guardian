@@ -1,4 +1,4 @@
-import type { DueItem } from '@/lib/maintenance/due';
+import { approximateDueDate, type DueItem } from '@/lib/maintenance/due';
 import { distanceAbbreviation } from '@/lib/garage/model';
 import { carPath } from '@/lib/navigation/garage-routes';
 
@@ -12,7 +12,9 @@ const copy = {
     date: 'Due by',
     distance: 'Odometer',
     or: 'or',
+    around: (date: string) => `around ${date}`,
     footer: 'Distance reminders use your latest entered odometer readings.',
+    forecastFooter: 'Dates marked “around” are estimated from your recent driving.',
     settings: 'Manage or disable email reminders',
   },
   es: {
@@ -24,7 +26,9 @@ const copy = {
     date: 'Fecha límite',
     distance: 'Odómetro',
     or: 'o',
+    around: (date: string) => `hacia el ${date}`,
     footer: 'Los recordatorios de distancia usan las últimas lecturas de odómetro que ingresaste.',
+    forecastFooter: 'Las fechas marcadas con «hacia el» se estiman según tu manejo reciente.',
     settings: 'Administrar o desactivar recordatorios por correo',
   },
 };
@@ -51,6 +55,13 @@ export function reminderOrigin(value: string | undefined) {
 
 export function renderDigest(items: DueItem[], language: 'en' | 'es', origin: string) {
   const t = copy[language];
+  const date = (iso: string) =>
+    new Intl.DateTimeFormat(language, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    }).format(new Date(`${iso}T00:00:00Z`));
   const groups = new Map<string, DueItem[]>();
   for (const item of items) groups.set(item.car.id, [...(groups.get(item.car.id) ?? []), item]);
   const html: string[] = [`<html lang="${language}"><body><p>${t.intro}</p>`];
@@ -62,30 +73,27 @@ export function renderDigest(items: DueItem[], language: 'en' | 'es', origin: st
     text.push('', `${car.name}: ${link}`);
     for (const item of group) {
       const details: string[] = [];
-      if (item.dueDate)
-        details.push(
-          `${t.date}: ${new Intl.DateTimeFormat(language, {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric',
-            timeZone: 'UTC',
-          }).format(new Date(`${item.dueDate}T00:00:00Z`))}`,
-        );
+      if (item.dueDate) details.push(`${t.date}: ${date(item.dueDate)}`);
       if (item.dueMiles !== null)
         details.push(
           `${t.distance}: ${new Intl.NumberFormat(language).format(item.dueMiles)} ${distanceAbbreviation(car.distanceUnit)}`,
         );
-      const line = `${item.schedule.name} — ${item.status === 'due' ? t.due : t.upcoming}${details.length ? ` (${details.join(` ${t.or} `)})` : ''}`;
+      const approximate = approximateDueDate(item);
+      const forecast = approximate ? `, ${t.around(date(approximate))}` : '';
+      const line = `${item.schedule.name} — ${item.status === 'due' ? t.due : t.upcoming}${details.length ? ` (${details.join(` ${t.or} `)}${forecast})` : ''}`;
       html.push(`<li>${escapeHtml(line)}</li>`);
       text.push(`- ${line}`);
     }
     html.push('</ul>');
   }
   const settings = `${origin}/settings/notifications`;
+  const footer = items.some((item) => approximateDueDate(item))
+    ? `${t.footer} ${t.forecastFooter}`
+    : t.footer;
   html.push(
-    `<p>${t.footer}</p><p><a href="${escapeHtml(settings)}">${t.settings}</a></p></body></html>`,
+    `<p>${escapeHtml(footer)}</p><p><a href="${escapeHtml(settings)}">${t.settings}</a></p></body></html>`,
   );
-  text.push('', t.footer, `${t.settings}: ${settings}`);
+  text.push('', footer, `${t.settings}: ${settings}`);
   return {
     subject: t.subject(items.length),
     htmlContent: html.join(''),

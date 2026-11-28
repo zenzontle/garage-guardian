@@ -2,7 +2,7 @@
 
 import { useFormatter, useTranslations } from 'next-intl';
 import { distanceAbbreviation, type DistanceUnit } from '@/lib/garage/model';
-import type { DueItem } from '@/lib/maintenance/due';
+import { approximateDueDate, type DueItem } from '@/lib/maintenance/due';
 import type { Currency } from '@/lib/currency/currency';
 
 export function useDisplay() {
@@ -20,9 +20,7 @@ export function useDisplay() {
     });
   const formatDistance = (value: number, unit?: DistanceUnit) =>
     `${number(value)} ${distanceAbbreviation(unit)}`;
-  function dueDescription(item: DueItem) {
-    if (item.status === 'setup') return t('setup');
-    if (item.status === 'completed') return t('completed');
+  function dueTarget(item: DueItem) {
     if (item.dueDate && item.dueMiles !== null)
       return t('combined', {
         date: displayDate(item.dueDate),
@@ -32,6 +30,15 @@ export function useDisplay() {
     if (item.dueMiles !== null)
       return t('distance', { distance: formatDistance(item.dueMiles, item.car.distanceUnit) });
     return '';
+  }
+  function dueDescription(item: DueItem) {
+    if (item.status === 'setup') return t('setup');
+    if (item.status === 'completed') return t('completed');
+    const target = dueTarget(item);
+    const approximate = approximateDueDate(item);
+    return approximate
+      ? t('forecast', { description: target, date: displayDate(approximate) })
+      : target;
   }
   const month = (iso: string) =>
     format.dateTime(new Date(`${iso}-01T00:00:00Z`), {

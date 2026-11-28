@@ -13,7 +13,7 @@
 | ------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | [Vehicles](vehicles.md)                           | Distance units, license plates, archiving, make/model suggestions                               |
 | [Vehicle catalog](vehicle-catalog.md)             | Catalog data source and provenance, regeneration, deployment                                    |
-| [Maintenance schedules](maintenance-schedules.md) | Repeat intervals, first due points, optional visit odometer                                     |
+| [Maintenance schedules](maintenance-schedules.md) | Repeat intervals, first due points, approximate due dates, optional visit odometer              |
 | [Fuel log](fuel.md)                               | Fill-up fields, units, fuel economy, odometer readings, deployment                              |
 | [Other costs](costs.md)                           | Insurance, registration, and other costs; renewal reminders; cost per distance; deployment      |
 | [Multi-currency](multi-currency.md)               | Receipt currencies, conversions, offline account receipts, home-currency reports                |

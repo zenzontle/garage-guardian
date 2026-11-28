@@ -2,6 +2,8 @@ import { expect, it } from 'vitest';
 import { reminderOrigin, renderDigest } from './email';
 import { loadReminderItems } from './maintenance';
 import { reminderStore } from './store.test-helper';
+import { getDueItem } from '@/lib/maintenance/due';
+import { car, schedule } from '@/test/fixtures';
 
 it.each([
   undefined,
@@ -43,3 +45,24 @@ it.each(['en', 'es'] as const)(
     expect(email.textContent).toContain('2026');
   },
 );
+
+it.each([
+  ['en', 'Oil change — coming up (Odometer: 70,000 mi, around Mar 12, 2027)', 'estimated'],
+  ['es', 'Oil change — próximamente (Odómetro: 70.000 mi, hacia el 12 mar 2027)', 'estiman'],
+] as const)('adds approximate dates and explains them in %s', (language, line, footer) => {
+  const item = {
+    ...getDueItem(
+      { ...schedule, intervalMonths: null, firstDueMiles: 70_000 },
+      { ...car, odometer: 69_600 },
+      [],
+      '2026-11-28',
+    ),
+    forecastDate: '2027-03-12',
+  };
+  const email = renderDigest([item], language, 'https://garage.example');
+  expect(email.textContent).toContain(line);
+  expect(email.textContent).toContain(footer);
+  const exact = renderDigest([{ ...item, forecastDate: null }], language, 'https://garage.example');
+  expect(exact.textContent).not.toContain(language === 'en' ? 'around' : 'hacia el');
+  expect(exact.textContent).not.toContain(footer);
+});

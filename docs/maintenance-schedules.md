@@ -8,6 +8,14 @@ Repeat intervals alone are enough. With no first due point, a distance interval 
 
 An explicit first due point is preserved, and linked service visits advance repeats from their recorded date/odometer. Tasks with neither intervals nor a due point still appear in dashboard setup guidance, with links to their vehicle schedules.
 
+## Approximate due dates
+
+Distance targets also show an approximate date, such as "at 70,000 mi, around Mar 12, 2027", on the dashboard, the vehicle page, and in the [weekly reminder email](account-reminders.md). The date comes from how far the vehicle has been driven recently, in its own distance unit, using the dated odometer readings of service visits and [fill-ups](fuel.md). The vehicle's own odometer has no date, so it does not feed the driving rate.
+
+The logic is in `src/lib/maintenance/forecast.ts`. Only readings from the last 12 months count, and readings dated after today are ignored. Several readings on one day count once, using the highest. Consecutive readings that go backward or stand still (a replaced odometer or a typo) are skipped, as are jumps faster than 1,000 miles or 1,600 kilometers a day. The usable pairs must cover at least three reading days and 30 days in total; otherwise there is no estimate, rather than a guess built on one or two readings.
+
+The estimate starts from the highest dated reading, at the average daily distance, and is never before today. If the vehicle's own odometer is higher than every dated reading, the estimate starts from it today instead. Tasks that are already due, completed, or time-only have no approximate date, and estimates more than three years out are not shown. When a task also has a due date, it is due at whichever comes first: if the due date comes first, only that exact date is shown. Approximate dates never change a task's status or when reminders are sent.
+
 ## Logging a task from the dashboard
 
 Due and coming-up tasks under **What needs attention** have a **Log** button. It opens a new service visit for that vehicle with the task already chosen as its completed item, so saving it advances the schedule like any linked visit.
