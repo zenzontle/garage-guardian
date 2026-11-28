@@ -738,7 +738,10 @@
       "missingCategory": "Falta la categoría.",
       "unknownCategory": "La categoría “{value}” no se reconoce, así que se importa como Otro.",
       "invalidRenewal": "La fecha de renovación debe ser válida y posterior a la fecha del gasto.",
-      "textTooLong": "{field} tiene más de {max} caracteres."
+      "textTooLong": "{field} tiene más de {max} caracteres.",
+      "currencyMismatch": "“{value}” no está en {currency}, la moneda de esta fila.",
+      "volumeUnitMismatch": "La unidad de volumen “{value}” no coincide con la columna “{header}”.",
+      "itemNameTooLong": "Un nombre de servicio tiene más de {max} caracteres."
     }
   }
 }

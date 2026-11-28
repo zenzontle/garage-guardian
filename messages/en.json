@@ -738,7 +738,10 @@
       "missingCategory": "The category is missing.",
       "unknownCategory": "The category “{value}” isn’t known, so it is imported as Other.",
       "invalidRenewal": "The renewal date must be a valid date after the cost date.",
-      "textTooLong": "{field} is longer than {max} characters."
+      "textTooLong": "{field} is longer than {max} characters.",
+      "currencyMismatch": "“{value}” is not in {currency}, the currency of this row.",
+      "volumeUnitMismatch": "The volume unit “{value}” doesn’t match the column “{header}”.",
+      "itemNameTooLong": "A service name is longer than {max} characters."
     }
   }
 }

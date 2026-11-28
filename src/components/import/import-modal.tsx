@@ -58,7 +58,8 @@ export function ImportModal<K extends ImportKind>({
   const [mapping, setMapping] = useState<ImportMapping>({});
   const [carChoice, setCarChoice] = useState('');
   const [currency, setCurrency] = useState<Currency>(homeCurrency);
-  const [dateOrder, setDateOrder] = useState<DateOrder>(locale === 'es' ? 'dmy' : 'mdy');
+  const localeOrder: DateOrder = locale === 'es' ? 'dmy' : 'mdy';
+  const [dateOrder, setDateOrder] = useState<DateOrder>(localeOrder);
   const [includeDuplicates, setIncludeDuplicates] = useState(false);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<{ count: number; total: number } | null>(null);
@@ -111,7 +112,8 @@ export function ImportModal<K extends ImportKind>({
     );
     const dates =
       detected.date === undefined ? [] : table.slice(1).map((row) => row[detected.date!] ?? '');
-    setDateOrder((current) => detectDateOrder(dates) ?? current);
+    // Each file is read on its own: a previous file's order is not carried over.
+    setDateOrder(detectDateOrder(dates) ?? localeOrder);
   }
 
   const preview = useMemo(

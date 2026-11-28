@@ -83,6 +83,8 @@ export type ImportRecord = { visit: Visit; fuel: FuelEntry; expense: Expense };
 export const MAX_IMPORT_ROWS = 2000;
 const TEXT_MAX_LENGTH = 100;
 const NOTES_MAX_LENGTH = 2000;
+// The visit form's limit for a service name.
+const ITEM_NAME_MAX_LENGTH = 80;
 
 export type ImportIssueCode =
   | 'missingDate'
@@ -96,12 +98,15 @@ export type ImportIssueCode =
   | 'invalidAmount'
   | 'missingAmount'
   | 'invalidCurrency'
+  | 'currencyMismatch'
   | 'missingItems'
+  | 'itemNameTooLong'
   | 'itemCostsTooHigh'
   | 'invalidItemCosts'
   | 'invalidVolume'
   | 'missingVolume'
   | 'invalidVolumeUnit'
+  | 'volumeUnitMismatch'
   | 'missingFuelPrice'
   | 'invalidUnitPrice'
   | 'unknownFuelType'
@@ -222,21 +227,26 @@ const HEADER_ALIASES: Record<ImportField, readonly string[]> = {
  * unit price even though both also contain words of other fields.
  */
 export function autoMap(kind: ImportKind, headers: string[]): ImportMapping {
-  const normalized = headers.map(normalizeHeader);
   const mapping: ImportMapping = {};
   const used = new Set<number>();
   const fields: readonly ImportField[] = IMPORT_FIELDS[kind];
-  // Exact matches first, in alias priority, so a weaker alias never steals an exact column.
   const ranks = Math.max(...fields.map((field) => HEADER_ALIASES[field].length));
-  for (let rank = 0; rank < ranks; rank++) {
-    for (const field of fields) {
-      if (mapping[field] !== undefined) continue;
-      const alias = HEADER_ALIASES[field][rank];
-      if (alias === undefined) continue;
-      const column = normalized.findIndex((header, index) => !used.has(index) && header === alias);
-      if (column === -1) continue;
-      mapping[field] = column;
-      used.add(column);
+  // Whole names first, then names without a parenthesized unit or currency ("Total (MXN)").
+  for (const names of [
+    headers.map(normalizeHeader),
+    headers.map((header) => normalizeHeader(header.replace(/\([^)]*\)/g, ' '))),
+  ]) {
+    // Alias priority across fields, so a weaker alias never steals an exact column.
+    for (let rank = 0; rank < ranks; rank++) {
+      for (const field of fields) {
+        if (mapping[field] !== undefined) continue;
+        const alias = HEADER_ALIASES[field][rank];
+        if (alias === undefined) continue;
+        const column = names.findIndex((name, index) => !used.has(index) && name === alias);
+        if (column === -1) continue;
+        mapping[field] = column;
+        used.add(column);
+      }
     }
   }
   return mapping;
@@ -283,6 +293,37 @@ export function plainDecimal(value: string): string | null {
   if (/^\d{1,3}(,\d{3})+(\.\d*)?$/.test(text)) return text.replaceAll(',', '');
   return /^\d+(\.\d*)?$|^\.\d+$/.test(text) ? (text.startsWith('.') ? `0${text}` : text) : null;
 }
+
+/**
+ * The currency an amount names itself, as a symbol (US$, MX$, CA$, C$) or a trailing code. A bare
+ * $ names none: it is used for dollars and pesos alike.
+ */
+export function amountCurrency(value: string): Currency | null {
+  const text = value.trim().toUpperCase();
+  const prefix = /^(US|MX|CA|C)\$/.exec(text)?.[1];
+  if (prefix) return prefix === 'US' ? 'USD' : prefix === 'MX' ? 'MXN' : 'CAD';
+  const code = /\s*(USD|MXN|CAD)$/.exec(text)?.[1];
+  return code && isCurrency(code) ? code : null;
+}
+
+/** A unit named by a column header, such as "Liters" or "Odometer (km)". */
+function headerUnit<T>(header: string, parse: (value: string) => T | null): T | null {
+  const text = normalizeHeader(header);
+  if (!text) return null;
+  const whole = parse(text);
+  if (whole) return whole;
+  for (const word of text.split(' ')) {
+    const unit = parse(word);
+    if (unit) return unit;
+  }
+  return null;
+}
+
+const headerCurrency = (header: string) =>
+  headerUnit(header, (word) => {
+    const code = word.toUpperCase();
+    return isCurrency(code) ? code : null;
+  });
 
 function parseOdometer(value: string): number | null {
   const text = plainDecimal(value);
@@ -400,7 +441,14 @@ const characters = (value: string) => Array.from(value).length;
 const carKey = (name: string) => name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 
 type Cells = (field: ImportField) => string;
-type RowContext = { line: number; cells: Cells; issues: ImportIssue[]; options: ImportOptions };
+type RowContext = {
+  line: number;
+  cells: Cells;
+  /** The header of the column mapped to a field, which may name a unit or currency. */
+  header: Cells;
+  issues: ImportIssue[];
+  options: ImportOptions;
+};
 
 function readCar({ cells, issues, options }: RowContext, cars: Car[], mapped: boolean): Car | null {
   if (options.carId) {
@@ -432,24 +480,46 @@ function readDate({ cells, issues, options }: RowContext, field: 'date' | 'renew
   return date;
 }
 
-function readCurrency({ cells, issues, options }: RowContext): Currency {
-  const text = cells('currency').trim().toUpperCase();
-  if (!text) return options.currency;
-  if (isCurrency(text)) return text;
-  issues.push({ code: 'invalidCurrency', values: { value: cells('currency').trim() } });
-  return options.currency;
+/**
+ * The row's currency: its currency column, else a currency its amounts or their headers name
+ * (MX$250, "Total (MXN)"), else the import's default. Amounts naming another currency than the
+ * row's are errors rather than saved in the wrong currency.
+ */
+function readCurrency(
+  { cells, header, issues, options }: RowContext,
+  amounts: readonly ImportField[],
+): Currency {
+  const text = cells('currency').trim();
+  let column: Currency | null = null;
+  if (text) {
+    if (isCurrency(text.toUpperCase())) column = text.toUpperCase() as Currency;
+    else issues.push({ code: 'invalidCurrency', values: { value: text } });
+  }
+  const named = amounts.flatMap((field) => {
+    const value = cells(field).trim();
+    const currency = value ? (amountCurrency(value) ?? headerCurrency(header(field))) : null;
+    return currency ? [{ value, currency }] : [];
+  });
+  const currency = column ?? named[0]?.currency ?? options.currency;
+  const conflict = named.find((entry) => entry.currency !== currency);
+  if (conflict)
+    issues.push({ code: 'currencyMismatch', values: { value: conflict.value, currency } });
+  return currency;
 }
 
 function readOdometer(context: RowContext, car: Car | null, required: boolean): number | null {
-  const { cells, issues } = context;
+  const { cells, header, issues } = context;
   const text = cells('odometer').trim();
+  // Readings are never converted: a unit in the cell or the header must be the vehicle's.
   const unitText = cells('distanceUnit').trim();
-  if (car && unitText) {
-    const unit = parseDistanceUnit(unitText);
+  const named =
+    unitText || (headerUnit(header('odometer'), parseDistanceUnit) ? header('odometer') : '');
+  if (car && named) {
+    const unit = unitText ? parseDistanceUnit(unitText) : headerUnit(named, parseDistanceUnit);
     if (unit !== car.distanceUnit)
       issues.push({
         code: 'distanceUnitMismatch',
-        values: { value: unitText, unit: distanceAbbreviation(car.distanceUnit) },
+        values: { value: named.trim(), unit: distanceAbbreviation(car.distanceUnit) },
       });
   }
   if (!text) {
@@ -512,6 +582,8 @@ function buildVisit(
   const odometer = readOdometer(context, car, false);
   const names = splitItems(context.cells('items'));
   if (!names.length) issues.push({ code: 'missingItems' });
+  const longName = names.find((name) => characters(name) > ITEM_NAME_MAX_LENGTH);
+  if (longName) issues.push({ code: 'itemNameTooLong', values: { max: ITEM_NAME_MAX_LENGTH } });
   // An item named like one of the vehicle's active tasks completes that task, as in the form.
   const schedules = snapshot.schedules.filter(
     (item: ScheduleItem) => item.carId === car?.id && item.isActive,
@@ -530,7 +602,7 @@ function buildVisit(
   if (total === null) issues.push({ code: 'invalidAmount' });
   else if (items.reduce((sum, item) => sum + (item.costCents ?? 0), 0) > total)
     issues.push({ code: 'itemCostsTooHigh' });
-  const currency = readCurrency(context);
+  const currency = readCurrency(context, ['total', 'itemCosts']);
   const provider = readText(context, 'provider', TEXT_MAX_LENGTH, 'provider');
   const notes = readText(context, 'notes', NOTES_MAX_LENGTH, 'notes');
   if (!car || !date || total === null || issues.length) return null;
@@ -566,8 +638,17 @@ function buildFuelEntry(
   else if (volumeMilli === null || volumeMilli < 1 || volumeMilli > MAX_VOLUME_MILLI)
     issues.push({ code: 'invalidVolume' });
   const unitText = cells('volumeUnit').trim();
-  const volumeUnit = unitText ? parseVolumeUnit(unitText) : defaultVolumeUnit(car ?? undefined);
-  if (!volumeUnit) issues.push({ code: 'invalidVolumeUnit', values: { value: unitText } });
+  // A unit cell wins, then a unit in the volume header ("Liters"), then the vehicle's default.
+  const namedUnit = headerUnit(context.header('volume'), parseVolumeUnit);
+  const cellUnit = unitText ? parseVolumeUnit(unitText) : null;
+  const volumeUnit = unitText ? cellUnit : (namedUnit ?? defaultVolumeUnit(car ?? undefined));
+  if (unitText && !cellUnit)
+    issues.push({ code: 'invalidVolumeUnit', values: { value: unitText } });
+  else if (cellUnit && namedUnit && cellUnit !== namedUnit)
+    issues.push({
+      code: 'volumeUnitMismatch',
+      values: { value: unitText, header: context.header('volume').trim() },
+    });
   // Either price or total is enough; the other is computed like in the fill-up form.
   const priceText = cells('unitPrice').trim();
   const priceDecimal = priceText ? plainDecimal(priceText) : null;
@@ -595,7 +676,7 @@ function buildFuelEntry(
   const isFullTank = parseFlag(cells('fullTank'), true);
   const missedPrevious = parseFlag(cells('missedPrevious'), false);
   if (isFullTank === null || missedPrevious === null) issues.push({ code: 'invalidFlag' });
-  const currency = readCurrency(context);
+  const currency = readCurrency(context, ['unitPrice', 'total']);
   const station = readText(context, 'station', STATION_MAX_LENGTH, 'station');
   const notes = readText(context, 'notes', FUEL_NOTES_MAX_LENGTH, 'notes');
   if (
@@ -652,14 +733,21 @@ function buildExpense(
     else {
       // Kept as an "Other" cost, with the file's category as its description.
       issues.push({ code: 'unknownCategory', values: { value: categoryText } });
-      if (!description) description = categoryText.slice(0, EXPENSE_DESCRIPTION_MAX_LENGTH);
+      if (!description) {
+        description = categoryText;
+        if (characters(description) > EXPENSE_DESCRIPTION_MAX_LENGTH)
+          issues.push({
+            code: 'textTooLong',
+            values: { field: 'description', max: EXPENSE_DESCRIPTION_MAX_LENGTH },
+          });
+      }
     }
   }
   const totalText = cells('total').trim();
   const total = totalText ? parseMoney(totalText) : null;
   if (!totalText) issues.push({ code: 'missingAmount' });
   else if (total === null) issues.push({ code: 'invalidAmount' });
-  const currency = readCurrency(context);
+  const currency = readCurrency(context, ['total']);
   const renewsOn = readDate(context, 'renewsOn');
   if (renewsOn && date && renewsOn <= date) issues.push({ code: 'invalidRenewal' });
   const notes = readText(context, 'notes', EXPENSE_NOTES_MAX_LENGTH, 'notes');
@@ -722,6 +810,10 @@ export function buildImportPreview<K extends ImportKind>(
     mapping: ImportMapping,
     createdAt: string,
   ) => ImportRecord[K] | null;
+  const header: Cells = (field) => {
+    const column = mapping[field];
+    return column === undefined ? '' : (table[0]?.[column] ?? '');
+  };
   const rows: ImportRow<ImportRecord[K]>[] = body.map((cells, index) => {
     const read: Cells = (field) => {
       const column = mapping[field];
@@ -730,7 +822,7 @@ export function buildImportPreview<K extends ImportKind>(
     const issues: ImportIssue[] = [];
     const createdAt = new Date(options.now + index).toISOString();
     const record = build(
-      { line: index + 2, cells: read, issues, options },
+      { line: index + 2, cells: read, header, issues, options },
       snapshot,
       mapping,
       createdAt,

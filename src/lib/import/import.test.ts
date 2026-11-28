@@ -383,6 +383,92 @@ describe('buildImportPreview', () => {
     });
   });
 
+  describe('currencies named in amounts', () => {
+    const header = 'Date,Car,Category,Amount';
+
+    it('uses a currency the amount or its header names when the row has none', () => {
+      const result = preview(
+        'expense',
+        `${header}\n2026-09-01,Daily driver,Tolls,500 MXN\n2026-09-02,Daily driver,Tolls,MX$250\n2026-09-03,Daily driver,Tolls,$20`,
+      );
+      expect(recordsToImport(result, false).map((record) => record.currency)).toEqual([
+        'MXN',
+        'MXN',
+        'USD',
+      ]);
+      const named = preview(
+        'expense',
+        'Date,Car,Category,Total (CAD)\n2026-09-01,Daily driver,Tolls,5',
+      );
+      expect(recordsToImport(named, false)[0]).toMatchObject({
+        currency: 'CAD',
+        totalCostCents: 500,
+      });
+    });
+
+    it('rejects amounts in another currency than the row', () => {
+      const result = preview(
+        'visit',
+        'Date,Car,Services,Total,Currency\n2026-09-01,Daily driver,Wipers,12.00 CAD,USD',
+      );
+      expect(result.rows[0].issues).toEqual([
+        { code: 'currencyMismatch', values: { value: '12.00 CAD', currency: 'USD' } },
+      ]);
+      const fuel = preview(
+        'fuel',
+        'Date,Car,Odometer,Volume,Price per unit,Total\n2026-09-01,Daily driver,100,10,US$3,MX$30',
+      );
+      expect(issueCodes(fuel)).toEqual([['currencyMismatch']]);
+    });
+  });
+
+  describe('units named in headers', () => {
+    it('uses the volume unit a header names, and rejects a conflicting unit cell', () => {
+      const result = preview(
+        'fuel',
+        [
+          'Date,Car,Odometer,Liters,Total,Volume unit',
+          '2026-09-01,Daily driver,100,40,60,',
+          '2026-09-02,Daily driver,200,40,60,gal',
+        ].join('\n'),
+      );
+      expect(result.rows[0].record).toMatchObject({ volumeUnit: 'liters', volumeMilli: 40000 });
+      expect(result.rows[1].issues).toEqual([
+        { code: 'volumeUnitMismatch', values: { value: 'gal', header: 'Liters' } },
+      ]);
+    });
+
+    it('rejects an odometer header in another unit than the vehicle', () => {
+      const result = preview(
+        'fuel',
+        'Date,Car,Odometer (km),Gallons,Total\n2026-09-01,Daily driver,100,10,30',
+      );
+      expect(result.rows[0].issues).toEqual([
+        { code: 'distanceUnitMismatch', values: { value: 'Odometer (km)', unit: 'mi' } },
+      ]);
+      const plain = preview(
+        'fuel',
+        'Date,Car,Miles,Gallons,Total\n2026-09-01,Daily driver,100,10,30',
+      );
+      expect(plain.ready).toBe(1);
+    });
+  });
+
+  it('rejects long service names and unknown categories instead of cutting them', () => {
+    const visitResult = preview(
+      'visit',
+      `Date,Car,Services\n2026-09-01,Daily driver,${'x'.repeat(81)}`,
+    );
+    expect(issueCodes(visitResult)).toEqual([['itemNameTooLong']]);
+    const category = `${'c'.repeat(100)}😀`;
+    const costs = preview(
+      'expense',
+      `Date,Car,Category,Amount\n2026-09-01,Daily driver,${category},5`,
+    );
+    expect(issueCodes(costs)).toEqual([['unknownCategory', 'textTooLong']]);
+    expect(costs.rows[0].record).toBeNull();
+  });
+
   it('reads at most the row limit and counts the rest as skipped', () => {
     const rows = Array.from(
       { length: MAX_IMPORT_ROWS + 3 },

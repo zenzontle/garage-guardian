@@ -118,3 +118,17 @@ it('reports how many records were saved when an import stops', async () => {
     '1 of 2 records were saved before the import stopped.',
   );
 });
+
+it('detects the date order again for each file', async () => {
+  const { onImport } = renderModal();
+  await upload('Date,Car,Category,Amount\n25/03/2026,Daily driver,Tolls,1');
+  const order = () =>
+    (screen.getByRole('combobox', { name: 'Dates written like 3/4/2026' }) as HTMLSelectElement)
+      .value;
+  expect(order()).toBe('dmy');
+  await upload('Date,Car,Category,Amount\n03/04/2026,Daily driver,Tolls,1');
+  expect(order()).toBe('mdy');
+  await userEvent.click(screen.getByRole('button', { name: 'Import 1 record' }));
+  await waitFor(() => expect(onImport).toHaveBeenCalled());
+  expect(onImport.mock.calls[0][0]).toMatchObject([{ date: '2026-03-04' }]);
+});
